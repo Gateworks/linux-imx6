@@ -1,0 +1,1539 @@
+/*
+ * Copyright (C) 2013 Gateworks Corporation All Rights Reserved.
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+
+ * You should have received a copy of the GNU General Public License along
+ * with this program; if not, write to the Free Software Foundation, Inc.,
+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+ */
+#include <linux/types.h>
+#include <linux/sched.h>
+#include <linux/delay.h>
+#include <linux/pm.h>
+#include <linux/interrupt.h>
+#include <linux/irq.h>
+#include <linux/init.h>
+#include <linux/input.h>
+#include <linux/nodemask.h>
+#include <linux/clk.h>
+#include <linux/platform_device.h>
+#include <linux/fsl_devices.h>
+#include <linux/spi/spi.h>
+#include <linux/spi/flash.h>
+#include <linux/i2c.h>
+#include <linux/i2c/pca953x.h>
+#include <linux/ata.h>
+#include <linux/mtd/mtd.h>
+#include <linux/mtd/map.h>
+#include <linux/mtd/partitions.h>
+#include <linux/regulator/consumer.h>
+#include <linux/pmic_external.h>
+#include <linux/pmic_status.h>
+#include <linux/ipu.h>
+#include <linux/mxcfb.h>
+#include <linux/pwm_backlight.h>
+#include <linux/fec.h>
+#include <linux/memblock.h>
+#include <linux/gpio.h>
+#include <linux/etherdevice.h>
+#include <linux/regulator/anatop-regulator.h>
+#include <linux/regulator/consumer.h>
+#include <linux/regulator/machine.h>
+#include <linux/regulator/fixed.h>
+#include <linux/mfd/mxc-hdmi-core.h>
+#include <linux/pci.h>
+#include <linux/leds.h>
+#include <linux/leds_pwm.h>
+
+#include <mach/common.h>
+#include <mach/hardware.h>
+#include <mach/mxc_dvfs.h>
+#include <mach/memory.h>
+#include <mach/iomux-mx6q.h>
+#include <mach/imx-uart.h>
+#include <mach/viv_gpu.h>
+#include <mach/ahci_sata.h>
+#include <mach/ipu-v3.h>
+#include <mach/mxc_hdmi.h>
+#include <mach/mxc_asrc.h>
+#include <mach/mipi_dsi.h>
+
+#include <asm/irq.h>
+#include <asm/setup.h>
+#include <asm/mach-types.h>
+#include <asm/mach/arch.h>
+#include <asm/mach/time.h>
+
+#include "usb.h"
+#include "devices-imx6q.h"
+#include "crm_regs.h"
+#include "cpu_op-mx6.h"
+
+/* GPIO pins */
+#define MX6Q_VENTANA_VIDDEC_IRQ     IMX_GPIO_NR(1, 2)
+#define MX6Q_VENTANA_GPS_PPS        IMX_GPIO_NR(1, 5)
+#define MX6Q_VENTANA_HDMIIN_IRQ     IMX_GPIO_NR(1, 7)
+#define MX6Q_VENTANA_PFUZE_INT      IMX_GPIO_NR(1, 8)
+#define MX6Q_VENTANA_MX6_DIO0       IMX_GPIO_NR(1, 9)
+#define MX6Q_VENTANA_LVDS_BACK_EN   IMX_GPIO_NR(1, 10)
+#define MX6Q_VENTANA_MIPI_BACK_EN   IMX_GPIO_NR(1, 11)
+#define MX6Q_VENTANA_USB_HUB_RESET  IMX_GPIO_NR(1, 16)
+#define MX6Q_VENTANA_MX6_DIO1       IMX_GPIO_NR(1, 19)
+#define MX6Q_VENTANA_PCIE_CLKEN     IMX_GPIO_NR(1, 20)
+#define MX6Q_VENTANA_MIPI_DIO       IMX_GPIO_NR(1, 21)
+#define MX6Q_VENTANA_PCIE_SW_IRQ    IMX_GPIO_NR(1, 28)
+#define MX6Q_VENTANA_PCIE_RESET     IMX_GPIO_NR(1, 29)
+#define MX6Q_VENTANA_RGMII_RST      IMX_GPIO_NR(1, 30)
+#define MX6Q_VENTANA_MSATA_SEL      IMX_GPIO_NR(2, 8)
+#define MX6Q_VENTANA_MX6_DIO2       IMX_GPIO_NR(2, 9)
+#define MX6Q_VENTANA_MX6_DIO3       IMX_GPIO_NR(2, 10)
+#define MX6Q_VENTANA_UART2_EN       IMX_GPIO_NR(2, 11)
+#define MX6Q_VENTANA_RS485_TXEN     IMX_GPIO_NR(3, 24)
+#define MX6Q_VENTANA_I2CEXP_EN      IMX_GPIO_NR(4, 5)
+#define MX6Q_VENTANA_PANLEDG        IMX_GPIO_NR(4, 6)
+#define MX6Q_VENTANA_MEZZ_DIO0      IMX_GPIO_NR(4, 7)
+#define MX6Q_VENTANA_MEZZ_DIO1      IMX_GPIO_NR(4, 9)
+#define MX6Q_VENTANA_PANLEDR        IMX_GPIO_NR(4, 10)
+#define MX6Q_VENTANA_LOCLED         IMX_GPIO_NR(4, 15)
+#define MX6Q_VENTANA_ECSPI1_CS1     IMX_GPIO_NR(3, 19)
+#define MX6Q_VENTANA_USB_OTG_PWR    IMX_GPIO_NR(3, 22)
+#define MX6Q_VENTANA_SD3_CD         IMX_GPIO_NR(7, 0)
+#define MX6Q_VENTANA_CAP_TCH_INT    IMX_GPIO_NR(7, 12)
+#define MX6Q_VENTANA_ACCEL_IRQ      IMX_GPIO_NR(7, 13)
+#define MX6Q_VENTANA_DIO0_PWM
+#define MX6Q_VENTANA_DIO1_PWM
+
+void __init early_console_setup(unsigned long base, struct clk *clk);
+static struct clk *sata_clk;
+
+extern char *gp_reg_id;
+extern char *soc_reg_id;
+static int caam_enabled;
+
+#define MX6Q_VENTANA_SD1_CMD_PADCFG (PAD_CTL_DSE_240ohm)
+#define MX6Q_VENTANA_DISP0_DIO_PADCFG (PAD_CTL_DSE_240ohm)
+
+static iomux_v3_cfg_t mx6q_ventana_pads[] = {
+	/* AUDMUX4 */
+	MX6Q_PAD_SD2_DAT0__AUDMUX_AUD4_RXD,
+	MX6Q_PAD_SD2_DAT3__AUDMUX_AUD4_TXC,
+	MX6Q_PAD_SD2_DAT2__AUDMUX_AUD4_TXD,
+	MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS,
+
+	/* AUDMUX5 */
+	MX6Q_PAD_EIM_D25__AUDMUX_AUD5_RXC,
+	MX6Q_PAD_DISP0_DAT18__AUDMUX_AUD5_TXFS,
+	MX6Q_PAD_DISP0_DAT19__AUDMUX_AUD5_RXD,
+
+	/* CCM */
+	MX6Q_PAD_GPIO_0__CCM_CLKO,     /* SGTL500 sys_mckl */
+	MX6Q_PAD_NANDF_CS2__CCM_CLKO2, /* HDMI Receiver AUD5_MCLK */
+
+	/* ECSPI1 */
+	MX6Q_PAD_EIM_D17__ECSPI1_MISO,
+	MX6Q_PAD_EIM_D18__ECSPI1_MOSI,
+	MX6Q_PAD_EIM_D16__ECSPI1_SCLK,
+	MX6Q_PAD_EIM_D19__GPIO_3_19,	 /* CS1 */
+
+	/* ENET */
+	MX6Q_PAD_ENET_MDIO__ENET_MDIO,
+	MX6Q_PAD_ENET_MDC__ENET_MDC,
+	MX6Q_PAD_RGMII_TXC__ENET_RGMII_TXC,
+	MX6Q_PAD_RGMII_TD0__ENET_RGMII_TD0,
+	MX6Q_PAD_RGMII_TD1__ENET_RGMII_TD1,
+	MX6Q_PAD_RGMII_TD2__ENET_RGMII_TD2,
+	MX6Q_PAD_RGMII_TD3__ENET_RGMII_TD3,
+	MX6Q_PAD_RGMII_TX_CTL__ENET_RGMII_TX_CTL,
+	MX6Q_PAD_ENET_REF_CLK__ENET_TX_CLK,
+	MX6Q_PAD_RGMII_RXC__ENET_RGMII_RXC,
+	MX6Q_PAD_RGMII_RD0__ENET_RGMII_RD0,
+	MX6Q_PAD_RGMII_RD1__ENET_RGMII_RD1,
+	MX6Q_PAD_RGMII_RD2__ENET_RGMII_RD2,
+	MX6Q_PAD_RGMII_RD3__ENET_RGMII_RD3,
+	MX6Q_PAD_RGMII_RX_CTL__ENET_RGMII_RX_CTL,
+	MX6Q_PAD_ENET_TXD0__GPIO_1_30,	/* PHY RST# */
+
+	/* I2C1: GSC */
+	MX6Q_PAD_EIM_D21__I2C1_SCL,
+	MX6Q_PAD_EIM_D28__I2C1_SDA,
+
+	/* I2C2: PFUSE, PCIe Switch/Clock/Mezz */
+	MX6Q_PAD_KEY_COL3__I2C2_SCL,
+	MX6Q_PAD_KEY_ROW3__I2C2_SDA,
+
+	/* I2C3: Accel, Audio Codec, Video Dec, Video Enc, MIPI, LVDS, DIO */
+	MX6Q_PAD_GPIO_3__I2C3_SCL,
+	MX6Q_PAD_GPIO_6__I2C3_SDA,
+
+	/* UART1: RS485  */
+	MX6Q_PAD_SD3_DAT7__UART1_TXD,
+	MX6Q_PAD_SD3_DAT6__UART1_RXD,
+//	MX6Q_PAD_EIM_D24__UART1_DTR,
+	MX6Q_PAD_EIM_D24__GPIO_3_24,
+
+	/* UART2: Console */
+	MX6Q_PAD_SD4_DAT7__UART2_TXD,
+	MX6Q_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART3: GPS */
+	MX6Q_PAD_SD4_CMD__UART3_TXD,
+	MX6Q_PAD_SD4_CLK__UART3_RXD,
+
+	/* USBOTG ID pin */
+	MX6Q_PAD_GPIO_1__USBOTG_ID,
+
+	/* USBOTG OC pin */
+	MX6Q_PAD_KEY_COL4__USBOH3_USBOTG_OC,
+
+	/* USBOTG PWR EN */
+	MX6Q_PAD_EIM_D22__GPIO_3_22,
+
+	/* USDHC3 */
+	MX6Q_PAD_SD3_CLK__USDHC3_CLK_50MHZ,
+	MX6Q_PAD_SD3_CMD__USDHC3_CMD_50MHZ,
+	MX6Q_PAD_SD3_DAT0__USDHC3_DAT0_50MHZ,
+	MX6Q_PAD_SD3_DAT1__USDHC3_DAT1_50MHZ,
+	MX6Q_PAD_SD3_DAT2__USDHC3_DAT2_50MHZ,
+	MX6Q_PAD_SD3_DAT3__USDHC3_DAT3_50MHZ,
+	MX6Q_PAD_SD3_DAT5__GPIO_7_0,		/* CD */
+
+	/* PCI Reset */
+	MX6Q_PAD_ENET_TXD1__GPIO_1_29,
+
+	/* Touchscreen IRQ */
+	MX6Q_PAD_GPIO_17__GPIO_7_12,
+
+	/* LVDS Backlight */
+	MX6Q_PAD_SD2_CLK__GPIO_1_10, // CABC_EN
+	NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO, MX6Q_VENTANA_SD1_CMD_PADCFG), // Backlight brightness
+
+	/* MIPI */
+	MX6Q_PAD_SD1_DAT3__GPIO_1_21, // MIPI GP DIO	
+	MX6Q_PAD_SD2_CMD__GPIO_1_11,  // MIPI BK_EN
+	MX6Q_PAD_SD1_DAT1__PWM3_PWMO, // Backlight brightness
+
+	/* MX6_DIO0 */
+#ifndef MX6Q_VENTANA_DIO0_PWM
+  MX6Q_PAD_GPIO_9__GPIO_1_9,
+#else
+  MX6Q_PAD_GPIO_9__PWM1_PWMO,
+#endif
+	/* MX6_DIO1 */
+#ifndef MX6Q_VENTANA_DIO1_PWM
+  MX6Q_PAD_SD1_DAT2__GPIO_1_19,
+#else
+  MX6Q_PAD_SD1_DAT2__PWM2_PWMO,
+#endif
+	/* MX6_DIO2 */
+  MX6Q_PAD_SD4_DAT1__GPIO_2_9,
+  //MX6Q_PAD_SD4_DAT1__PWM3_PWMO,
+	/* MX6_DIO3 */
+  MX6Q_PAD_SD4_DAT2__GPIO_2_10,
+  //MX6Q_PAD_SD4_DAT2__PWM4_PWMO,
+
+	/* Video Decoder */
+	MX6Q_PAD_GPIO_2__GPIO_1_2, // IRQ
+
+	/* GPS PPS */
+	MX6Q_PAD_GPIO_5__GPIO_1_5,
+
+	/* Digital Video Decoder (HDMI IN) */
+	MX6Q_PAD_GPIO_7__GPIO_1_7, // IRQ
+
+	/* DIOI2C Disable */
+	MX6Q_PAD_GPIO_19__GPIO_4_5,
+
+	/* DISPLAY */
+	MX6Q_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK,
+//	MX6Q_PAD_DI0_PIN15__IPU1_DI0_PIN15,		/* DE */
+//	MX6Q_PAD_DI0_PIN2__IPU1_DI0_PIN2,		/* HSync */
+	NEW_PAD_CTRL(MX6Q_PAD_DI0_PIN2__IPU1_DI0_PIN2, MX6Q_VENTANA_DISP0_DIO_PADCFG),
+//	MX6Q_PAD_DI0_PIN3__IPU1_DI0_PIN3,		/* VSync */
+	NEW_PAD_CTRL(MX6Q_PAD_DI0_PIN3__IPU1_DI0_PIN3, MX6Q_VENTANA_DISP0_DIO_PADCFG),
+	MX6Q_PAD_DISP0_DAT0__IPU1_DISP0_DAT_0,
+	MX6Q_PAD_DISP0_DAT1__IPU1_DISP0_DAT_1,
+	MX6Q_PAD_DISP0_DAT2__IPU1_DISP0_DAT_2,
+	MX6Q_PAD_DISP0_DAT3__IPU1_DISP0_DAT_3,
+	MX6Q_PAD_DISP0_DAT4__IPU1_DISP0_DAT_4,
+	MX6Q_PAD_DISP0_DAT5__IPU1_DISP0_DAT_5,
+	MX6Q_PAD_DISP0_DAT6__IPU1_DISP0_DAT_6,
+	MX6Q_PAD_DISP0_DAT7__IPU1_DISP0_DAT_7,
+	MX6Q_PAD_DISP0_DAT8__IPU1_DISP0_DAT_8,
+	MX6Q_PAD_DISP0_DAT9__IPU1_DISP0_DAT_9,
+	MX6Q_PAD_DISP0_DAT10__IPU1_DISP0_DAT_10,
+	MX6Q_PAD_DISP0_DAT11__IPU1_DISP0_DAT_11,
+	MX6Q_PAD_DISP0_DAT12__IPU1_DISP0_DAT_12,
+	MX6Q_PAD_DISP0_DAT13__IPU1_DISP0_DAT_13,
+	MX6Q_PAD_DISP0_DAT14__IPU1_DISP0_DAT_14,
+	MX6Q_PAD_DISP0_DAT15__IPU1_DISP0_DAT_15,
+};
+
+#if 0
+// TODO Digital Video in
+static iomux_v3_cfg_t mx6q_ventana_csi0_sensor_pads[] = {
+	/* IPU1_CSI0 HDMI receiver (Digital Video In) */
+	MX6Q_PAD_CSI0_DAT4__IPU1_CSI0_D_4,
+	MX6Q_PAD_CSI0_DAT5__IPU1_CSI0_D_5,
+	MX6Q_PAD_CSI0_DAT6__IPU1_CSI0_D_6,
+	MX6Q_PAD_CSI0_DAT7__IPU1_CSI0_D_7,
+	MX6Q_PAD_CSI0_DAT8__IPU1_CSI0_D_8,
+	MX6Q_PAD_CSI0_DAT9__IPU1_CSI0_D_9,
+	MX6Q_PAD_CSI0_DAT10__IPU1_CSI0_D_10,
+	MX6Q_PAD_CSI0_DAT11__IPU1_CSI0_D_11,
+	MX6Q_PAD_CSI0_DAT12__IPU1_CSI0_D_12,
+	MX6Q_PAD_CSI0_DAT13__IPU1_CSI0_D_13,
+	MX6Q_PAD_CSI0_DAT14__IPU1_CSI0_D_14,
+	MX6Q_PAD_CSI0_DAT15__IPU1_CSI0_D_15,
+	MX6Q_PAD_CSI0_DAT16__IPU1_CSI0_D_16,
+	MX6Q_PAD_CSI0_DAT17__IPU1_CSI0_D_17,
+	MX6Q_PAD_CSI0_DAT18__IPU1_CSI0_D_18,
+	MX6Q_PAD_CSI0_DAT19__IPU1_CSI0_D_19,
+
+	MX6Q_PAD_CSI0_DATA_EN__IPU1_CSI0_DATA_EN,
+	MX6Q_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC,
+	MX6Q_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK,
+	MX6Q_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC,
+};
+#endif
+
+static iomux_v3_cfg_t mx6q_ventana_csi1_sensor_pads[] = {
+	/* IPU2_CSI1 Analog Video Decoder (Analog Video In - ADV7180) */
+	MX6Q_PAD_EIM_DA2__IPU2_CSI1_D_7,
+	MX6Q_PAD_EIM_DA3__IPU2_CSI1_D_6,
+	MX6Q_PAD_EIM_DA4__IPU2_CSI1_D_5,
+	MX6Q_PAD_EIM_DA5__IPU2_CSI1_D_4,
+	MX6Q_PAD_EIM_DA6__IPU2_CSI1_D_3,
+	MX6Q_PAD_EIM_DA7__IPU2_CSI1_D_2,
+	MX6Q_PAD_EIM_DA8__IPU2_CSI1_D_1,
+	MX6Q_PAD_EIM_DA9__IPU2_CSI1_D_0,
+
+	MX6Q_PAD_EIM_D29__IPU2_CSI1_VSYNC,
+	MX6Q_PAD_EIM_EB3__IPU2_CSI1_HSYNC,
+	MX6Q_PAD_EIM_A16__IPU2_CSI1_PIXCLK,
+};
+
+static iomux_v3_cfg_t mx6q_ventana_hdmi_ddc_pads[] = {
+  MX6Q_PAD_KEY_COL3__HDMI_TX_DDC_SCL, /* HDMI DDC SCL */
+  MX6Q_PAD_KEY_ROW3__HDMI_TX_DDC_SDA, /* HDMI DDC SDA */
+};
+
+static iomux_v3_cfg_t mx6q_ventana_i2c2_pads[] = {
+	MX6Q_PAD_KEY_COL3__I2C2_SCL,	/* I2C2 SCL */
+	MX6Q_PAD_KEY_ROW3__I2C2_SDA,	/* I2C2 SDA */
+};
+
+#define MX6Q_USDHC_PAD_SETTING(id, speed)	\
+mx6q_sd##id##_##speed##mhz[] = {		\
+	MX6Q_PAD_SD##id##_CLK__USDHC##id##_CLK_##speed##MHZ,	\
+	MX6Q_PAD_SD##id##_CMD__USDHC##id##_CMD_##speed##MHZ,	\
+	MX6Q_PAD_SD##id##_DAT0__USDHC##id##_DAT0_##speed##MHZ,	\
+	MX6Q_PAD_SD##id##_DAT1__USDHC##id##_DAT1_##speed##MHZ,	\
+	MX6Q_PAD_SD##id##_DAT2__USDHC##id##_DAT2_##speed##MHZ,	\
+	MX6Q_PAD_SD##id##_DAT3__USDHC##id##_DAT3_##speed##MHZ,	\
+}
+
+static iomux_v3_cfg_t MX6Q_USDHC_PAD_SETTING(3, 50);
+static iomux_v3_cfg_t MX6Q_USDHC_PAD_SETTING(3, 100);
+static iomux_v3_cfg_t MX6Q_USDHC_PAD_SETTING(3, 200);
+
+enum sd_pad_mode {
+	SD_PAD_MODE_LOW_SPEED,
+	SD_PAD_MODE_MED_SPEED,
+	SD_PAD_MODE_HIGH_SPEED,
+};
+
+/* plt_sd_pad_change
+ *  reconfig SDHC pads per SD bus frequency (called from esdhc_set_clock)
+ */
+static int plt_sd_pad_change(unsigned int index, int clock)
+{
+	/* LOW speed is the default state of SD pads */
+	static enum sd_pad_mode pad_mode = SD_PAD_MODE_LOW_SPEED;
+
+	iomux_v3_cfg_t *sd_pads_200mhz = NULL;
+	iomux_v3_cfg_t *sd_pads_100mhz = NULL;
+	iomux_v3_cfg_t *sd_pads_50mhz = NULL;
+
+	u32 sd_pads_200mhz_cnt;
+	u32 sd_pads_100mhz_cnt;
+	u32 sd_pads_50mhz_cnt;
+
+	switch (index) {
+	case 2:
+		sd_pads_200mhz = mx6q_sd3_200mhz;
+		sd_pads_100mhz = mx6q_sd3_100mhz;
+		sd_pads_50mhz = mx6q_sd3_50mhz;
+
+		sd_pads_200mhz_cnt = ARRAY_SIZE(mx6q_sd3_200mhz);
+		sd_pads_100mhz_cnt = ARRAY_SIZE(mx6q_sd3_100mhz);
+		sd_pads_50mhz_cnt = ARRAY_SIZE(mx6q_sd3_50mhz);
+		break;
+	default:
+		printk(KERN_ERR "no such SD host controller index %d\n", index);
+		return -EINVAL;
+	}
+
+	if (clock > 100000000) {
+		if (pad_mode == SD_PAD_MODE_HIGH_SPEED)
+			return 0;
+		BUG_ON(!sd_pads_200mhz);
+		pad_mode = SD_PAD_MODE_HIGH_SPEED;
+		return mxc_iomux_v3_setup_multiple_pads(sd_pads_200mhz,
+							sd_pads_200mhz_cnt);
+	} else if (clock > 52000000) {
+		if (pad_mode == SD_PAD_MODE_MED_SPEED)
+			return 0;
+		BUG_ON(!sd_pads_100mhz);
+		pad_mode = SD_PAD_MODE_MED_SPEED;
+		return mxc_iomux_v3_setup_multiple_pads(sd_pads_100mhz,
+							sd_pads_100mhz_cnt);
+	} else {
+		if (pad_mode == SD_PAD_MODE_LOW_SPEED)
+			return 0;
+		BUG_ON(!sd_pads_50mhz);
+		pad_mode = SD_PAD_MODE_LOW_SPEED;
+		return mxc_iomux_v3_setup_multiple_pads(sd_pads_50mhz,
+							sd_pads_50mhz_cnt);
+	}
+}
+
+static const struct esdhc_platform_data mx6q_ventana_sd3_data __initconst = {
+	.cd_gpio = MX6Q_VENTANA_SD3_CD,
+	.wp_gpio = -1,
+	.keep_power_at_suspend = 1,
+	.platform_pad_change = plt_sd_pad_change,
+	.delay_line = 0,
+};
+
+static const struct anatop_thermal_platform_data
+	mx6q_ventana_anatop_thermal_data __initconst = {
+		.name = "anatop_thermal",
+};
+
+static inline void mx6q_ventana_init_uart(void)
+{
+	imx6q_add_imx_uart(0, NULL);
+	imx6q_add_imx_uart(1, NULL);
+	imx6q_add_imx_uart(2, NULL);
+}
+
+static int mx6q_ventana_fec_phy_init(struct phy_device *phydev)
+{
+	// NB: 88E1510 PHY configured in bootloader
+	return 0;
+}
+
+static struct fec_platform_data fec_data __initdata = {
+	.init = mx6q_ventana_fec_phy_init,
+	.phy = PHY_INTERFACE_MODE_RGMII,
+};
+
+static int mx6q_ventana_spi_cs[] = {
+	MX6Q_VENTANA_ECSPI1_CS1,
+};
+
+static const struct spi_imx_master mx6q_ventana_spi_data __initconst = {
+	.chipselect     = mx6q_ventana_spi_cs,
+	.num_chipselect = ARRAY_SIZE(mx6q_ventana_spi_cs),
+};
+
+#if defined(CONFIG_MTD_M25P80) || defined(CONFIG_MTD_M25P80_MODULE)
+static struct mtd_partition imx6_ventana_spi_nor_partitions[] = {
+	{
+	 .name = "u-boot",
+	 .offset = 0,
+	 .size = SZ_512K,
+	},
+	{
+	 .name = "env",
+	 .offset = MTDPART_OFS_APPEND,
+	 .size = SZ_8K,
+	},
+	{
+	 .name = "kernel",
+	 .offset = MTDPART_OFS_APPEND,
+	 .size = SZ_2M,
+	},
+	{
+	 .name = "rootfs",
+	 .offset = MTDPART_OFS_APPEND,
+	 .size = MTDPART_SIZ_FULL,
+	},
+};
+
+static struct flash_platform_data imx6_ventana__spi_flash_data = {
+	.name = "m25p80",
+	.parts = imx6_ventana_spi_nor_partitions,
+	.nr_parts = ARRAY_SIZE(imx6_ventana_spi_nor_partitions),
+	.type = "w25q256",
+};
+#endif
+
+static struct spi_board_info imx6_ventana_spi_nor_device[] __initdata = {
+#if defined(CONFIG_MTD_M25P80)
+	{
+		.modalias = "m25p80",
+		.max_speed_hz = 20000000, /* max spi clock (SCK) speed in HZ */
+		.bus_num = 0,
+		.chip_select = 0,
+		.platform_data = &imx6_ventana__spi_flash_data,
+	},
+#endif
+};
+
+static void spi_device_init(void)
+{
+	spi_register_board_info(imx6_ventana_spi_nor_device,
+				ARRAY_SIZE(imx6_ventana_spi_nor_device));
+}
+
+static struct mxc_audio_platform_data mx6_ventana_audio_data;
+
+static int mx6_ventana_sgtl5000_init(void)
+{
+	struct clk *clko;
+	struct clk *new_parent;
+	int rate;
+
+	clko = clk_get(NULL, "clko_clk");
+	if (IS_ERR(clko)) {
+		pr_err("can't get CLKO clock.\n");
+		return PTR_ERR(clko);
+	}
+	new_parent = clk_get(NULL, "ahb");
+	if (!IS_ERR(new_parent)) {
+		clk_set_parent(clko, new_parent);
+		clk_put(new_parent);
+	}
+	rate = clk_round_rate(clko, 16000000);
+	if (rate < 8000000 || rate > 27000000) {
+		pr_err("Error:SGTL5000 mclk freq %d out of range!\n", rate);
+		clk_put(clko);
+		return -1;
+	}
+
+	mx6_ventana_audio_data.sysclk = rate;
+	clk_set_rate(clko, rate);
+	clk_enable(clko);
+	return 0;
+}
+
+static struct imx_ssi_platform_data mx6_ventana_ssi_pdata = {
+	.flags = IMX_SSI_DMA | IMX_SSI_SYN,
+};
+
+static struct mxc_audio_platform_data mx6_ventana_audio_data = {
+	.ssi_num = 1,
+	.src_port = 2,
+	.ext_port = 4,
+	.init = mx6_ventana_sgtl5000_init,
+	.hp_gpio = -1,
+};
+
+static struct platform_device mx6_ventana_audio_device = {
+	.name = "imx-sgtl5000",
+};
+
+#ifdef CONFIG_PPS_CLIENT_GPIO
+/* GPS PPS */
+#include <linux/pps-gpio.h>
+static struct pps_gpio_platform_data mx6_ventana_pps_data = {
+	.gpio_pin = MX6Q_VENTANA_GPS_PPS,
+	.gpio_label = "GPS_PPS",
+	.assert_falling_edge = 0,
+	.capture_clear = 0,
+};
+
+static struct platform_device mx6_ventana_pps_device = {
+	.name = "pps-gpio",
+	.id = -1,
+	.dev.platform_data = &mx6_ventana_pps_data,
+};
+#endif
+
+/* GPIO LEDs */
+static struct gpio_led mx6_ventana_gpio_leds[] = {
+	{
+		.name = "user1",
+		.default_trigger = "hearbeat",
+		.gpio = MX6Q_VENTANA_PANLEDG,
+	},
+	{
+		.name = "user2",
+		.gpio = MX6Q_VENTANA_PANLEDR,
+	},
+	{
+		.name = "user3",
+		.gpio = MX6Q_VENTANA_LOCLED,
+	},
+};
+
+static struct gpio_led_platform_data mx6_ventana_led_pdata = {
+	.leds = mx6_ventana_gpio_leds,
+	.num_leds = ARRAY_SIZE(mx6_ventana_gpio_leds),
+};
+
+static struct platform_device mx6_ventana_leds_gpio_device = {
+	.name = "leds-gpio",
+	.id = -1,
+	.dev = {
+		.platform_data = &mx6_ventana_led_pdata,
+	},
+};
+
+/* PWM LEDs */
+static struct led_pwm mx6_ventana_pwm_leds[] = {
+#ifdef MX6Q_VENTANA_DIO0_PWM
+	{
+		.name = "dio0",
+		.pwm_id = 0,
+		.max_brightness = 255,
+		.pwm_period_ns = 7812500,
+	},
+#endif
+#ifdef MX6Q_VENTANA_DIO0_PWM
+	{
+		.name = "dio1",
+		.pwm_id = 1,
+		.max_brightness = 255,
+		.pwm_period_ns = 7812500,
+	},
+#endif
+};
+
+static struct led_pwm_platform_data mx6_ventana_pwm_pdata = {
+	.num_leds = ARRAY_SIZE(mx6_ventana_pwm_leds),
+	.leds = mx6_ventana_pwm_leds,
+};
+
+static struct platform_device mx6_ventana_leds_pwm_device = {
+	.name = "leds_pwm",
+	.id = -1,
+	.dev = {
+		.platform_data = &mx6_ventana_pwm_pdata,
+	},
+};
+
+/* I2C */
+static struct imxi2c_platform_data mx6q_ventana_i2c_data = {
+	.bitrate = 100000,
+};
+
+static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
+};
+
+static struct i2c_board_info mxc_i2c1_board_info[] __initdata = {
+};
+
+/* position 0-7 (alignment?) */
+static int mma8451_position = 1;
+
+static void mx6_csi1_io_init(void)
+{
+	if (cpu_is_mx6q()) {
+		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_csi1_sensor_pads,
+			ARRAY_SIZE(mx6q_ventana_csi1_sensor_pads));
+	} else if (cpu_is_mx6dl()) {
+		// TODO: different padconf for mx6dl which only has 1 IPU
+		printk(KERN_ERR "%s: mx6dl pinmux not yet implemented\n", __func__);
+	}
+
+#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
+	/* Tvin reset */
+	gpio_request(MX6_ARM2_CSI0_RST_TVIN, "tvin-reset");
+	gpio_direction_output(MX6_ARM2_CSI0_RST_TVIN, 1);
+#else
+	// set i2c 0x0f.7 (RESET)
+#endif
+
+#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
+	/* Tvin power down */
+	gpio_request(MX6_ARM2_CSI0_PWN, "cam-pwdn");
+	gpio_direction_output(MX6_ARM2_CSI0_PWN, 0);
+	msleep(1);
+	gpio_set_value(MX6_ARM2_CSI0_PWN, 1);
+#else
+	// set i2c 0x0f.2 (PDBP)
+	// set i2c 0x0f.5 (PWRDOWN)
+#endif
+
+	/* set IPU2 Mux to parallel interface */
+  /* For MX6Q:
+   * GPR1 bit19 and bit20 meaning:
+   * Bit19:       0 - Enable mipi to IPU1 CSI0
+   *                      virtual channel is fixed to 0
+   *              1 - Enable parallel interface to IPU1 CSI0
+   * Bit20:       0 - Enable mipi to IPU2 CSI1
+   *                      virtual channel is fixed to 3
+   *              1 - Enable parallel interface to IPU2 CSI1
+   * IPU1 CSI1 directly connect to mipi csi2,
+   *      virtual channel is fixed to 1
+   * IPU2 CSI0 directly connect to mipi csi2,
+   *      virtual channel is fixed to 2
+   *
+   * For MX6DL:
+   * GPR1 bit 21 and GPR13 bit 0-5, RM has detail information
+   */
+	if (cpu_is_mx6q())
+		mxc_iomux_set_gpr_register(1, 20, 1, 1); /* GPR1[20] = 1 */
+	else if (cpu_is_mx6dl())
+		mxc_iomux_set_gpr_register(13, 3, 3, 4); /* GPR13[0:2] = 4 */
+}
+
+static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
+	.dvddio_reg = "VDD_DLY_3P3",
+	.dvdd_reg = "DVDD", // VDD_1P8
+	.avdd_reg = "AVDD", // VDD_1P8
+	.pvdd_reg = "PVDD", // VDD_1P8
+	.pwdn = NULL, // TODO
+	.reset = NULL, // TODO
+	.cvbs = true,
+	.io_init = mx6_csi1_io_init, // IPU2_CSI1
+};
+
+
+static struct fsl_mxc_lcd_platform_data adv7393_pdata = {
+  .io_reg = "VDD_DLY_3P3",
+  .core_reg = "VDD",   // VDD_1P8
+	.analog_reg = "VAA", // VDD_1P8
+	.ipu_id = 0,
+	.disp_id = 0,
+  .default_ifmt = IPU_PIX_FMT_RGB565,
+};
+
+static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
+	/* Audio Codec */
+	{
+		I2C_BOARD_INFO("sgtl5000", 0x0a),
+	},
+
+	/* Accelerometer */
+	{
+		I2C_BOARD_INFO("mma8451", 0x1c),
+		.irq = gpio_to_irq(MX6Q_VENTANA_ACCEL_IRQ), // not used by driver
+		.platform_data = (void *)&mma8451_position,
+	},
+
+	/* HDMI Video Decoder (Video In) */
+	{
+		I2C_BOARD_INFO("adv7611", 0x4c),
+		.irq = gpio_to_irq(MX6Q_VENTANA_HDMIIN_IRQ),
+	},
+
+	/* Analog Video Decoder (Video In) */
+	{
+		I2C_BOARD_INFO("adv7180", 0x20),
+		.irq = gpio_to_irq(MX6Q_VENTANA_VIDDEC_IRQ),
+		.platform_data = (void *)&adv7180_pdata,
+	},
+
+	/* Analog Video Encoder (Video Out) */
+	{
+		I2C_BOARD_INFO("adv7393", 0x2a),
+		.platform_data = (void *)&adv7393_pdata,
+	},
+
+	/* HDMI Monitor (DDC channel) */
+	{
+		I2C_BOARD_INFO("mxc_hdmi_i2c", 0x50),
+	},
+
+	/* Touchscreen controller */
+	{
+		I2C_BOARD_INFO("egalax_ts", 0x4),
+		.irq = gpio_to_irq(MX6Q_VENTANA_CAP_TCH_INT),
+	},
+};
+
+static void imx6q_ventana_usbotg_vbus(bool on)
+{
+	printk(KERN_DEBUG "%s: %s\n", __func__, on?"on":"off");
+	if (on)
+		gpio_set_value(MX6Q_VENTANA_USB_OTG_PWR, 1);
+	else
+		gpio_set_value(MX6Q_VENTANA_USB_OTG_PWR, 0);
+}
+
+static void __init imx6q_ventana_init_usb(void)
+{
+	int ret = 0;
+
+	imx_otg_base = MX6_IO_ADDRESS(MX6Q_USB_OTG_BASE_ADDR);
+	/* disable external charger detect,
+	 * or it will affect signal quality at dp .
+	 */
+	ret = gpio_request(MX6Q_VENTANA_USB_OTG_PWR, "usb-pwr");
+	if (ret) {
+		pr_err("failed to get GPIO MX6Q_VENTANA_USB_OTG_PWR: %d\n",
+			ret);
+		return;
+	}
+	gpio_export(MX6Q_VENTANA_USB_OTG_PWR, 0);
+	gpio_direction_output(MX6Q_VENTANA_USB_OTG_PWR, 0);
+	mxc_iomux_set_gpr_register(1, 13, 1, 1);
+
+	mx6_set_otghost_vbus_func(imx6q_ventana_usbotg_vbus);
+}
+
+/* HW Initialization, if return 0, initialization is successful. */
+static int mx6q_ventana_sata_init(struct device *dev, void __iomem *addr)
+{
+	u32 tmpdata;
+	int ret = 0;
+	struct clk *clk;
+
+	sata_clk = clk_get(dev, "imx_sata_clk");
+	if (IS_ERR(sata_clk)) {
+		dev_err(dev, "no sata clock.\n");
+		return PTR_ERR(sata_clk);
+	}
+	ret = clk_enable(sata_clk);
+	if (ret) {
+		dev_err(dev, "can't enable sata clock.\n");
+		goto put_sata_clk;
+	}
+
+	/* Set PHY Paremeters, two steps to configure the GPR13,
+	 * one write for rest of parameters, mask of first write is 0x07FFFFFD,
+	 * and the other one write for setting the mpll_clk_off_b
+	 *.rx_eq_val_0(iomuxc_gpr13[26:24]),
+	 *.los_lvl(iomuxc_gpr13[23:19]),
+	 *.rx_dpll_mode_0(iomuxc_gpr13[18:16]),
+	 *.sata_speed(iomuxc_gpr13[15]),
+	 *.mpll_ss_en(iomuxc_gpr13[14]),
+	 *.tx_atten_0(iomuxc_gpr13[13:11]),
+	 *.tx_boost_0(iomuxc_gpr13[10:7]),
+	 *.tx_lvl(iomuxc_gpr13[6:2]),
+	 *.mpll_ck_off(iomuxc_gpr13[1]),
+	 *.tx_edgerate_0(iomuxc_gpr13[0]),
+	 */
+	tmpdata = readl(IOMUXC_GPR13);
+	writel(((tmpdata & ~0x07FFFFFD) | 0x0593A044), IOMUXC_GPR13);
+
+	/* enable SATA_PHY PLL */
+	tmpdata = readl(IOMUXC_GPR13);
+	writel(((tmpdata & ~0x2) | 0x2), IOMUXC_GPR13);
+
+	/* Get the AHB clock rate, and configure the TIMER1MS reg later */
+	clk = clk_get(NULL, "ahb");
+	if (IS_ERR(clk)) {
+		dev_err(dev, "no ahb clock.\n");
+		ret = PTR_ERR(clk);
+		goto release_sata_clk;
+	}
+	tmpdata = clk_get_rate(clk) / 1000;
+	clk_put(clk);
+
+	ret = sata_init(addr, tmpdata);
+	if (ret == 0)
+		return ret;
+
+release_sata_clk:
+	clk_disable(sata_clk);
+put_sata_clk:
+	clk_put(sata_clk);
+
+	return ret;
+}
+
+static void mx6q_ventana_sata_exit(struct device *dev)
+{
+	clk_disable(sata_clk);
+	clk_put(sata_clk);
+}
+
+static struct ahci_platform_data mx6q_ventana_sata_data = {
+	.init = mx6q_ventana_sata_init,
+	.exit = mx6q_ventana_sata_exit,
+};
+
+static struct viv_gpu_platform_data imx6q_gpu_pdata __initdata = {
+	.reserved_mem_size = SZ_128M,
+};
+
+static struct imx_asrc_platform_data imx_asrc_data = {
+	.channel_bits = 4,
+	.clk_map_ver = 2,
+};
+
+static void mx6_reset_mipi_dsi(void)
+{
+	gpio_set_value(MX6Q_VENTANA_MIPI_BACK_EN, 1);
+	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 1);
+	udelay(10);
+	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 0);
+	udelay(50);
+	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 1);
+
+	/* TRULY-WVGA needs to delay 120ms min for reset complete */
+	msleep(120);
+}
+
+static struct mipi_dsi_platform_data mipi_dsi_pdata = {
+	.ipu_id   = 0,
+	.disp_id  = 1,
+	.lcd_panel  = "TRULY-WVGA",
+	.reset    = mx6_reset_mipi_dsi,
+};
+
+/* Framebuffer Output devices
+ *
+ *  the 'disp_dev' field names the display type which matches the name
+ *  registered for various mxc_display drivers registered with
+ *  mxc_dispdrv_register
+ *
+ *  the 'mode_str' gets passed to mxc_display->init function as
+ *  setting->dft_mode_str
+ *
+ *  i.MX6Q has 2 IPU's each with 2 display ports thus can have 4 simultaneous
+ *  displays.  The defaults can be changed with video= kernel commandline.
+ *
+ *  Examples:
+ *    HDMI out on /dev/fb0,1:
+ *       video=mxcfb0:dev=hdmi,1280x720M@60,if=RGB24
+ *    Freescale LVDS1 on /dev/fb2,3:
+ *       video=mxcfb1:dev=ldb,LDB-XGA,if=RGB666
+ *
+ * see: Documentation/fb/modedb.txt
+ *
+ * late_init = false is used on sabresd fb's but not on sabrelite
+ *  may want to unset.  Sabresd has kernel cmdline hoooks to make these
+ *  early init.  I think that may be in order to allow display devices to be
+ *  tweaked depending on mx6q vs mx6dl
+ */
+static struct ipuv3_fb_platform_data ventana_fb_data[] = {
+	{
+		/* mxcfb0: fb0,1 */
+		.disp_dev = "ldb",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+		.mode_str = "LDB-XGA",
+		.default_bpp = 16,
+		.int_clk = false,
+		.late_init = false,
+	}, {
+		/* mxcfb1: fb2,3 */
+		.disp_dev = "adv7393",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB565,
+		.mode_str = "TVOUT",
+		.default_bpp = 16,
+		.int_clk = false,
+		.late_init = false,
+	}, {
+		/* mxcfb2: fb4,5 */
+		.disp_dev = "mipi_dsi",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
+		.mode_str = "TRULY-WVGA",
+		.default_bpp = 24,
+		.int_clk = false,
+		.late_init = false,
+	}, {
+		/* mxcfb3: fb6,7 */
+		.disp_dev = "ldb",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+		.mode_str = "LDB-VGA",
+		.default_bpp = 16,
+		.int_clk = false,
+		.late_init = false,
+	},
+};
+
+static void hdmi_init(int ipu_id, int disp_id)
+{
+	int hdmi_mux_setting;
+	int max_ipu_id = cpu_is_mx6q() ? 1 : 0;
+
+	if ((ipu_id > max_ipu_id) || (ipu_id < 0)) {
+		pr_err("Invalid IPU select for HDMI: %d. Set to 0\n", ipu_id);
+		ipu_id = 0;
+	}
+
+	if ((disp_id > 1) || (disp_id < 0)) {
+		pr_err("Invalid DI select for HDMI: %d. Set to 0\n", disp_id);
+		disp_id = 0;
+	}
+
+	/* Configure the connection between IPU1/2 and HDMI */
+	hdmi_mux_setting = 2*ipu_id + disp_id;
+
+	/* GPR3, bits 2-3 = HDMI_MUX_CTL */
+	mxc_iomux_set_gpr_register(3, 2, 2, hdmi_mux_setting);
+
+	/* Set HDMI event as SDMA event2 while Chip version later than TO1.2 */
+	if (hdmi_SDMA_check())
+		mxc_iomux_set_gpr_register(0, 0, 1, 1);
+}
+
+/* i2c2 iomux with hdmi ddc,
+ * the pins default work at i2c2 function,
+ * when hdcp enable, the pins should work at ddc function
+ */
+static void hdmi_enable_ddc_pin(void)
+{
+	if (cpu_is_mx6dl()) {
+		// TODO: different pinmux
+		printk(KERN_ERR "%s: mx6dl pinmux not yet supported\n", __func__);
+	} else {
+		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_hdmi_ddc_pads,
+			ARRAY_SIZE(mx6q_ventana_hdmi_ddc_pads));
+	}
+}
+
+static void hdmi_disable_ddc_pin(void)
+{
+	if (cpu_is_mx6dl()) {
+		// TODO: different pinmux
+		printk(KERN_ERR "%s: mx6dl pinmux not yet supported\n", __func__);
+	} else {
+		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_i2c2_pads,
+			ARRAY_SIZE(mx6q_ventana_i2c2_pads));
+	}
+}
+
+static struct fsl_mxc_hdmi_platform_data hdmi_data = {
+	.init = hdmi_init,
+	.enable_pins = hdmi_enable_ddc_pin,
+	.disable_pins = hdmi_disable_ddc_pin,
+};
+
+/* HDMI out: IPU1_DISP0 */
+static struct fsl_mxc_hdmi_core_platform_data hdmi_core_data = {
+	.ipu_id = 0,
+	.disp_id = 0,
+};
+
+/* Analog Video Out: IPU1_DISP0 */
+static struct fsl_mxc_lcd_platform_data lcdif_data = {
+	.ipu_id = 0,
+	.disp_id = 0,
+	.default_ifmt = IPU_PIX_FMT_RGB565,
+};
+
+/* LVDS out: IPU2_DISP0 */
+static struct fsl_mxc_ldb_platform_data ldb_data = {
+	.ipu_id = 1,
+	.disp_id = 0,
+	.ext_ref = 1,
+	.mode = LDB_SEP0,
+	.sec_ipu_id = 1,
+	.sec_disp_id = 1,
+};
+
+/* bypass_reset - check this - its not set false on sabrelite
+ */
+static struct imx_ipuv3_platform_data ipu_data[] = {
+	{
+		/* IPU1 */
+		.rev = 4,
+		.csi_clk[0] = "clko_clk",
+		.bypass_reset = false,
+	}, {
+		/* IPU2 */
+		.rev = 4,
+		.csi_clk[0] = "clko_clk",
+		.bypass_reset = false,
+	},
+};
+
+static struct fsl_mxc_capture_platform_data capture_data[] = {
+	{
+		/* /dev/video0: IPU1_CSI0 - HDMI In Digital Receiver */
+		.csi = 0,
+		.ipu = 0,
+		.mclk_source = 0,
+		.is_mipi = 0,
+	}, {
+		/* /dev/video1: IPU2_CSI1 - ADV7180 Analog Video Decoder */
+		.csi = 1,
+		.ipu = 1,
+		.mclk_source = 0,
+		.is_mipi = 0,
+	},
+};
+
+
+static void ventana_suspend_enter(void)
+{
+	/* suspend preparation */
+	// TODO: disable SWBST
+}
+
+static void ventana_suspend_exit(void)
+{
+	/* resume restore */
+	// TODO: resume SWBST
+}
+
+static const struct pm_platform_data mx6q_ventana_pm_data __initconst = {
+	.name = "imx_pm",
+	.suspend_enter = ventana_suspend_enter,
+	.suspend_exit = ventana_suspend_exit,
+};
+
+
+/* VMMC Regulator (internal fixed) */
+static struct regulator_consumer_supply ventana_vmmc_consumers[] = {
+	REGULATOR_SUPPLY("vmmc", "sdhci-esdhc-imx.2"),
+};
+
+static struct regulator_init_data ventana_vmmc_init = {
+	.num_consumer_supplies = ARRAY_SIZE(ventana_vmmc_consumers),
+	.consumer_supplies = ventana_vmmc_consumers,
+};
+
+static struct fixed_voltage_config ventana_vmmc_reg_config = {
+	.supply_name		= "vmmc",
+	.microvolts		= 3300000,
+	.gpio			= -1,
+	.init_data		= &ventana_vmmc_init,
+};
+
+static struct platform_device ventana_vmmc_reg_devices = {
+	.name	= "reg-fixed-voltage",
+	.id	= 3,
+	.dev	= {
+		.platform_data = &ventana_vmmc_reg_config,
+	},
+};
+
+
+/* VDD_DLY_3P3 - Delayed 3.3V fixed from main power supply
+ *  enabled via VGEN6 of PFUZE
+ */
+static struct regulator_consumer_supply ventana_vdd_dly_3p3_consumers[] = {
+	REGULATOR_SUPPLY("VDDIO", "2-000a"), // SGTL5000 audio codec
+	REGULATOR_SUPPLY("VDDIO", "2-0020"), // ADV7180 video decoder 
+	REGULATOR_SUPPLY("VDDIO", "2-004c"), // ADV7611 hdmi decoder 
+	REGULATOR_SUPPLY("VDDIO", "2-002a"), // ADV7393 video encoder
+//	REGULATOR_SUPPLY("VDDIO", "2-00XX"), // MIPI Expansion
+//	REGULATOR_SUPPLY("VDDIO", "2-00XX"), // LVDS Expansion
+	REGULATOR_SUPPLY("VDDIO", "1-006b"), // SI52147 PCIe clock generator
+};
+
+static struct regulator_init_data ventana_vdd_dly_3p3_init = {
+	.num_consumer_supplies = ARRAY_SIZE(ventana_vdd_dly_3p3_consumers),
+	.consumer_supplies = ventana_vdd_dly_3p3_consumers,
+};
+
+static struct fixed_voltage_config ventana_vdd_dly_3p3_reg_config = {
+	.supply_name = "VDD_DLY_3P3",
+	.microvolts  = 3300000,
+	.gpio        = -1,
+	.init_data   = &ventana_vdd_dly_3p3_init,
+};
+
+static struct platform_device mx6_ventana_vdd_dly_3p3_device = {
+	.name = "reg-fixed-voltage",
+	.id = 4,
+	.dev = {
+		.platform_data = &ventana_vdd_dly_3p3_reg_config,
+	},
+};
+
+
+/* initialize audio
+ */
+static int imx6_init_audio(void)
+{
+	mxc_register_device(&mx6_ventana_audio_device,
+			    &mx6_ventana_audio_data);
+	imx6q_add_imx_ssi(1, &mx6_ventana_ssi_pdata);
+	return 0;
+}
+
+
+/* PWM4_PWMO (LVDS display backlight control)
+ */
+static struct platform_pwm_backlight_data mx6_ventana_pwm_backlight_data = {
+	.pwm_id = 3,  // PWM4
+	.max_brightness = 255,
+	.dft_brightness = 128,
+	.pwm_period_ns = 50000,
+};
+
+
+/* DVFS regulator setup
+ */
+static struct mxc_dvfs_platform_data ventana_dvfscore_data = {
+	.reg_id = "VDDCORE",
+	.soc_id = "VDDSOC",
+//	.pu_id = "cpu_vddvpu",
+	.clk1_id = "cpu_clk",
+	.clk2_id = "gpc_dvfs_clk",
+	.gpc_cntr_offset = MXC_GPC_CNTR_OFFSET,
+	.ccm_cdcr_offset = MXC_CCM_CDCR_OFFSET,
+	.ccm_cacrr_offset = MXC_CCM_CACRR_OFFSET,
+	.ccm_cdhipr_offset = MXC_CCM_CDHIPR_OFFSET,
+	.prediv_mask = 0x1F800,
+	.prediv_offset = 11,
+	.prediv_val = 3,
+	.div3ck_mask = 0xE0000000,
+	.div3ck_offset = 29,
+	.div3ck_val = 2,
+	.emac_val = 0x08,
+	.upthr_val = 25,
+	.dnthr_val = 9,
+	.pncthr_val = 33,
+	.upcnt_val = 10,
+	.dncnt_val = 10,
+	.delay_time = 80,
+};
+
+
+/* Misc fixups
+ */
+static void __init fixup_mxc_board(struct machine_desc *desc, struct tag *tags,
+				   char **cmdline, struct meminfo *mi)
+{
+}
+
+
+/* CSI2 - MIPI Capture
+ */
+static struct mipi_csi2_platform_data mipi_csi2_pdata = {
+	.ipu_id	 = 0,
+	.csi_id = 0,
+	.v_channel = 0,
+	.lanes = 2,
+	.dphy_clk = "mipi_pllref_clk",
+	.pixel_clk = "emi_clk",
+};
+
+
+/* Crypto enable/disable - default disabled as it seems to take over CLKO
+ */
+static int __init caam_setup(char *__unused)
+{
+	caam_enabled = 1;
+	return 1;
+}
+early_param("caam", caam_setup);
+
+
+/* PCIe
+ */
+static const struct imx_pcie_platform_data mx6_ventana_pcie_data  __initconst = {
+	/* GPIO for enabling PCIE 3P3 */
+	.pcie_pwr_en	= -EINVAL,
+	/* GPIO to miniPCIe PERST# (pin22)     - Power Good / Reset */
+	.pcie_rst	= MX6Q_VENTANA_PCIE_RESET,
+	/* GPIO to miniPCIe WAKE# (pin1)       - Wake event */
+	.pcie_wake_up	= -EINVAL,
+	/* GPIO to miniPCIe W_DISABLE# (pin20) - Wireless disable */
+	.pcie_dis	= -EINVAL,
+};
+
+
+/* fixup for PEX 8909 bridge to configure GPIO1-7 as output High
+ * as they are used for slots1-7 PERST#
+ */
+static void mx6_ventana_pciesw_early_fixup(struct pci_dev *dev)
+{
+	u32 dw;
+
+	if (dev->devfn != 0)
+		return;
+	pci_read_config_dword(dev, 0x62c, &dw);
+	dw |= 0xaaa8; // GPIO1-7 outputs
+	pci_write_config_dword(dev, 0x62c, dw);	
+
+	pci_read_config_dword(dev, 0x644, &dw);
+	dw |= 0xfe;  // GPIO1-7 output high 
+	pci_write_config_dword(dev, 0x644, dw);	
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLX, 0x8609,
+	mx6_ventana_pciesw_early_fixup);
+
+
+/*!
+ * Board specific initialization.
+ */
+static void __init mx6_ventana_board_init(void)
+{
+	int i;
+	struct clk *clko2;
+	struct clk *new_parent;
+	int rate;
+	int ret;
+
+	if (cpu_is_mx6q()) {
+		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_pads,
+						ARRAY_SIZE(mx6q_ventana_pads));
+	} else if (cpu_is_mx6dl()) {
+		printk(KERN_ERR "%s: mx6dl pinmux not yet implemented\n", __func__);
+	}
+
+	/* Delayed 3.3V supply */
+	platform_device_register(&mx6_ventana_vdd_dly_3p3_device);
+
+#ifdef CONFIG_FEC_1588
+	/* Set GPIO_16 input for IEEE-1588 ts_clk and RMII reference clock
+	 * For MX6 GPR1 bit21 meaning:
+	 * Bit21:       0 - GPIO_16 pad output
+	 *              1 - GPIO_16 pad input
+	 */
+	mxc_iomux_set_gpr_register(1, 21, 1, 1);
+#endif
+
+	/* regulators for DVS */
+	gp_reg_id = ventana_dvfscore_data.reg_id;
+	soc_reg_id = ventana_dvfscore_data.soc_id;
+
+	/* UART */
+	mx6q_ventana_init_uart();
+
+	/* HDMI output */
+	imx6q_add_mxc_hdmi_core(&hdmi_core_data);
+
+	/* IPU (imx6q has 2, imx6dl has 1) */
+	imx6q_add_ipuv3(0, &ipu_data[0]);
+	if (cpu_is_mx6q()) {
+		imx6q_add_ipuv3(1, &ipu_data[1]);
+		for (i = 0; i < 4 && i < ARRAY_SIZE(ventana_fb_data); i++)
+			imx6q_add_ipuv3fb(i, &ventana_fb_data[i]);
+	} else
+		for (i = 0; i < 2 && i < ARRAY_SIZE(ventana_fb_data); i++)
+			imx6q_add_ipuv3fb(i, &ventana_fb_data[i]);
+
+
+	imx6q_add_vdoa();
+
+	/* MIPI DSI Output */
+	imx6q_add_mipi_dsi(&mipi_dsi_pdata);
+
+	/* LCD output */
+	imx6q_add_lcdif(&lcdif_data);
+	imx6q_add_ldb(&ldb_data);
+	imx6q_add_v4l2_output(0);
+
+	/* /dev/video0 HDMI Receiver */
+	imx6q_add_v4l2_capture(0, &capture_data[0]);
+
+	/* /dev/video1 ADV7180 Analog Video Decoder */
+	imx6q_add_v4l2_capture(1, &capture_data[1]);
+
+	/* MIPI input */
+	imx6q_add_mipi_csi2(&mipi_csi2_pdata);
+
+	/* RTC */
+	imx6q_add_imx_snvs_rtc();
+
+	/* this clobbers CLKO used for sgtl150000 */
+	if (1 == caam_enabled)
+		imx6q_add_imx_caam();
+
+	/* I2C */
+	imx6q_add_imx_i2c(0, &mx6q_ventana_i2c_data);
+	imx6q_add_imx_i2c(1, &mx6q_ventana_i2c_data);
+	imx6q_add_imx_i2c(2, &mx6q_ventana_i2c_data);
+	i2c_register_board_info(0, mxc_i2c0_board_info,
+			ARRAY_SIZE(mxc_i2c0_board_info));
+	i2c_register_board_info(1, mxc_i2c1_board_info,
+			ARRAY_SIZE(mxc_i2c1_board_info));
+	i2c_register_board_info(2, mxc_i2c2_board_info,
+			ARRAY_SIZE(mxc_i2c2_board_info));
+
+	/* PMIC */
+	ret = gpio_request(MX6Q_VENTANA_PFUZE_INT, "pFUZE-int");
+	if (ret) {
+		printk(KERN_ERR"request pFUZE-int error!!\n");
+		return;
+	} else {
+		gpio_direction_input(MX6Q_VENTANA_PFUZE_INT);
+		mx6q_ventana_init_pfuze100(MX6Q_VENTANA_PFUZE_INT);
+	}
+
+	/* SPI */
+	imx6q_add_ecspi(0, &mx6q_ventana_spi_data);
+	spi_device_init();
+
+	/* HDMI (how does this differ from hdmi_core? */
+	imx6q_add_mxc_hdmi(&hdmi_data);
+
+	/* thermal sensor */
+	imx6q_add_anatop_thermal_imx(1, &mx6q_ventana_anatop_thermal_data);
+
+	/* GigE MAC */
+	imx6_init_fec(fec_data);
+
+	/* Power Management */
+	imx6q_add_pm_imx(0, &mx6q_ventana_pm_data);
+
+	/* MMC */
+	imx6q_add_sdhci_usdhc_imx(2, &mx6q_ventana_sd3_data);
+
+	/* GPU */
+	imx_add_viv_gpu(&imx6_gpu_data, &imx6q_gpu_pdata);
+
+	/* USB */
+	imx6q_ventana_init_usb();
+
+	/* SATA (only on mx6q) */
+	if (cpu_is_mx6q())
+		imx6q_add_ahci(0, &mx6q_ventana_sata_data);
+
+	/* VPU */
+	imx6q_add_vpu();
+
+	/* Audio */
+	imx6_init_audio();
+	platform_device_register(&ventana_vmmc_reg_devices);
+	imx_asrc_data.asrc_core_clk = clk_get(NULL, "asrc_clk");
+	imx_asrc_data.asrc_audio_clk = clk_get(NULL, "asrc_serial_clk");
+	imx6q_add_asrc(&imx_asrc_data);
+
+	/* GPIO: GPIO/PWM/PPS */
+	platform_device_register(&mx6_ventana_leds_gpio_device);
+	platform_device_register(&mx6_ventana_leds_pwm_device);
+#ifdef CONFIG_PPS_CLIENT_GPIO
+	platform_device_register(&mx6_ventana_pps_device);
+#endif
+
+	/* release USB Hub reset */
+	gpio_set_value(MX6Q_VENTANA_USB_HUB_RESET, 1);
+
+	/*
+	 * Disable HannStar touch panel CABC function,
+	 * this function turns the panel's backlight automatically
+	 * according to the content shown on the panel which
+	 * may cause annoying unstable backlight issue.
+	 */
+	gpio_request(MX6Q_VENTANA_LVDS_BACK_EN, "cabc-en0");
+	gpio_export(MX6Q_VENTANA_LVDS_BACK_EN, 0);
+	gpio_direction_output(MX6Q_VENTANA_LVDS_BACK_EN, 0);
+
+	gpio_request(MX6Q_VENTANA_RS485_TXEN, "rs485-txen");
+	gpio_export(MX6Q_VENTANA_RS485_TXEN, 0);
+	gpio_direction_output(MX6Q_VENTANA_RS485_TXEN, 0);
+
+	/* User GPIO's */
+#ifndef MX6Q_VENTANA_DIO0_PWM
+	gpio_request(MX6Q_VENTANA_MX6_DIO0, "dio0");
+	gpio_export(MX6Q_VENTANA_MX6_DIO0, 1);
+	gpio_direction_input(MX6Q_VENTANA_MX6_DIO0);
+#endif
+#ifndef MX6Q_VENTANA_DIO1_PWM
+	gpio_request(MX6Q_VENTANA_MX6_DIO1, "dio1");
+	gpio_export(MX6Q_VENTANA_MX6_DIO1, 1);
+	gpio_direction_input(MX6Q_VENTANA_MX6_DIO1);
+#endif
+	gpio_request(MX6Q_VENTANA_MX6_DIO2, "dio2");
+	gpio_export(MX6Q_VENTANA_MX6_DIO2, 1);
+	gpio_direction_input(MX6Q_VENTANA_MX6_DIO2);
+	gpio_request(MX6Q_VENTANA_MX6_DIO3, "dio3");
+	gpio_export(MX6Q_VENTANA_MX6_DIO3, 1);
+	gpio_direction_input(MX6Q_VENTANA_MX6_DIO3);
+	gpio_request(MX6Q_VENTANA_UART2_EN, "uart2_en");
+	gpio_export(MX6Q_VENTANA_UART2_EN, 0);
+	gpio_direction_output(MX6Q_VENTANA_UART2_EN, 0);
+	gpio_request(MX6Q_VENTANA_I2CEXP_EN, "i2c_dis#");
+	gpio_export(MX6Q_VENTANA_I2CEXP_EN, 0);
+	gpio_direction_output(MX6Q_VENTANA_I2CEXP_EN, 0);
+	gpio_request(MX6Q_VENTANA_MEZZ_DIO0, "mezz_dio0");
+	gpio_export(MX6Q_VENTANA_MEZZ_DIO0, 1);
+	gpio_direction_input(MX6Q_VENTANA_MEZZ_DIO0);
+	gpio_request(MX6Q_VENTANA_MEZZ_DIO1, "mezz_dio1");
+	gpio_export(MX6Q_VENTANA_MEZZ_DIO1, 1);
+	gpio_direction_input(MX6Q_VENTANA_MEZZ_DIO1);
+
+	/* PWM */
+	imx6q_add_mxc_pwm(0);
+	imx6q_add_mxc_pwm(1);
+	imx6q_add_mxc_pwm(2);
+	imx6q_add_mxc_pwm(3);
+	imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
+
+	imx6q_add_otp();
+	imx6q_add_viim();
+	imx6q_add_imx2_wdt(0, NULL);
+	imx6q_add_dma();
+
+	imx6q_add_dvfs_core(&ventana_dvfscore_data);
+
+	/* HDMI audio */
+	imx6q_add_hdmi_soc();
+	imx6q_add_hdmi_soc_dai();
+
+	/* Clocks */
+	clko2 = clk_get(NULL, "clko2_clk");
+	if (IS_ERR(clko2))
+		pr_err("can't get CLKO2 clock.\n");
+
+	new_parent = clk_get(NULL, "osc_clk");
+	if (!IS_ERR(new_parent)) {
+		clk_set_parent(clko2, new_parent);
+		clk_put(new_parent);
+	}
+	rate = clk_round_rate(clko2, 24000000);
+	clk_set_rate(clko2, rate);
+	clk_enable(clko2);
+	imx6q_add_busfreq();
+
+	/* PCIe RC interface */
+	gpio_request(MX6Q_VENTANA_PCIE_RESET, "pcie_reset");
+	gpio_export(MX6Q_VENTANA_PCIE_RESET, 0);
+	gpio_direction_output(MX6Q_VENTANA_PCIE_RESET, 0);
+	mdelay(1);
+	gpio_set_value(MX6Q_VENTANA_PCIE_RESET, 1);
+	gpio_free(MX6Q_VENTANA_PCIE_RESET);
+	imx6q_add_pcie(&mx6_ventana_pcie_data);
+
+	imx6_add_armpmu();
+	imx6q_add_perfmon(0);
+	imx6q_add_perfmon(1);
+	imx6q_add_perfmon(2);
+}
+
+extern void __iomem *twd_base;
+static void __init mx6_ventana_timer_init(void)
+{
+	struct clk *uart_clk;
+#ifdef CONFIG_LOCAL_TIMERS
+	twd_base = ioremap(LOCAL_TWD_ADDR, SZ_256);
+	BUG_ON(!twd_base);
+#endif
+	mx6_clocks_init(32768, 24000000, 0, 0);
+
+	uart_clk = clk_get_sys("imx-uart.0", NULL);
+	early_console_setup(UART2_BASE_ADDR, uart_clk);
+}
+
+static struct sys_timer mx6_ventana_timer = {
+	.init   = mx6_ventana_timer_init,
+};
+
+static void __init mx6q_ventana_reserve(void)
+{
+#if defined(CONFIG_MXC_GPU_VIV) || defined(CONFIG_MXC_GPU_VIV_MODULE)
+	phys_addr_t phys;
+
+	if (imx6q_gpu_pdata.reserved_mem_size) {
+		phys = memblock_alloc_base(imx6q_gpu_pdata.reserved_mem_size,
+					   SZ_4K, SZ_1G);
+		memblock_remove(phys, imx6q_gpu_pdata.reserved_mem_size);
+		imx6q_gpu_pdata.reserved_mem_base = phys;
+	}
+#endif
+}
+
+/*
+ * initialize __mach_desc_GWVENTANA data structure.
+ */
+MACHINE_START(GWVENTANA, "Gateworks i.MX6Q Ventana Board")
+	/* Maintainer: Gateworks Corporation */
+	.boot_params = MX6_PHYS_OFFSET + 0x100,
+	.fixup = fixup_mxc_board,
+	.map_io = mx6_map_io,
+	.init_irq = mx6_init_irq,
+	.init_machine = mx6_ventana_board_init,
+	.timer = &mx6_ventana_timer,
+	.reserve = mx6q_ventana_reserve,
+MACHINE_END
