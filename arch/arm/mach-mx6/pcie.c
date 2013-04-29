@@ -21,7 +21,6 @@
  * with this program; if not, write to the Free Software Foundation, Inc.,
  * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
  */
-
 #include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/interrupt.h>
@@ -33,9 +32,11 @@
 
 #include <mach/pcie.h>
 
+#include <asm/signal.h>
 #include <asm/sizes.h>
 
 #include "crm_regs.h"
+#include "msi.h"
 
 /* Register Definitions */
 #define PRT_LOG_R_BaseAddress 0x700
@@ -55,6 +56,17 @@
 #define DB_R1_RegisterResetValue 0x0
 #define DB_R1_RegisterResetMask 0xFFFFFFFF
 /* End of Register Definition for DB_R1 */
+
+#define PCIE_PL_MSICA		0x820
+#define PCIE_PL_MSICUA		0x824
+#define PCIE_PL_MSIC_INT	0x828
+
+#define MSIC_INT_EN	0x0
+#define MSIC_INT_MASK	0x4
+#define MSIC_INT_STATUS	0x8
+
+#define PCIE_PL_MSIC_GPIO	0x888
+#define PCIE_RC_IOBLSSR     0x1c
 
 #define ATU_R_BaseAddress 0x900
 #define ATU_VIEWPORT_R (ATU_R_BaseAddress + 0x0)
@@ -162,11 +174,6 @@
 
 #define PCIE_DBI_BASE_ADDR	(PCIE_ARB_END_ADDR - SZ_16K + 1)
 
-#define  PCIE_CONF_BUS(b)		(((b) & 0xFF) << 16)
-#define  PCIE_CONF_DEV(d)		(((d) & 0x1F) << 11)
-#define  PCIE_CONF_FUNC(f)		(((f) & 0x7) << 8)
-#define  PCIE_CONF_REG(r)		((r) & ~0x3)
-
 static void __iomem *base;
 static void __iomem *dbi_base;
 
@@ -202,19 +209,6 @@ static void change_field(int *in, int start, int end, int val);
 static inline void imx_pcie_clrset(u32 mask, u32 val, void __iomem *addr)
 {
 	writel(((readl(addr) & ~mask) | (val & mask)), addr);
-}
-
-static struct imx_pcie_port *bus_to_port(int bus)
-{
-	int i;
-
-	for (i = num_pcie_ports - 1; i >= 0; i--) {
-		int rbus = imx_pcie_port[i].root_bus_nr;
-		if (rbus != -1 && rbus == bus)
-			break;
-	}
-
-	return i >= 0 ? imx_pcie_port + i : NULL;
 }
 
 static int __init imx_pcie_setup(int nr, struct pci_sys_data *sys)
@@ -312,6 +306,10 @@ static int imx_pcie_link_up(void __iomem *dbi_base)
 
 static void imx_pcie_regions_setup(void __iomem *dbi_base)
 {
+	unsigned bus;
+	unsigned i;
+	unsigned untranslated_base = PCIE_ARB_END_ADDR +1 - SZ_1M;
+	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT;
 	/*
 	 * i.MX6 defines 16MB in the AXI address map for PCIe.
 	 *
@@ -337,84 +335,186 @@ static void imx_pcie_regions_setup(void __iomem *dbi_base)
 			dbi_base + PCI_CLASS_REVISION);
 
 	/*
-	 * region0 outbound used to access target cfg
+	 * region0-3 outbound used to access target cfg
 	 */
-	writel(0, dbi_base + ATU_VIEWPORT_R);
-	writel(PCIE_ARB_END_ADDR - SZ_1M + 1, dbi_base + ATU_REGION_LOWBASE_R);
-	writel(PCIE_ARB_END_ADDR, dbi_base + ATU_REGION_LIMIT_ADDR_R);
-	writel(0, dbi_base + ATU_REGION_UPBASE_R);
+	for (bus = 1; bus <= 4; bus++) {
+		writel(bus - 1, dbi_base + ATU_VIEWPORT_R);
+		writel(untranslated_base, dbi_base + ATU_REGION_LOWBASE_R);
+		untranslated_base += (1 << 18);
+		if (bus == 4)
+			untranslated_base -= (1 << 14); //(remove registers)
+		writel(untranslated_base - 1, dbi_base + ATU_REGION_LIMIT_ADDR_R);
+		writel(0, dbi_base + ATU_REGION_UPBASE_R);
 
-	writel(0, dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
-	writel(0, dbi_base + ATU_REGION_UP_TRGT_ADDR_R);
-	writel(CfgRdWr0, dbi_base + ATU_REGION_CTRL1_R);
-	writel((1<<31), dbi_base + ATU_REGION_CTRL2_R);
+		writel(bus << 24, dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
+		writel(0, dbi_base + ATU_REGION_UP_TRGT_ADDR_R);
+		writel((bus > 1) ? CfgRdWr1 : CfgRdWr0,
+				dbi_base + ATU_REGION_CTRL1_R);
+		writel((1<<31), dbi_base + ATU_REGION_CTRL2_R);
+	}
+
+	writel(MSI_MATCH_ADDR, dbi_base + PCIE_PL_MSICA);
+	writel(0, dbi_base + PCIE_PL_MSICUA);
+	for (i = 0; i < 8 ; i++) {
+		writel(0, p + MSIC_INT_EN);
+		writel(0xffffffff, p + MSIC_INT_MASK);
+		writel(0xffffffff, p + MSIC_INT_STATUS);
+		p += 12;
+	}
+}
+
+void imx_pcie_mask_irq(unsigned pos, int set)
+{
+	unsigned mask = 1 << (pos & 0x1f);
+	unsigned val, newval;
+	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT + MSIC_INT_MASK + ((pos >> 5) * 12);
+	if (pos >= (8 * 32))
+		return;
+	val = readl(p);
+	if (set)
+		newval = val | mask;
+	else
+		newval = val & ~mask;
+	if (val != newval)
+		writel(newval, p);
+}
+
+void imx_pcie_enable_irq(unsigned pos, int set)
+{
+	unsigned mask = 1 << (pos & 0x1f);
+	unsigned val, newval;
+	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT + MSIC_INT_EN + ((pos >> 5) * 12);
+	if (pos >= (8 * 32))
+		return;
+	val = readl(p);
+	if (set)
+		newval = val | mask;
+	else
+		newval = val & ~mask;
+	if (val != newval)
+		writel(newval, p);
+	if (set && (val != newval))
+		imx_pcie_mask_irq(pos, 0);	/* unmask when enabled */
+}
+
+unsigned imx_pcie_msi_pending(unsigned index)
+{
+	unsigned val, mask;
+	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT + (index * 12);
+	if (index >= 8)
+		return 0;
+	val = readl(p + MSIC_INT_STATUS);
+	mask = readl(p + MSIC_INT_MASK);
+	val &= ~mask;
+	writel(val, p + MSIC_INT_STATUS);
+	return val;
+}
+
+static char master_abort(struct pci_bus *bus, u32 devfn, int where)
+{
+	u32 reg;
+	int ret = 0;
+
+	reg = readl(dbi_base + PCIE_RC_IOBLSSR);
+	if (reg & 0x71000000) {
+		if (reg & 1<<30)
+			pr_err("%d:%02d.%d 0x%04x: parity error\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		if (reg & 1<<29) {
+			pr_err("%d:%02d.%d 0x%04x: master abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+			ret = 1;
+		}
+		if (reg & 1<<28)
+			pr_err("%d:%02d.%d 0x%04x: target abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		if (reg & 1<<24)
+			pr_err("%d:%02d.%d 0x%04x: master data parity error\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		writel(reg, dbi_base + PCIE_RC_IOBLSSR);
+		udelay(1500); // without this delay subsequent reads through bridge can erroneously return 0???
+	}
+	return ret;
+}
+
+static u32 get_cfg_addr(struct pci_bus *bus, u32 devfn, int where)
+{
+	unsigned busnum;
+
+	if (!bus->number) {
+		if (devfn != 0)
+			return 0;
+		return ((u32)dbi_base) + (where & 0x0ffc);
+	}
+	if ((devfn > 0xff) || (bus->number > 15))
+		return 0;
+	busnum = bus->number - 1;
+	if ((busnum < 3) && (devfn <= 3)) {
+		return ((u32)base) + (busnum << 18) + (devfn << 16) + (where & 0xfffc);
+	}
+	writel(3, dbi_base + ATU_VIEWPORT_R);
+	writel((bus->number << 24) | (devfn << 16),
+			dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
+	writel((bus->number > 1) ? CfgRdWr1 : CfgRdWr0,
+			dbi_base + ATU_REGION_CTRL1_R);
+	return ((u32)base) + (3 << 18) + (where & 0xfffc);
 }
 
 static int imx_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 			int size, u32 *val)
 {
-	struct imx_pcie_port *pp = bus_to_port(bus->number);
 	u32 va_address;
+	u32 v;
 
-	if (pp) {
-		if (devfn != 0) {
-			*val = 0xffffffff;
-			return PCIBIOS_DEVICE_NOT_FOUND;
-		}
-
-		va_address = (u32)dbi_base + (where & ~0x3);
-	} else
-		va_address = (u32)base + (PCIE_CONF_BUS(bus->number - 1) +
-					  PCIE_CONF_DEV(PCI_SLOT(devfn)) +
-					  PCIE_CONF_FUNC(PCI_FUNC(devfn)) +
-					  PCIE_CONF_REG(where));
-
-	*val = readl(va_address);
-
-	if (size == 1)
-		*val = (*val >> (8 * (where & 3))) & 0xFF;
-	else if (size == 2)
-		*val = (*val >> (8 * (where & 3))) & 0xFFFF;
-
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x\n", __func__, bus->number, devfn, where, size);
+	va_address = get_cfg_addr(bus, devfn, where);
+	if (!va_address) {
+		*val = 0xffffffff;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	v = readl(va_address);
+	if (master_abort(bus, devfn, where)) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	}
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x v=%x\n", __func__, bus->number, devfn, where, size, v);
+	if (size == 4) {
+		*val = v;
+	} else if (size == 1) {
+		*val = (v >> (8 * (where & 3))) & 0xFF;
+	} else if (size == 2) {
+		*val = (v >> (8 * (where & 3))) & 0xFFFF;
+	} else {
+		*val = 0xffffffff;
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int imx_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 			int where, int size, u32 val)
 {
-	struct imx_pcie_port *pp = bus_to_port(bus->number);
-	u32 va_address = 0, mask = 0, tmp = 0;
-	int ret = PCIBIOS_SUCCESSFUL;
-
-	if (pp) {
-		if (devfn != 0)
-			return PCIBIOS_DEVICE_NOT_FOUND;
-
-		va_address = (u32)dbi_base + (where & ~0x3);
-	} else
-		va_address = (u32)base + (PCIE_CONF_BUS(bus->number - 1) +
-					  PCIE_CONF_DEV(PCI_SLOT(devfn)) +
-					  PCIE_CONF_FUNC(PCI_FUNC(devfn)) +
-					  PCIE_CONF_REG(where));
-
+	u32 va_address, mask, tmp;
+	
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x val=%x\n", __func__, bus->number, devfn, where, size, val);
+	va_address = get_cfg_addr(bus, devfn, where);
+	if (!va_address)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	if (size == 4) {
 		writel(val, va_address);
-		goto exit;
+		return (master_abort(bus, devfn, where))
+			?PCIBIOS_DEVICE_NOT_FOUND:PCIBIOS_SUCCESSFUL;
 	}
-
 	if (size == 2)
 		mask = ~(0xFFFF << ((where & 0x3) * 8));
 	else if (size == 1)
 		mask = ~(0xFF << ((where & 0x3) * 8));
 	else
-		ret = PCIBIOS_BAD_REGISTER_NUMBER;
+		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	tmp = readl(va_address) & mask;
 	tmp |= val << ((where & 0x3) * 8);
 	writel(tmp, va_address);
-exit:
-
-	return ret;
+	return (master_abort(bus, devfn, where))
+		?PCIBIOS_DEVICE_NOT_FOUND:PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops imx_pcie_ops = {
@@ -437,9 +537,20 @@ imx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 	return bus;
 }
 
+signed short irq_map[] = {
+	-EINVAL,
+	MXC_INT_PCIE_3,		/* int a */
+	MXC_INT_PCIE_2,		/* int b */
+	MXC_INT_PCIE_1,		/* int c */
+	MXC_INT_PCIE_0,		/* int d/MSI */
+};
+
 static int __init imx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	return MXC_INT_PCIE_3;
+	int val = -EINVAL;
+	if (pin <= 4)
+		val = irq_map[pin];
+	return val;
 }
 
 static struct hw_pci imx_pci __initdata = {
@@ -667,6 +778,25 @@ static void __init add_pcie_port(void __iomem *base, void __iomem *dbi_base,
 	}
 }
 
+static int imx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
+		struct pt_regs *regs)
+{
+	unsigned long instr;
+	unsigned long pc = instruction_pointer(regs) - 4;
+
+	instr = *(unsigned long *)pc;
+
+	/* imprecise aborts are no longer enabled in 3.7+ during init it would appear.
+	 * We now using PCIE_RC_IOBLSSR to detect master abort however we will still
+	 * get at least one imprecise abort and need to have a handler.
+	 */
+	pr_info("PCIe abort: address = 0x%08lx fsr = 0x%03x PC = 0x%08lx LR = 0x%08lx instr=%08lx\n",
+		addr, fsr, regs->ARM_pc, regs->ARM_lr, instr);
+
+	return 0;
+}
+
+
 static int __devinit imx_pcie_pltfm_probe(struct platform_device *pdev)
 {
 	struct resource *mem;
@@ -715,8 +845,18 @@ static int __devinit imx_pcie_pltfm_probe(struct platform_device *pdev)
 	imx_pcie_regions_setup(dbi_base);
 	usleep_range(3000, 4000);
 
+	/*
+	 * Force to GEN1 because of PCIE2USB storage stress tests
+	 * would be failed when GEN2 is enabled
+	 */
+	writel(((readl(dbi_base + LNK_CAP) & 0xfffffff0) | 0x1),
+			dbi_base + LNK_CAP);
+
 	/* start link up */
 	imx_pcie_clrset(iomuxc_gpr12_app_ltssm_enable, 1 << 10, IOMUXC_GPR12);
+
+	hook_fault_code(16 + 6, imx_pcie_abort_handler, SIGBUS, 0,
+			"imprecise external abort");
 
 	/* add the pcie port */
 	add_pcie_port(base, dbi_base, pdata);
