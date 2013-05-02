@@ -114,6 +114,7 @@
 #define MX6Q_VENTANA_DIO0_PWM
 #define MX6Q_VENTANA_DIO1_PWM
 
+static int __init ventana_model_setup(void);
 void __init early_console_setup(unsigned long base, struct clk *clk);
 static struct clk *sata_clk;
 
@@ -254,9 +255,8 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	/* DIOI2C Disable */
 	MX6Q_PAD_GPIO_19__GPIO_4_5,
 
-	/* DISPLAY */
+	/* Analog Video Out (NB: can be muxed to either IPU1_DISP0 or IPU2_DISP0) */
 	MX6Q_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK,
-//	MX6Q_PAD_DI0_PIN15__IPU1_DI0_PIN15,		/* DE */
 //	MX6Q_PAD_DI0_PIN2__IPU1_DI0_PIN2,		/* HSync */
 	NEW_PAD_CTRL(MX6Q_PAD_DI0_PIN2__IPU1_DI0_PIN2, MX6Q_VENTANA_DISP0_DIO_PADCFG),
 //	MX6Q_PAD_DI0_PIN3__IPU1_DI0_PIN3,		/* VSync */
@@ -673,6 +673,13 @@ static struct at24_platform_data ventana_eeprom_info = {
   .setup = ventana_eeprom_setup,
 };
 
+/* Analog Video Out - IPU1_DISP0 */
+static struct fsl_mxc_lcd_platform_data adv7393_pdata = {
+	.ipu_id = 0,
+	.disp_id = 0,
+	.default_ifmt = IPU_PIX_FMT_BT656,
+};
+
 static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 	{
 /*
@@ -706,25 +713,6 @@ static void mx6_csi1_io_init(void)
 		printk(KERN_ERR "%s: mx6dl pinmux not yet implemented\n", __func__);
 	}
 
-#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
-	/* Tvin reset */
-	gpio_request(MX6_ARM2_CSI0_RST_TVIN, "tvin-reset");
-	gpio_direction_output(MX6_ARM2_CSI0_RST_TVIN, 1);
-#else
-	// set i2c 0x0f.7 (RESET)
-#endif
-
-#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
-	/* Tvin power down */
-	gpio_request(MX6_ARM2_CSI0_PWN, "cam-pwdn");
-	gpio_direction_output(MX6_ARM2_CSI0_PWN, 0);
-	msleep(1);
-	gpio_set_value(MX6_ARM2_CSI0_PWN, 1);
-#else
-	// set i2c 0x0f.2 (PDBP)
-	// set i2c 0x0f.5 (PWRDOWN)
-#endif
-
 	/* set IPU2 Mux to parallel interface */
   /* For MX6Q:
    * GPR1 bit19 and bit20 meaning:
@@ -748,6 +736,7 @@ static void mx6_csi1_io_init(void)
 		mxc_iomux_set_gpr_register(13, 3, 3, 4); /* GPR13[0:2] = 4 */
 }
 
+/* Analog Video In - IPU2_CSI1 */
 static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.dvddio_reg = "VDD_DLY_3P3",
 	.dvdd_reg = "DVDD", // VDD_1P8
@@ -757,16 +746,6 @@ static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.reset = NULL, // TODO
 	.cvbs = true,
 	.io_init = mx6_csi1_io_init, // IPU2_CSI1
-};
-
-
-static struct fsl_mxc_lcd_platform_data adv7393_pdata = {
-  .io_reg = "VDD_DLY_3P3",
-  .core_reg = "VDD",   // VDD_1P8
-	.analog_reg = "VAA", // VDD_1P8
-	.ipu_id = 0,
-	.disp_id = 0,
-  .default_ifmt = IPU_PIX_FMT_RGB565,
 };
 
 static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
@@ -797,7 +776,7 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 
 	/* Analog Video Encoder (Video Out) */
 	{
-		I2C_BOARD_INFO("adv7393", 0x2a),
+		I2C_BOARD_INFO("mxc_adv739x", 0x2a),
 		.platform_data = (void *)&adv7393_pdata,
 	},
 
@@ -937,6 +916,7 @@ static void mx6_reset_mipi_dsi(void)
 	msleep(120);
 }
 
+/* MIPI Display Out - IPU1_DISP1 */
 static struct mipi_dsi_platform_data mipi_dsi_pdata = {
 	.ipu_id   = 0,
 	.disp_id  = 1,
@@ -971,29 +951,26 @@ static struct mipi_dsi_platform_data mipi_dsi_pdata = {
  */
 static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 	{
-		/* mxcfb0: fb0,1 */
+		/* mxcfb0: fb0,1 - LVDS Freescale MXC-LVDS1 */
 		.disp_dev = "ldb",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
 		.mode_str = "LDB-XGA",
 		.default_bpp = 16,
 		.int_clk = false,
-		.late_init = false,
 	}, {
-		/* mxcfb1: fb2,3 */
+		/* mxcfb1: fb2,3 - Analog Video out */
 		.disp_dev = "adv7393",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB565,
-		.mode_str = "TVOUT",
-		.default_bpp = 16,
+		.mode_str = "BT656-NTSC",
+		.default_bpp = 8,
 		.int_clk = false,
-		.late_init = false,
 	}, {
-		/* mxcfb2: fb4,5 */
+		/* mxcfb2: fb4,5 - MIPI DSI */
 		.disp_dev = "mipi_dsi",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
 		.mode_str = "TRULY-WVGA",
 		.default_bpp = 24,
 		.int_clk = false,
-		.late_init = false,
 	}, {
 		/* mxcfb3: fb6,7 */
 		.disp_dev = "ldb",
@@ -1001,7 +978,6 @@ static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 		.mode_str = "LDB-VGA",
 		.default_bpp = 16,
 		.int_clk = false,
-		.late_init = false,
 	},
 };
 
@@ -1010,6 +986,7 @@ static void hdmi_init(int ipu_id, int disp_id)
 	int hdmi_mux_setting;
 	int max_ipu_id = cpu_is_mx6q() ? 1 : 0;
 
+	printk(KERN_INFO "%s IPU%d_DISP%d\n", __func__, ipu_id+1, disp_id);
 	if ((ipu_id > max_ipu_id) || (ipu_id < 0)) {
 		pr_err("Invalid IPU select for HDMI: %d. Set to 0\n", ipu_id);
 		ipu_id = 0;
@@ -1069,7 +1046,7 @@ static struct fsl_mxc_hdmi_core_platform_data hdmi_core_data = {
 	.disp_id = 0,
 };
 
-/* Analog Video Out: IPU1_DISP0 */
+/* LCD Video Out: IPU1_DISP0 */
 static struct fsl_mxc_lcd_platform_data lcdif_data = {
 	.ipu_id = 0,
 	.disp_id = 0,
@@ -1084,6 +1061,13 @@ static struct fsl_mxc_ldb_platform_data ldb_data = {
 	.mode = LDB_SEP0,
 	.sec_ipu_id = 1,
 	.sec_disp_id = 1,
+};
+
+/* Analog Video Out: IPU1_DISP0 (NB: can also be IPU2_DISP0 if pinmux changed) */
+static struct fsl_mxc_lcd_platform_data bt656_data = {
+	.ipu_id = 0,
+	.disp_id = 0,
+	.default_ifmt = IPU_PIX_FMT_BT656,
 };
 
 /* bypass_reset - check this - its not set false on sabrelite
@@ -1348,7 +1332,6 @@ static void __init mx6_ventana_board_init(void)
 	soc_reg_id = ventana_dvfscore_data.soc_id;
 
 	/* I2C */
-printk("%s initializing I2C\n", __func__);
 	imx6q_add_imx_i2c(0, &mx6q_ventana_i2c_data);
 	imx6q_add_imx_i2c(1, &mx6q_ventana_i2c_data);
 	imx6q_add_imx_i2c(2, &mx6q_ventana_i2c_data);
@@ -1386,6 +1369,43 @@ printk("%s initializing I2C\n", __func__);
 
 	/* USB */
 	imx6q_ventana_init_usb();
+
+	/* RTC */
+	//imx6q_add_imx_snvs_rtc();
+
+	/* thermal sensor */
+	imx6q_add_anatop_thermal_imx(1, &mx6q_ventana_anatop_thermal_data);
+
+	/* Power Management */
+	imx6q_add_pm_imx(0, &mx6q_ventana_pm_data);
+
+	/* GPU */
+	imx_add_viv_gpu(&imx6_gpu_data, &imx6q_gpu_pdata);
+
+	/* GPIO: GPIO/PWM/PPS */
+	platform_device_register(&mx6_ventana_leds_gpio_device);
+	platform_device_register(&mx6_ventana_leds_pwm_device);
+#ifdef CONFIG_PPS_CLIENT_GPIO
+	platform_device_register(&mx6_ventana_pps_device);
+#endif
+
+	/* PWM */
+	imx6q_add_mxc_pwm(0);
+	imx6q_add_mxc_pwm(1);
+	imx6q_add_mxc_pwm(2);
+	imx6q_add_mxc_pwm(3);
+
+	imx6q_add_otp();
+	imx6q_add_viim();
+	imx6q_add_imx2_wdt(0, NULL);
+	imx6q_add_dma();
+
+	imx6q_add_dvfs_core(&ventana_dvfscore_data);
+
+	imx6_add_armpmu();
+	imx6q_add_perfmon(0);
+	imx6q_add_perfmon(1);
+	imx6q_add_perfmon(2);
 }
 
 static int __init ventana_model_setup(void)
@@ -1400,33 +1420,43 @@ static int __init ventana_model_setup(void)
 		mx6q_ventana_init_uart();
 
 		/* HDMI output */
-		if (info->config_hdmi_out)
+		if (info->config_hdmi_out) {
 			imx6q_add_mxc_hdmi_core(&hdmi_core_data);
+		}
+
+		/* MIPI DSI Output */
+		if (info->config_mipi_dsi)
+			imx6q_add_mipi_dsi(&mipi_dsi_pdata);
+
+		/* Sync Display device output */
+		if (info->config_lvds0 || info->config_lvds1) {
+			imx6q_add_lcdif(&lcdif_data);
+			imx6q_add_ldb(&ldb_data);
+			imx6q_add_bt656(&bt656_data);
+			imx6q_add_v4l2_output(0);
+		}
 
 		/* IPU (imx6q has 2, imx6dl has 1) */
 		if (info->config_ipu0)
 			imx6q_add_ipuv3(0, &ipu_data[0]);
-		if (info->config_ipu1 && cpu_is_mx6q()) {
+		if (info->config_ipu1 && cpu_is_mx6q())
 			imx6q_add_ipuv3(1, &ipu_data[1]);
+		if (info->config_ipu0 || info->config_ipu1)
+			imx6q_add_vdoa(); // Video Data Order Adapter
+
+
+		/* MXC Framebuffer device */
+		if (info->config_ipu1 && cpu_is_mx6q()) {
 			for (i = 0; i < 4 && i < ARRAY_SIZE(ventana_fb_data); i++)
 				imx6q_add_ipuv3fb(i, &ventana_fb_data[i]);
 		} else if (info->config_ipu0) {
 			for (i = 0; i < 2 && i < ARRAY_SIZE(ventana_fb_data); i++)
 				imx6q_add_ipuv3fb(i, &ventana_fb_data[i]);
 		}
-		if (info->config_ipu0 || info->config_ipu1)
-			imx6q_add_vdoa();
 
-		/* MIPI DSI Output */
-		if (info->config_mipi_dsi)
-			imx6q_add_mipi_dsi(&mipi_dsi_pdata);
-
-		/* LCD output */
-		if (info->config_lvds0 || info->config_lvds1) {
-			imx6q_add_lcdif(&lcdif_data);
-			imx6q_add_ldb(&ldb_data);
-			imx6q_add_v4l2_output(0);
-		}
+		/* HDMI output */
+		if (info->config_hdmi_out)
+			imx6q_add_mxc_hdmi(&hdmi_data);
 
 		/* /dev/video0 HDMI Receiver */
 		if (info->config_hdmi_in)
@@ -1450,10 +1480,6 @@ static int __init ventana_model_setup(void)
 			spi_device_init();
 		}
 
-		/* HDMI (how does this differ from hdmi_core? */
-		if (info->config_hdmi_out)
-			imx6q_add_mxc_hdmi(&hdmi_data);
-
 		/* GigE MAC */
 		if (info->config_eth0) {
 			memcpy(&fec_data.mac, info->mac0, ETH_ALEN);
@@ -1461,7 +1487,7 @@ static int __init ventana_model_setup(void)
 		}
 
 		/* MMC */
-		if ( info->config_sd0 || info->config_sd1
+		if (info->config_sd0 || info->config_sd1
 		  || info->config_sd2 || info->config_sd3)
 			platform_device_register(&ventana_vmmc_reg_devices);
 		if (info->config_sd2 /* 0-based */)
@@ -1557,43 +1583,6 @@ static int __init ventana_model_setup(void)
 
 	} else {
 	}
-
-	/* RTC */
-	//imx6q_add_imx_snvs_rtc();
-
-	/* thermal sensor */
-	imx6q_add_anatop_thermal_imx(1, &mx6q_ventana_anatop_thermal_data);
-
-	/* Power Management */
-	imx6q_add_pm_imx(0, &mx6q_ventana_pm_data);
-
-	/* GPU */
-	imx_add_viv_gpu(&imx6_gpu_data, &imx6q_gpu_pdata);
-
-	/* GPIO: GPIO/PWM/PPS */
-	platform_device_register(&mx6_ventana_leds_gpio_device);
-	platform_device_register(&mx6_ventana_leds_pwm_device);
-#ifdef CONFIG_PPS_CLIENT_GPIO
-	platform_device_register(&mx6_ventana_pps_device);
-#endif
-
-	/* PWM */
-	imx6q_add_mxc_pwm(0);
-	imx6q_add_mxc_pwm(1);
-	imx6q_add_mxc_pwm(2);
-	imx6q_add_mxc_pwm(3);
-
-	imx6q_add_otp();
-	imx6q_add_viim();
-	imx6q_add_imx2_wdt(0, NULL);
-	imx6q_add_dma();
-
-	imx6q_add_dvfs_core(&ventana_dvfscore_data);
-
-	imx6_add_armpmu();
-	imx6q_add_perfmon(0);
-	imx6q_add_perfmon(1);
-	imx6q_add_perfmon(2);
 
 	return 0;
 }
