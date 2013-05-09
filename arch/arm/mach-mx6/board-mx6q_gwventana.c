@@ -712,28 +712,9 @@ static void mx6_csi1_io_init(void)
 		printk(KERN_ERR "%s: mx6dl pinmux not yet implemented\n", __func__);
 	}
 
-#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
-	/* Tvin reset */
-	gpio_request(MX6_ARM2_CSI0_RST_TVIN, "tvin-reset");
-	gpio_direction_output(MX6_ARM2_CSI0_RST_TVIN, 1);
-#else
-	// set i2c 0x0f.7 (RESET)
-#endif
-
-#if 0 // POR# is reset and PWRDWN# is pulled up - need to do this via i2c
-	/* Tvin power down */
-	gpio_request(MX6_ARM2_CSI0_PWN, "cam-pwdn");
-	gpio_direction_output(MX6_ARM2_CSI0_PWN, 0);
-	msleep(1);
-	gpio_set_value(MX6_ARM2_CSI0_PWN, 1);
-#else
-	// set i2c 0x0f.2 (PDBP)
-	// set i2c 0x0f.5 (PWRDOWN)
-#endif
-
 	/* set IPU2 Mux to parallel interface */
   /* For MX6Q:
-   * GPR1 bit19 and bit20 meaning:
+   * IOMUX_GPR1 bit19 and bit20 meaning:
    * Bit19:       0 - Enable mipi to IPU1 CSI0
    *                      virtual channel is fixed to 0
    *              1 - Enable parallel interface to IPU1 CSI0
@@ -759,10 +740,13 @@ static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.dvdd_reg = "DVDD", // VDD_1P8
 	.avdd_reg = "AVDD", // VDD_1P8
 	.pvdd_reg = "PVDD", // VDD_1P8
-	.pwdn = NULL, // TODO
-	.reset = NULL, // TODO
+	.pwdn = NULL,
+	.reset = NULL,
 	.cvbs = true,
-	.io_init = mx6_csi1_io_init, // IPU2_CSI1
+	.mclk = 0,
+	.mclk_source = 0,
+	.csi = 1, // IPU2_CSI1
+	.io_init = mx6_csi1_io_init,
 };
 
 static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
@@ -834,6 +818,7 @@ static void __init imx6q_ventana_init_usb(void)
 	}
 	gpio_export(MX6Q_VENTANA_USB_OTG_PWR, 0);
 	gpio_direction_output(MX6Q_VENTANA_USB_OTG_PWR, 0);
+	/* IOMUX_GPR1[13]=1 selects GPIO_1 for USB_OTG_ID */
 	mxc_iomux_set_gpr_register(1, 13, 1, 1);
 
 	mx6_set_otghost_vbus_func(imx6q_ventana_usbotg_vbus);
