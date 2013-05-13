@@ -114,7 +114,6 @@
 #define MX6Q_VENTANA_DIO0_PWM
 #define MX6Q_VENTANA_DIO1_PWM
 
-static int __init ventana_model_setup(void);
 void __init early_console_setup(unsigned long base, struct clk *clk);
 static struct clk *sata_clk;
 
@@ -715,7 +714,7 @@ static void mx6_csi1_io_init(void)
 
 	/* set IPU2 Mux to parallel interface */
   /* For MX6Q:
-   * GPR1 bit19 and bit20 meaning:
+   * IOMUX_GPR1 bit19 and bit20 meaning:
    * Bit19:       0 - Enable mipi to IPU1 CSI0
    *                      virtual channel is fixed to 0
    *              1 - Enable parallel interface to IPU1 CSI0
@@ -742,10 +741,13 @@ static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.dvdd_reg = "DVDD", // VDD_1P8
 	.avdd_reg = "AVDD", // VDD_1P8
 	.pvdd_reg = "PVDD", // VDD_1P8
-	.pwdn = NULL, // TODO
-	.reset = NULL, // TODO
+	.pwdn = NULL,
+	.reset = NULL,
 	.cvbs = true,
-	.io_init = mx6_csi1_io_init, // IPU2_CSI1
+	.io_init = mx6_csi1_io_init,
+	.mclk = 0,
+	.mclk_source = 0,
+	.csi = 1,
 };
 
 static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
@@ -817,6 +819,7 @@ static void __init imx6q_ventana_init_usb(void)
 	}
 	gpio_export(MX6Q_VENTANA_USB_OTG_PWR, 0);
 	gpio_direction_output(MX6Q_VENTANA_USB_OTG_PWR, 0);
+	/* IOMUX_GPR1[13]=1 selects GPIO_1 for USB_OTG_ID */
 	mxc_iomux_set_gpr_register(1, 13, 1, 1);
 
 	mx6_set_otghost_vbus_func(imx6q_ventana_usbotg_vbus);
@@ -1053,6 +1056,13 @@ static struct fsl_mxc_lcd_platform_data lcdif_data = {
 	.default_ifmt = IPU_PIX_FMT_RGB565,
 };
 
+/* Analog Video Out: IPU1_DISP0 */
+static struct fsl_mxc_lcd_platform_data bt656_data = {
+	.ipu_id = 0,
+	.disp_id = 0,
+	.default_ifmt = IPU_PIX_FMT_BT656,
+};
+
 /* LVDS out: IPU2_DISP0 */
 static struct fsl_mxc_ldb_platform_data ldb_data = {
 	.ipu_id = 1,
@@ -1061,13 +1071,6 @@ static struct fsl_mxc_ldb_platform_data ldb_data = {
 	.mode = LDB_SEP0,
 	.sec_ipu_id = 1,
 	.sec_disp_id = 1,
-};
-
-/* Analog Video Out: IPU1_DISP0 (NB: can also be IPU2_DISP0 if pinmux changed) */
-static struct fsl_mxc_lcd_platform_data bt656_data = {
-	.ipu_id = 0,
-	.disp_id = 0,
-	.default_ifmt = IPU_PIX_FMT_BT656,
 };
 
 /* bypass_reset - check this - its not set false on sabrelite
