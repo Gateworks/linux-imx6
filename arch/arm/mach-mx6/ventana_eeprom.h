@@ -92,8 +92,8 @@ struct ventana_board_info {
 	u8 config_spifl1:1;  // 2
 	u8 config_gspbatt:1; // 3
 	u8 config_hdmi_in:1; // 4
-	u8 config_vid_out:1; // 5
-	u8 config_vid_in:1;  // 6
+	u8 config_cvbs_out:1;// 5
+	u8 config_cvbs_in:1; // 6
 	u8 config_res7:1;    // 7
 
 	u8 config_res8:1;    // 0: 0x49

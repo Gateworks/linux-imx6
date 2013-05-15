@@ -672,7 +672,7 @@ static struct at24_platform_data ventana_eeprom_info = {
   .setup = ventana_eeprom_setup,
 };
 
-/* Analog Video Out - IPU1_DISP0 */
+/* CVBS Video Out - IPU1_DISP0 */
 static struct fsl_mxc_lcd_platform_data adv7393_pdata = {
 	.ipu_id = 0,
 	.disp_id = 0,
@@ -985,11 +985,6 @@ static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 		.int_clk = false,
 	}, {
 		/* mxcfb2: /dev/fb4 */
-/*
-		.disp_dev = "ldb",
-		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
-		.mode_str = "LDB-VGA",
-*/
 		.disp_dev = "hdmi",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
 		.mode_str = "1280x720M@60",
@@ -1004,6 +999,9 @@ static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 		.int_clk = false,
 	},
 };
+
+
+/* Initialize HDMI */
 static void hdmi_init(int ipu_id, int disp_id)
 {
 	int hdmi_mux_setting;
@@ -1057,16 +1055,17 @@ static void hdmi_disable_ddc_pin(void)
 	}
 }
 
+/* Platform data for mxc_hdmi driver */
 static struct fsl_mxc_hdmi_platform_data hdmi_data = {
 	.init = hdmi_init,
 	.enable_pins = hdmi_enable_ddc_pin,
 	.disable_pins = hdmi_disable_ddc_pin,
 };
 
-/* HDMI out: IPU1_DISP0 */
+/* HDMI out: IPU2_DISP1 */
 static struct fsl_mxc_hdmi_core_platform_data hdmi_core_data = {
-	.ipu_id = 0,
-	.disp_id = 0,
+	.ipu_id = 1,
+	.disp_id = 1,
 };
 
 /* LCD Video Out: IPU1_DISP0 */
@@ -1076,7 +1075,7 @@ static struct fsl_mxc_lcd_platform_data lcdif_data = {
 	.default_ifmt = IPU_PIX_FMT_RGB565,
 };
 
-/* Analog Video Out: IPU1_DISP0 */
+/* BT656 Video Out: IPU1_DISP0 */
 static struct fsl_mxc_lcd_platform_data bt656_data = {
 	.ipu_id = 0,
 	.disp_id = 0,
@@ -1354,6 +1353,12 @@ static void __init mx6_ventana_board_init(void)
 	gp_reg_id = ventana_dvfscore_data.reg_id;
 	soc_reg_id = ventana_dvfscore_data.soc_id;
 
+	/* UART */
+	mx6q_ventana_init_uart();
+
+	/* HDMI output */
+	imx6q_add_mxc_hdmi_core(&hdmi_core_data);
+
 	/* I2C */
 	imx6q_add_imx_i2c(0, &mx6q_ventana_i2c_data);
 	imx6q_add_imx_i2c(1, &mx6q_ventana_i2c_data);
@@ -1439,25 +1444,21 @@ static int __init ventana_model_setup(void)
 	printk("Running on Gateworks Ventana %s\n", info->model);
 
 	if (strncmp(info->model, "GW", 2) == 0) {
-		/* UART */
-		mx6q_ventana_init_uart();
-
-		/* HDMI output */
-		if (info->config_hdmi_out) {
-			imx6q_add_mxc_hdmi_core(&hdmi_core_data);
-		}
 
 		/* MIPI DSI Output */
 		if (info->config_mipi_dsi)
 			imx6q_add_mipi_dsi(&mipi_dsi_pdata);
 
 		/* Sync Display device output */
-		if (info->config_lvds0 || info->config_lvds1) {
-			imx6q_add_lcdif(&lcdif_data);
-			imx6q_add_ldb(&ldb_data);
-			imx6q_add_bt656(&bt656_data);
-			imx6q_add_v4l2_output(0);
-		}
+		if (info->config_lvds0 || info->config_lvds1)
+			imx6q_add_ldb(&ldb_data);     // LVDS interface
+		if (info->config_lcd)
+			imx6q_add_lcdif(&lcdif_data); // parallel RGB interface
+		if (info->config_cvbs_out)
+			imx6q_add_bt656(&bt656_data); // BT656 interface
+		/* HDMI output */
+		if (info->config_hdmi_out)
+			imx6q_add_mxc_hdmi(&hdmi_data);
 
 		/* IPU (imx6q has 2, imx6dl has 1) */
 		if (info->config_ipu0)
@@ -1465,8 +1466,7 @@ static int __init ventana_model_setup(void)
 		if (info->config_ipu1 && cpu_is_mx6q())
 			imx6q_add_ipuv3(1, &ipu_data[1]);
 		if (info->config_ipu0 || info->config_ipu1)
-			imx6q_add_vdoa(); // Video Data Order Adapter
-
+			imx6q_add_vdoa();            // Video Data Order Adapter
 
 		/* MXC Framebuffer device */
 		if (info->config_ipu1 && cpu_is_mx6q()) {
@@ -1477,16 +1477,19 @@ static int __init ventana_model_setup(void)
 				imx6q_add_ipuv3fb(i, &ventana_fb_data[i]);
 		}
 
-		/* HDMI output */
-		if (info->config_hdmi_out)
-			imx6q_add_mxc_hdmi(&hdmi_data);
+		/* V4L2 output */
+		if ( info->config_lvds0 || info->config_lvds1
+		  || info->config_cvbs_out || info->config_hdmi_out)
+		{
+			imx6q_add_v4l2_output(0);
+		}
 
 		/* /dev/video0 HDMI Receiver */
 		if (info->config_hdmi_in)
 			imx6q_add_v4l2_capture(0, &capture_data[0]);
 
 		/* /dev/video1 ADV7180 Analog Video Decoder */
-		if (info->config_vid_in)
+		if (info->config_cvbs_in)
 			imx6q_add_v4l2_capture(1, &capture_data[1]);
 
 		/* MIPI input */
