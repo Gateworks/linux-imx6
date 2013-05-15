@@ -434,10 +434,12 @@ static int ldb_disp_init(struct mxc_dispdrv_handle *disp,
 		ldb->control_reg = ldb->reg + 2;
 		ldb->gpr3_reg = ldb->reg + 3;
 
-		ldb->lvds_bg_reg = regulator_get(&ldb->pdev->dev, plat_data->lvds_bg_reg);
-		if (!IS_ERR(ldb->lvds_bg_reg)) {
-			regulator_set_voltage(ldb->lvds_bg_reg, 2500000, 2500000);
-			regulator_enable(ldb->lvds_bg_reg);
+		if (plat_data->lvds_bg_reg) {
+			ldb->lvds_bg_reg = regulator_get(&ldb->pdev->dev, plat_data->lvds_bg_reg);
+			if (!IS_ERR(ldb->lvds_bg_reg)) {
+				regulator_set_voltage(ldb->lvds_bg_reg, 2500000, 2500000);
+				regulator_enable(ldb->lvds_bg_reg);
+			}
 		}
 
 		/* ipu selected by platform data setting */
