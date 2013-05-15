@@ -927,63 +927,83 @@ static struct mipi_dsi_platform_data mipi_dsi_pdata = {
 	.reset    = mx6_reset_mipi_dsi,
 };
 
-/* Framebuffer Output devices
+/* mxc Framebuffer devices
  *
- *  the 'disp_dev' field names the display type which matches the name
- *  registered for various mxc_display drivers registered with
- *  mxc_dispdrv_register
+ * i.MX6Q has 2 IPU's each with 2 display ports thus can have 4 simultaneous
+ * displays.  The defaults can be changed with video= kernel commandline.
+ * For single IPU processors only 2 can be registered.  The first
+ * device registered per IPU uses the Display Processor (DP) providing
+ * combining of 2 video/graphic planes thus 2 framebuffer devices are
+ * registered for those devices.
  *
- *  the 'mode_str' gets passed to mxc_display->init function as
- *  setting->dft_mode_str
+ *  @disp_dev - name of output interface used for display
+ *              (matching a registered mxc_display driver)
+ *              ldb     = LVDS interface
+ *              hdmi    = HDMI interface
+ *              adv7393 = CVBS interface
+ *  @interface_pix_fmt - pixel format at the IPU transmitter
+ *              RGB666 - 18bit devices
+ *              RGB24  - 24bit devices
+ *              BT656  - 8bit BT656 devices
+ *  @fb_pix_fmt - pixel format of the framebuffer device
+ *              IPU_PIX_FMT_RGB565
+ *  @default_bpp - default bit-depth of the framebuffer
+ *  @mode_str - named panel string or a resolution in the VESA coordinated video
+ *              timings format (see Documentation/fb/modedb.txt)
  *
- *  i.MX6Q has 2 IPU's each with 2 display ports thus can have 4 simultaneous
- *  displays.  The defaults can be changed with video= kernel commandline.
- *
- *  Examples:
+ *  Valid Examples:
  *    HDMI out on /dev/fb0,1:
  *       video=mxcfb0:dev=hdmi,1280x720M@60,if=RGB24
- *    Freescale LVDS1 on /dev/fb2,3:
+ *    Freescale MXC-LVDS1 10" 1024x768 on /dev/fb2,3:
  *       video=mxcfb1:dev=ldb,LDB-XGA,if=RGB666
- *
- * see: Documentation/fb/modedb.txt
- *
- * late_init = false is used on sabresd fb's but not on sabrelite
- *  may want to unset.  Sabresd has kernel cmdline hoooks to make these
- *  early init.  I think that may be in order to allow display devices to be
- *  tweaked depending on mx6q vs mx6dl
+ *    CVBS on /dev/fb0,1 + HDMI on /dev/fb1,2:
+ *       video=mxcfb0:dev=adv739x,BT656-NTSC,if=BT656,fbpix=RGB565 \
+ *             mxcfb1:dev=ldb,LDB-XGA,if=RGB666 \
+ *             mxcfb2:off
  */
 static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 	{
-		/* mxcfb0: fb0,1 - LVDS Freescale MXC-LVDS1 */
+		/* mxcfb0: Analog Video out
+		 * /dev/fb0 - primary display (BG/Graphics)
+		 * /dev/fb1 - overlay display (FG/Video)
+		 */
+		.disp_dev = "adv739x",
+		.interface_pix_fmt = IPU_PIX_FMT_BT656,
+		.fb_pix_fmt = IPU_PIX_FMT_RGB565,
+		.mode_str = "BT656-NTSC",
+		.default_bpp = 16,
+		.int_clk = false,
+	}, {
+		/* mxcfb1: LVDS Freescale MXC-LVDS1
+		 * /dev/fb2 - primary display (BG/Graphics)
+		 * /dev/fb3 - overlay display (FG/Video)
+		 */
 		.disp_dev = "ldb",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
 		.mode_str = "LDB-XGA",
 		.default_bpp = 16,
 		.int_clk = false,
 	}, {
-		/* mxcfb1: fb2,3 - Analog Video out */
-		.disp_dev = "adv7393",
-		.interface_pix_fmt = IPU_PIX_FMT_RGB565,
-		.mode_str = "BT656-NTSC",
-		.default_bpp = 8,
+		/* mxcfb2: /dev/fb4 */
+/*
+		.disp_dev = "ldb",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+		.mode_str = "LDB-VGA",
+*/
+		.disp_dev = "hdmi",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+		.mode_str = "1280x720M@60",
+		.default_bpp = 16,
 		.int_clk = false,
 	}, {
-		/* mxcfb2: fb4,5 - MIPI DSI */
+		/* mxcfb3: MIPI DSI /dev/fb5 */
 		.disp_dev = "mipi_dsi",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
 		.mode_str = "TRULY-WVGA",
 		.default_bpp = 24,
 		.int_clk = false,
-	}, {
-		/* mxcfb3: fb6,7 */
-		.disp_dev = "ldb",
-		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
-		.mode_str = "LDB-VGA",
-		.default_bpp = 16,
-		.int_clk = false,
 	},
 };
-
 static void hdmi_init(int ipu_id, int disp_id)
 {
 	int hdmi_mux_setting;
