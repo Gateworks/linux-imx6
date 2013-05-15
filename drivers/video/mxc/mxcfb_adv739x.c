@@ -200,6 +200,15 @@ int adv739x_fb_event(struct notifier_block *nb, unsigned long val, void *v)
 	if (strcmp(event->info->fix.id, adv739x->fbi->fix.id))
 		return 0;
 
+	fbi->mode = (struct fb_videomode *)fb_match_mode(&fbi->var,
+		&fbi->modelist);
+	if (!fbi->mode) {
+		dev_warn(&adv739x->pdev->dev,
+				"adv739x: can not find mode for xres=%d, yres=%d\n",
+				fbi->var.xres, fbi->var.yres);
+		return 0;
+	}
+
 	switch (val) {
 	case FB_EVENT_MODE_CHANGE:
 		if(strcmp(fbi->mode->name, "BT656-NTSC") == 0)
