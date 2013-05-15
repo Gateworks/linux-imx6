@@ -1949,11 +1949,19 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 	uint32_t bt656_v_start_width_field1 = 0, bt656_v_end_width_field1 = 0;
 	int u_map = 0, y_map = 0, v_map = 0;
 
-//di=0 clk=27000000 720/480 fmt=BT65 19/276/3/20/1/3 0 sig=1924
-printk("\n\n%s: di=%d clk=%d %d/%d fmt=%c%c%c%c %d/%d/%d/%d/%d/%d %d sig=%d\n", 
- __func__, disp, pixel_clk, width, height,
- (pixel_fmt>>0)&0xff, (pixel_fmt>>8)&0xff, (pixel_fmt>>16)&0xff, (pixel_fmt>>24)&0xff,
- h_start_width, h_sync_width, h_end_width, v_start_width, v_sync_width, v_end_width, v_to_h_sync, sig);
+	int ipuno = -1;
+	if (ipu_get_soc(0) == ipu)
+		ipuno = 1;
+	else if (ipu_get_soc(1) == ipu)
+		ipuno = 2;
+	printk(KERN_INFO "%s: IPU%d_DISP%d clk=%d %d/%d fmt=%c%c%c%c\n",
+		__func__, ipuno, disp, pixel_clk, width, height,
+		(pixel_fmt>>0)&0xff, (pixel_fmt>>8)&0xff,
+		(pixel_fmt>>16)&0xff, (pixel_fmt>>24)&0xff);
+	printk(KERN_INFO "%s: margins:%d/%d/%d/%d/%d/%d %d\n", __func__,
+		h_start_width, h_sync_width, h_end_width,
+		v_start_width, v_sync_width, v_end_width,
+		v_to_h_sync);
 
 	dev_dbg(ipu->dev, "panel size = %d x %d\n", width, height);
 
