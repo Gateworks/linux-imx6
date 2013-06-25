@@ -420,7 +420,7 @@ static char master_abort(struct pci_bus *bus, u32 devfn, int where)
 		if (reg & 1<<30)
 			pr_err("%d:%02d.%d 0x%04x: parity error\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
 		if (reg & 1<<29) {
-			pr_err("%d:%02d.%d 0x%04x: master abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+//			pr_err("%d:%02d.%d 0x%04x: master abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
 			ret = 1;
 		}
 		if (reg & 1<<28)
@@ -781,6 +781,7 @@ static void __init add_pcie_port(void __iomem *base, void __iomem *dbi_base,
 static int imx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
 		struct pt_regs *regs)
 {
+#if 0
 	unsigned long instr;
 	unsigned long pc = instruction_pointer(regs) - 4;
 
@@ -792,7 +793,7 @@ static int imx_pcie_abort_handler(unsigned long addr, unsigned int fsr,
 	 */
 	pr_info("PCIe abort: address = 0x%08lx fsr = 0x%03x PC = 0x%08lx LR = 0x%08lx instr=%08lx\n",
 		addr, fsr, regs->ARM_pc, regs->ARM_lr, instr);
-
+#endif
 	return 0;
 }
 
