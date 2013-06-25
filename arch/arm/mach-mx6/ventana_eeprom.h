@@ -14,11 +14,13 @@ struct ventana_board_info {
 	u8 res1[3];          // 0x1D: reserved
 	u8 mfgdate[4];       // 0x20: MFG date (read only)
 	// GPIO config
-	u8 dio0;             // 0x24: 0|1|2
-	u8 dio1;             // 0x25: 0|1|2
-	u8 dio2;             // 0x26: 0|1|2
-	u8 dio3;             // 0x27: 0|1|2
-	u8 res2[3];          // 0x28
+	u8 dio0;             // 0x24: 0=GPIO|1=PWM
+	u8 dio1;             // 0x25: 0=GPIO|1=PWM
+	u8 dio2;             // 0x26: 0=GPIO|1=PWM
+	u8 dio3;             // 0x27: 0=GPIO|1=PWM
+	u8 msata_en;         // 0x28: 0=PCIe|1=mSATA
+	u8 rs232_en;         // 0x29: RS232 Enable 
+	u8 res2[1];          // 0x30
 	// sdram config
 	u8 sdram_size;       // 0x2B: enum (512,1024,2048) MB
 	u8 sdram_speed;      // 0x2C: enum (100,133,166,200,267,333,400) MHz
@@ -71,7 +73,7 @@ struct ventana_board_info {
 	u8 config_csi0:1;    // 0: 0x46
 	u8 config_csi1:1;    // 1
 	u8 config_caam:1;    // 2
-	u8 config_res0:1;    // 3
+	u8 config_mezz:1;    // 3
 	u8 config_res1:1;    // 4
 	u8 config_res2:1;    // 5
 	u8 config_res3:1;    // 6
@@ -92,9 +94,9 @@ struct ventana_board_info {
 	u8 config_spifl1:1;  // 2
 	u8 config_gspbatt:1; // 3
 	u8 config_hdmi_in:1; // 4
-	u8 config_cvbs_out:1;// 5
-	u8 config_cvbs_in:1; // 6
-	u8 config_res7:1;    // 7
+	u8 config_vid_out:1; // 5
+	u8 config_vid_in:1;  // 6
+	u8 config_nand:1;    // 7
 
 	u8 config_res8:1;    // 0: 0x49
 	u8 config_res9:1;    // 1
