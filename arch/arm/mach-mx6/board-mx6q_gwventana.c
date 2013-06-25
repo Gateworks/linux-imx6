@@ -81,38 +81,21 @@
 #include "ventana_eeprom.h"
 
 /* GPIO pins */
-#define MX6Q_VENTANA_VIDDEC_IRQ     IMX_GPIO_NR(1, 2)
+#define MX6Q_VENTANA_CAN_STBY       IMX_GPIO_NR(1, 2)
 #define MX6Q_VENTANA_GPS_PPS        IMX_GPIO_NR(1, 5)
 #define MX6Q_VENTANA_HDMIIN_IRQ     IMX_GPIO_NR(1, 7)
 #define MX6Q_VENTANA_PFUZE_INT      IMX_GPIO_NR(1, 8)
-#define MX6Q_VENTANA_MX6_DIO0       IMX_GPIO_NR(1, 9)
 #define MX6Q_VENTANA_LVDS_BACK_EN   IMX_GPIO_NR(1, 10)
-#define MX6Q_VENTANA_MIPI_BACK_EN   IMX_GPIO_NR(1, 11)
 #define MX6Q_VENTANA_USB_HUB_RESET  IMX_GPIO_NR(1, 16)
-#define MX6Q_VENTANA_MX6_DIO1       IMX_GPIO_NR(1, 19)
-#define MX6Q_VENTANA_PCIE_CLKEN     IMX_GPIO_NR(1, 20)
-#define MX6Q_VENTANA_MIPI_DIO       IMX_GPIO_NR(1, 21)
-#define MX6Q_VENTANA_PCIE_SW_IRQ    IMX_GPIO_NR(1, 28)
 #define MX6Q_VENTANA_PCIE_RESET     IMX_GPIO_NR(1, 29)
 #define MX6Q_VENTANA_RGMII_RST      IMX_GPIO_NR(1, 30)
-#define MX6Q_VENTANA_MSATA_SEL      IMX_GPIO_NR(2, 8)
-#define MX6Q_VENTANA_MX6_DIO2       IMX_GPIO_NR(2, 9)
-#define MX6Q_VENTANA_MX6_DIO3       IMX_GPIO_NR(2, 10)
 #define MX6Q_VENTANA_UART2_EN       IMX_GPIO_NR(2, 11)
-#define MX6Q_VENTANA_RS485_TXEN     IMX_GPIO_NR(3, 24)
 #define MX6Q_VENTANA_I2CEXP_EN      IMX_GPIO_NR(4, 5)
-#define MX6Q_VENTANA_PANLEDG        IMX_GPIO_NR(4, 6)
-#define MX6Q_VENTANA_MEZZ_DIO0      IMX_GPIO_NR(4, 7)
-#define MX6Q_VENTANA_MEZZ_DIO1      IMX_GPIO_NR(4, 9)
-#define MX6Q_VENTANA_PANLEDR        IMX_GPIO_NR(4, 10)
-#define MX6Q_VENTANA_LOCLED         IMX_GPIO_NR(4, 15)
 #define MX6Q_VENTANA_ECSPI1_CS1     IMX_GPIO_NR(3, 19)
 #define MX6Q_VENTANA_USB_OTG_PWR    IMX_GPIO_NR(3, 22)
 #define MX6Q_VENTANA_SD3_CD         IMX_GPIO_NR(7, 0)
 #define MX6Q_VENTANA_CAP_TCH_INT    IMX_GPIO_NR(7, 12)
 #define MX6Q_VENTANA_ACCEL_IRQ      IMX_GPIO_NR(7, 13)
-#define MX6Q_VENTANA_DIO0_PWM
-#define MX6Q_VENTANA_DIO1_PWM
 
 void __init early_console_setup(unsigned long base, struct clk *clk);
 static struct clk *sata_clk;
@@ -124,6 +107,77 @@ static int caam_enabled;
 #define MX6Q_VENTANA_SD1_CMD_PADCFG (PAD_CTL_DSE_240ohm)
 #define MX6Q_VENTANA_DISP0_DIO_PADCFG (PAD_CTL_DSE_240ohm)
 
+static iomux_v3_cfg_t mx6q_ventana_audmux5_pads[] = {
+	/* AUDMUX5 */
+	MX6Q_PAD_EIM_D25__AUDMUX_AUD5_RXC,
+	MX6Q_PAD_DISP0_DAT19__AUDMUX_AUD5_RXD,
+	MX6Q_PAD_EIM_D24__AUDMUX_AUD5_RXFS,
+};
+
+/* ECSPI1 */
+static iomux_v3_cfg_t mx6q_ventana_spi_pads[] = {
+	MX6Q_PAD_EIM_D17__ECSPI1_MISO,
+	MX6Q_PAD_EIM_D18__ECSPI1_MOSI,
+	MX6Q_PAD_EIM_D16__ECSPI1_SCLK,
+	MX6Q_PAD_EIM_D19__GPIO_3_19,	 /* CS1 */
+};
+
+/* NAND */
+static iomux_v3_cfg_t mx6q_ventana_nand_pads[] = {
+	/* GPMI NAND */
+	MX6Q_PAD_NANDF_D0__RAWNAND_D0,
+	MX6Q_PAD_NANDF_D1__RAWNAND_D1,
+	MX6Q_PAD_NANDF_D2__RAWNAND_D2,
+	MX6Q_PAD_NANDF_D3__RAWNAND_D3,
+	MX6Q_PAD_NANDF_D4__RAWNAND_D4,
+	MX6Q_PAD_NANDF_D5__RAWNAND_D5,
+	MX6Q_PAD_NANDF_D6__RAWNAND_D6,
+	MX6Q_PAD_NANDF_D7__RAWNAND_D7,
+
+	MX6Q_PAD_NANDF_CS0__RAWNAND_CE0N,
+	MX6Q_PAD_NANDF_ALE__RAWNAND_ALE,
+	MX6Q_PAD_NANDF_CLE__RAWNAND_CLE,
+	MX6Q_PAD_NANDF_WP_B__RAWNAND_RESETN,
+	MX6Q_PAD_NANDF_RB0__RAWNAND_READY0,
+  MX6Q_PAD_SD4_CMD__RAWNAND_RDN,
+  MX6Q_PAD_SD4_CLK__RAWNAND_WRN,
+};
+
+static iomux_v3_cfg_t mx6q_ventana_flexcan_pads[] = {
+	/* CANbus */
+	MX6Q_PAD_KEY_COL2__CAN1_TXCAN,
+	MX6Q_PAD_KEY_ROW2__CAN1_RXCAN,
+	MX6Q_PAD_GPIO_2__GPIO_1_2,
+};
+
+static iomux_v3_cfg_t mx6q_gw5400a_uart_pads[] = {
+	/* UART1: RS485  */
+	MX6Q_PAD_SD3_DAT7__UART1_TXD,
+	MX6Q_PAD_SD3_DAT6__UART1_RXD,
+
+	/* UART2: Console */
+	MX6Q_PAD_SD4_DAT7__UART2_TXD,
+	MX6Q_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART3: GPS */
+	MX6Q_PAD_SD4_CMD__UART3_TXD,
+	MX6Q_PAD_SD4_CLK__UART3_RXD,
+};
+
+static iomux_v3_cfg_t mx6q_gw5400b_uart_pads[] = {
+	/* UART1: RS485  */
+	MX6Q_PAD_SD3_DAT7__UART1_TXD,
+	MX6Q_PAD_SD3_DAT6__UART1_RXD,
+
+	/* UART2: Console */
+	MX6Q_PAD_SD4_DAT7__UART2_TXD,
+	MX6Q_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART5: GPS */
+	MX6Q_PAD_KEY_COL1__UART5_TXD,
+	MX6Q_PAD_KEY_ROW1__UART5_RXD,
+};
+
 static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	/* AUDMUX4 */
 	MX6Q_PAD_SD2_DAT0__AUDMUX_AUD4_RXD,
@@ -131,20 +185,8 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	MX6Q_PAD_SD2_DAT2__AUDMUX_AUD4_TXD,
 	MX6Q_PAD_SD2_DAT1__AUDMUX_AUD4_TXFS,
 
-	/* AUDMUX5 */
-	MX6Q_PAD_EIM_D25__AUDMUX_AUD5_RXC,
-	MX6Q_PAD_DISP0_DAT18__AUDMUX_AUD5_TXFS,
-	MX6Q_PAD_DISP0_DAT19__AUDMUX_AUD5_RXD,
-
 	/* CCM */
 	MX6Q_PAD_GPIO_0__CCM_CLKO,     /* SGTL500 sys_mckl */
-	MX6Q_PAD_NANDF_CS2__CCM_CLKO2, /* HDMI Receiver AUD5_MCLK */
-
-	/* ECSPI1 */
-	MX6Q_PAD_EIM_D17__ECSPI1_MISO,
-	MX6Q_PAD_EIM_D18__ECSPI1_MOSI,
-	MX6Q_PAD_EIM_D16__ECSPI1_SCLK,
-	MX6Q_PAD_EIM_D19__GPIO_3_19,	 /* CS1 */
 
 	/* ENET */
 	MX6Q_PAD_ENET_MDIO__ENET_MDIO,
@@ -176,20 +218,6 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	MX6Q_PAD_GPIO_3__I2C3_SCL,
 	MX6Q_PAD_GPIO_6__I2C3_SDA,
 
-	/* UART1: RS485  */
-	MX6Q_PAD_SD3_DAT7__UART1_TXD,
-	MX6Q_PAD_SD3_DAT6__UART1_RXD,
-//	MX6Q_PAD_EIM_D24__UART1_DTR,
-	MX6Q_PAD_EIM_D24__GPIO_3_24,
-
-	/* UART2: Console */
-	MX6Q_PAD_SD4_DAT7__UART2_TXD,
-	MX6Q_PAD_SD4_DAT4__UART2_RXD,
-
-	/* UART3: GPS */
-	MX6Q_PAD_SD4_CMD__UART3_TXD,
-	MX6Q_PAD_SD4_CLK__UART3_RXD,
-
 	/* USBOTG ID pin */
 	MX6Q_PAD_GPIO_1__USBOTG_ID,
 
@@ -217,33 +245,6 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	/* LVDS Backlight */
 	MX6Q_PAD_SD2_CLK__GPIO_1_10, // CABC_EN
 	NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO, MX6Q_VENTANA_SD1_CMD_PADCFG), // Backlight brightness
-
-	/* MIPI */
-	MX6Q_PAD_SD1_DAT3__GPIO_1_21, // MIPI GP DIO	
-	MX6Q_PAD_SD2_CMD__GPIO_1_11,  // MIPI BK_EN
-	MX6Q_PAD_SD1_DAT1__PWM3_PWMO, // Backlight brightness
-
-	/* MX6_DIO0 */
-#ifndef MX6Q_VENTANA_DIO0_PWM
-  MX6Q_PAD_GPIO_9__GPIO_1_9,
-#else
-  MX6Q_PAD_GPIO_9__PWM1_PWMO,
-#endif
-	/* MX6_DIO1 */
-#ifndef MX6Q_VENTANA_DIO1_PWM
-  MX6Q_PAD_SD1_DAT2__GPIO_1_19,
-#else
-  MX6Q_PAD_SD1_DAT2__PWM2_PWMO,
-#endif
-	/* MX6_DIO2 */
-  MX6Q_PAD_SD4_DAT1__GPIO_2_9,
-  //MX6Q_PAD_SD4_DAT1__PWM3_PWMO,
-	/* MX6_DIO3 */
-  MX6Q_PAD_SD4_DAT2__GPIO_2_10,
-  //MX6Q_PAD_SD4_DAT2__PWM4_PWMO,
-
-	/* Video Decoder */
-	MX6Q_PAD_GPIO_2__GPIO_1_2, // IRQ
 
 	/* GPS PPS */
 	MX6Q_PAD_GPIO_5__GPIO_1_5,
@@ -415,17 +416,48 @@ static const struct esdhc_platform_data mx6q_ventana_sd3_data __initconst = {
 	.delay_line = 0,
 };
 
+
+static int __init gpmi_nand_platform_init(void)
+{
+	return mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_nand_pads, ARRAY_SIZE(mx6q_ventana_nand_pads));
+}
+
+static struct mtd_partition imx6_ventana_nand_partitions[] = {
+	{
+	 .name = "uboot",
+	 .offset = 0,
+	 .size = SZ_1M * 16,
+	},
+	{
+	 .name = "env",
+	 .offset = MTDPART_OFS_APPEND,
+	 .size = SZ_1M,
+	},
+	{
+	 .name = "rootfs",
+	 .offset = MTDPART_OFS_APPEND,
+	 .size = MTDPART_SIZ_FULL,
+	},
+};
+
+static const struct gpmi_nand_platform_data
+mx6q_gpmi_nand_platform_data __initconst = {
+	.platform_init           = gpmi_nand_platform_init,
+	.min_prop_delay_in_ns    = 5,
+	.max_prop_delay_in_ns    = 9,
+	.max_chip_count          = 1,
+
+	/* Medium information. */
+	.partitions = imx6_ventana_nand_partitions,
+	.partition_count = ARRAY_SIZE(imx6_ventana_nand_partitions),
+	.enable_bbt = 0, // do not store BBT in FLASH
+	.enable_ddr = 0, // Enable PoP DDR
+};
+
 static const struct anatop_thermal_platform_data
 	mx6q_ventana_anatop_thermal_data __initconst = {
 		.name = "anatop_thermal",
 };
-
-static inline void mx6q_ventana_init_uart(void)
-{
-	imx6q_add_imx_uart(0, NULL);
-	imx6q_add_imx_uart(1, NULL);
-	imx6q_add_imx_uart(2, NULL);
-}
 
 static int mx6q_ventana_fec_phy_init(struct phy_device *phydev)
 {
@@ -450,7 +482,7 @@ static const struct spi_imx_master mx6q_ventana_spi_data __initconst = {
 #if defined(CONFIG_MTD_M25P80) || defined(CONFIG_MTD_M25P80_MODULE)
 static struct mtd_partition imx6_ventana_spi_nor_partitions[] = {
 	{
-	 .name = "u-boot",
+	 .name = "uboot",
 	 .offset = 0,
 	 .size = SZ_512K,
 	},
@@ -460,7 +492,7 @@ static struct mtd_partition imx6_ventana_spi_nor_partitions[] = {
 	 .size = SZ_8K,
 	},
 	{
-	 .name = "kernel",
+	 .name = "linux",
 	 .offset = MTDPART_OFS_APPEND,
 	 .size = SZ_2M,
 	},
@@ -566,15 +598,15 @@ static struct gpio_led mx6_ventana_gpio_leds[] = {
 	{
 		.name = "user1",
 		.default_trigger = "hearbeat",
-		.gpio = MX6Q_VENTANA_PANLEDG,
+		.gpio = -1,
 	},
 	{
 		.name = "user2",
-		.gpio = MX6Q_VENTANA_PANLEDR,
+		.gpio = -1,
 	},
 	{
 		.name = "user3",
-		.gpio = MX6Q_VENTANA_LOCLED,
+		.gpio = -1,
 	},
 };
 
@@ -593,22 +625,30 @@ static struct platform_device mx6_ventana_leds_gpio_device = {
 
 /* PWM LEDs */
 static struct led_pwm mx6_ventana_pwm_leds[] = {
-#ifdef MX6Q_VENTANA_DIO0_PWM
 	{
 		.name = "dio0",
 		.pwm_id = 0,
 		.max_brightness = 255,
 		.pwm_period_ns = 7812500,
 	},
-#endif
-#ifdef MX6Q_VENTANA_DIO0_PWM
 	{
 		.name = "dio1",
 		.pwm_id = 1,
 		.max_brightness = 255,
 		.pwm_period_ns = 7812500,
 	},
-#endif
+	{
+		.name = "dio2",
+		.pwm_id = 1,
+		.max_brightness = 255,
+		.pwm_period_ns = 7812500,
+	},
+	{
+		.name = "dio3",
+		.pwm_id = 1,
+		.max_brightness = 255,
+		.pwm_period_ns = 7812500,
+	},
 };
 
 static struct led_pwm_platform_data mx6_ventana_pwm_pdata = {
@@ -650,6 +690,8 @@ static void ventana_eeprom_setup(struct memory_accessor *mem_acc, void *context)
 	  || info->chksum[1] != (chksum&0xff))
 	{
 		printk(KERN_ERR "Ventana EEPROM data corrupt\n");
+		info->chksum[0] = 0;
+		info->chksum[1] = 0;
 		return;
 	}
 };
@@ -772,7 +814,6 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 	/* Analog Video Decoder (Video In) */
 	{
 		I2C_BOARD_INFO("adv7180", 0x20),
-		.irq = gpio_to_irq(MX6Q_VENTANA_VIDDEC_IRQ),
 		.platform_data = (void *)&adv7180_pdata,
 	},
 
@@ -806,6 +847,15 @@ static void imx6q_ventana_usbotg_vbus(bool on)
 static void __init imx6q_ventana_init_usb(void)
 {
 	int ret = 0;
+
+{
+	int pmu_reg_3p0 = __raw_readl(MXC_PLL_BASE + 0x120);
+
+	printk("%s: pmu_reg_3p0=0x%08x\n", __func__, pmu_reg_3p0);
+	pmu_reg_3p0 &= ~(1<<7); // select VBUS OTG1
+	pmu_reg_3p0 |= 1<<7;    // select VBUS OTG2
+	__raw_writel(pmu_reg_3p0, MXC_PLL_BASE + 0x120);
+}
 
 	imx_otg_base = MX6_IO_ADDRESS(MX6Q_USB_OTG_BASE_ADDR);
 	/* disable external charger detect,
@@ -906,14 +956,28 @@ static struct imx_asrc_platform_data imx_asrc_data = {
 	.clk_map_ver = 2,
 };
 
+static void mx6q_ventana_flexcan0_switch(int enable)
+{
+	if (enable) {
+		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
+	} else {
+		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 0);
+	}
+}
+
+static const struct flexcan_platform_data
+		mx6q_ventana_flexcan0_pdata __initconst = {
+		.transceiver_switch = mx6q_ventana_flexcan0_switch,
+};
+
 static void mx6_reset_mipi_dsi(void)
 {
-	gpio_set_value(MX6Q_VENTANA_MIPI_BACK_EN, 1);
-	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 1);
+	gpio_set_value(IMX_GPIO_NR(1,11), 1);
+	gpio_set_value(IMX_GPIO_NR(1,21), 1);
 	udelay(10);
-	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 0);
+	gpio_set_value(IMX_GPIO_NR(1,21), 0);
 	udelay(50);
-	gpio_set_value(MX6Q_VENTANA_MIPI_DIO, 1);
+	gpio_set_value(IMX_GPIO_NR(1,21), 1);
 
 	/* TRULY-WVGA needs to delay 120ms min for reset complete */
 	msleep(120);
@@ -1306,6 +1370,7 @@ static void mx6_ventana_pciesw_early_fixup(struct pci_dev *dev)
 
 	if (dev->devfn != 0)
 		return;
+
 	pci_read_config_dword(dev, 0x62c, &dw);
 	dw |= 0xaaa8; // GPIO1-7 outputs
 	pci_write_config_dword(dev, 0x62c, dw);	
@@ -1353,9 +1418,6 @@ static void __init mx6_ventana_board_init(void)
 	gp_reg_id = ventana_dvfscore_data.reg_id;
 	soc_reg_id = ventana_dvfscore_data.soc_id;
 
-	/* UART */
-	mx6q_ventana_init_uart();
-
 	/* HDMI output */
 	imx6q_add_mxc_hdmi_core(&hdmi_core_data);
 
@@ -1398,6 +1460,9 @@ static void __init mx6_ventana_board_init(void)
 	/* USB */
 	imx6q_ventana_init_usb();
 
+	/* SATA - must be registered early as uses platform_driver_probe */
+	imx6q_add_ahci(0, &mx6q_ventana_sata_data);
+
 	/* RTC */
 	//imx6q_add_imx_snvs_rtc();
 
@@ -1409,13 +1474,6 @@ static void __init mx6_ventana_board_init(void)
 
 	/* GPU */
 	imx_add_viv_gpu(&imx6_gpu_data, &imx6q_gpu_pdata);
-
-	/* GPIO: GPIO/PWM/PPS */
-	platform_device_register(&mx6_ventana_leds_gpio_device);
-	platform_device_register(&mx6_ventana_leds_pwm_device);
-#ifdef CONFIG_PPS_CLIENT_GPIO
-	platform_device_register(&mx6_ventana_pps_device);
-#endif
 
 	/* PWM */
 	imx6q_add_mxc_pwm(0);
@@ -1438,12 +1496,229 @@ static void __init mx6_ventana_board_init(void)
 
 static int __init ventana_model_setup(void)
 {
-	int i;
 	struct ventana_board_info *info = &ventana_board_info;
+	int i;
 
 	printk("Running on Gateworks Ventana %s\n", info->model);
 
 	if (strncmp(info->model, "GW", 2) == 0) {
+		int pwm_leds = 0;
+
+		/*
+		 * model specific setup
+		 */
+		if (strncmp(info->model, "GW54", 4) == 0) {
+			if (strncmp(info->model, "GW5400-A", 8) == 0) {
+				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400a_uart_pads,
+					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
+				imx6q_add_imx_uart(0, NULL);
+				imx6q_add_imx_uart(1, NULL);
+				imx6q_add_imx_uart(2, NULL);
+
+				// SPI FLASH
+				if (info->config_spifl0 || info->config_spifl1) {
+					mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_spi_pads,
+						ARRAY_SIZE(mx6q_ventana_spi_pads));
+					imx6q_add_ecspi(0, &mx6q_ventana_spi_data);
+					spi_device_init();
+				}
+
+				// user1:panledg
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_COL0__GPIO_4_6);
+				mx6_ventana_gpio_leds[0].gpio = IMX_GPIO_NR(4,6);
+
+				// user2:panledr
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_COL2__GPIO_4_10);
+				mx6_ventana_gpio_leds[1].gpio = IMX_GPIO_NR(4,10);
+
+				// user3:locled
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_ROW4__GPIO_4_15);
+				mx6_ventana_gpio_leds[2].gpio = IMX_GPIO_NR(4,15); 
+
+				// VIDDEC_IRQ#
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
+
+				// MIPI DSI
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT3__GPIO_1_21); // MIPI GP DIO	
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD2_CMD__GPIO_1_11);  // MIPI BK_EN
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT1__PWM3_PWMO); // BL brightness
+
+				// UART1 Transmit Enable
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_EIM_D24__GPIO_3_24),
+				gpio_request(IMX_GPIO_NR(3,24), "rs485-txen");
+				gpio_export(IMX_GPIO_NR(3,24), 0);
+				gpio_direction_output(IMX_GPIO_NR(3,24), 0);
+
+				// Expansion DIO0
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_ROW0__GPIO_4_7);
+				gpio_request(IMX_GPIO_NR(4,7), "mezz_dio0");
+				gpio_export(IMX_GPIO_NR(4,7), 1);
+				gpio_direction_input(IMX_GPIO_NR(4,7));
+
+				// Expansion DIO1
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_ROW1__GPIO_4_9);
+				gpio_request(IMX_GPIO_NR(4,9), "mezz_dio1");
+				gpio_export(IMX_GPIO_NR(4,9), 1);
+				gpio_direction_input(IMX_GPIO_NR(4,9));
+			}
+
+			else if ( (strncmp(info->model, "GW5400", 6) == 0)
+		         || (strncmp(info->model, "GW5410", 6) == 0)
+			) {
+				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400b_uart_pads,
+					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
+				imx6q_add_imx_uart(0, NULL);
+				imx6q_add_imx_uart(1, NULL);
+				imx6q_add_imx_uart(4, NULL);
+
+				if (info->config_ssi1) {
+					mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_audmux5_pads,
+						ARRAY_SIZE(mx6q_ventana_audmux5_pads));
+				}
+
+				// user1:panledg
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_COL0__GPIO_4_6);
+				mx6_ventana_gpio_leds[0].gpio = IMX_GPIO_NR(4,6);
+
+				// user2:panledr
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_ROW0__GPIO_4_7);
+				mx6_ventana_gpio_leds[1].gpio = IMX_GPIO_NR(4,7);
+
+				// user3:locled
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_KEY_ROW4__GPIO_4_15);
+				mx6_ventana_gpio_leds[2].gpio = IMX_GPIO_NR(4,15); 
+
+				// VIDDEC_IRQ#
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_EIM_A17__GPIO_2_21);
+
+				// UART1 Transmit Enable
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD3_DAT4__GPIO_7_1),
+				gpio_request(IMX_GPIO_NR(7,1), "rs485-txen");
+				gpio_export(IMX_GPIO_NR(7,1), 0);
+				gpio_direction_output(IMX_GPIO_NR(7,1), 0);
+
+				// Expansion IO0 - Power Enable
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_EIM_A19__GPIO_2_19);
+				gpio_request(IMX_GPIO_NR(2,19), "exp_pwren#");
+				gpio_export(IMX_GPIO_NR(2,19), 1);
+				gpio_direction_input(IMX_GPIO_NR(2,19));
+
+				// Expansion IO1 - IRQ
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_EIM_A20__GPIO_2_18);
+				gpio_request(IMX_GPIO_NR(2,18), "exp_irq#");
+				gpio_export(IMX_GPIO_NR(2,18), 1);
+				gpio_direction_input(IMX_GPIO_NR(2,18));
+
+				// NAND
+				if (info->config_nand) {
+					imx6q_add_gpmi(&mx6q_gpmi_nand_platform_data);
+				}
+			}
+
+			/* release USB Hub reset */
+			gpio_set_value(MX6Q_VENTANA_USB_HUB_RESET, 1);
+
+			/*
+			 * Disable HannStar touch panel CABC function,
+			 * this function turns the panel's backlight automatically
+			 * according to the content shown on the panel which
+			 * may cause annoying unstable backlight issue.
+			 */
+			gpio_request(MX6Q_VENTANA_LVDS_BACK_EN, "cabc-en0");
+			gpio_export(MX6Q_VENTANA_LVDS_BACK_EN, 0);
+			gpio_direction_output(MX6Q_VENTANA_LVDS_BACK_EN, 0);
+
+#if 0
+			/* TODO: register DIO as GPIO or PWM based on
+			 *  pad conf (mxc_iomux_v3_get_pad) done in bootloader
+			 */ 
+			/* User IO's */
+			if (info->dio0 == 1) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_9__PWM1_PWMO);
+				mx6_ventana_pwm_leds[pwm_leds].name = "dio0";
+				mx6_ventana_pwm_leds[pwm_leds].pwm_id = 0;
+				pwm_leds++;
+			} else {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_9__GPIO_1_9);
+				gpio_request(IMX_GPIO_NR(1,9), "dio0");
+				gpio_export(IMX_GPIO_NR(1,9), 1);
+				gpio_direction_input(IMX_GPIO_NR(1,9));
+			}
+
+			if (info->dio1 == 1) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT2__PWM2_PWMO);
+				mx6_ventana_pwm_leds[pwm_leds].name = "dio1";
+				mx6_ventana_pwm_leds[pwm_leds].pwm_id = 1;
+				pwm_leds++;
+			} else {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT2__GPIO_1_19);
+				gpio_request(IMX_GPIO_NR(1,19), "dio1");
+				gpio_export(IMX_GPIO_NR(1,19), 1);
+				gpio_direction_input(IMX_GPIO_NR(1,19));
+			}
+
+			if (info->dio2 == 1) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD4_DAT1__PWM3_PWMO);
+				mx6_ventana_pwm_leds[pwm_leds].name = "dio2";
+				mx6_ventana_pwm_leds[pwm_leds].pwm_id = 2;
+				pwm_leds++;
+			} else {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD4_DAT1__GPIO_2_9);
+				gpio_request(IMX_GPIO_NR(2,9), "dio2");
+				gpio_export(IMX_GPIO_NR(2,9), 1);
+				gpio_direction_input(IMX_GPIO_NR(2,9));
+			}
+
+			if (info->dio3 == 1) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD4_DAT2__PWM4_PWMO);
+				mx6_ventana_pwm_leds[pwm_leds].name = "dio3";
+				mx6_ventana_pwm_leds[pwm_leds].pwm_id = 3;
+				pwm_leds++;
+			} else {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD4_DAT2__GPIO_2_10);
+				gpio_request(IMX_GPIO_NR(2,10), "dio3");
+				gpio_export(IMX_GPIO_NR(2,10), 1);
+				gpio_direction_input(IMX_GPIO_NR(2,10));
+			}
+#endif
+
+			gpio_request(MX6Q_VENTANA_UART2_EN, "uart2_en");
+			gpio_export(MX6Q_VENTANA_UART2_EN, 0);
+			gpio_direction_output(MX6Q_VENTANA_UART2_EN, 0);
+			gpio_request(MX6Q_VENTANA_I2CEXP_EN, "i2c_dis#");
+			gpio_export(MX6Q_VENTANA_I2CEXP_EN, 0);
+			gpio_direction_output(MX6Q_VENTANA_I2CEXP_EN, 0);
+
+			/* GPIO: GPIO/PWM/PPS */
+			mx6_ventana_pwm_pdata.num_leds = pwm_leds;
+			platform_device_register(&mx6_ventana_leds_gpio_device);
+			platform_device_register(&mx6_ventana_leds_pwm_device);
+#ifdef CONFIG_PPS_CLIENT_GPIO
+			platform_device_register(&mx6_ventana_pps_device);
+#endif
+
+			imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
+		}
+
+		else {
+			printk("Default Ventana configuration\n");
+			imx6q_add_imx_uart(0, NULL);
+			imx6q_add_imx_uart(1, NULL);
+			imx6q_add_imx_uart(4, NULL);
+
+			// SPI FLASH
+			if (info->config_spifl0 || info->config_spifl1) {
+				mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_spi_pads,
+					ARRAY_SIZE(mx6q_ventana_spi_pads));
+				imx6q_add_ecspi(0, &mx6q_ventana_spi_data);
+				spi_device_init();
+			}
+
+			// NAND
+			if (info->config_nand) {
+				imx6q_add_gpmi(&mx6q_gpmi_nand_platform_data);
+			}
+		}
 
 		/* MIPI DSI Output */
 		if (info->config_mipi_dsi)
@@ -1454,7 +1729,7 @@ static int __init ventana_model_setup(void)
 			imx6q_add_ldb(&ldb_data);     // LVDS interface
 		if (info->config_lcd)
 			imx6q_add_lcdif(&lcdif_data); // parallel RGB interface
-		if (info->config_cvbs_out)
+		if (info->config_vid_out)
 			imx6q_add_bt656(&bt656_data); // BT656 interface
 		/* HDMI output */
 		if (info->config_hdmi_out)
@@ -1479,7 +1754,7 @@ static int __init ventana_model_setup(void)
 
 		/* V4L2 output */
 		if ( info->config_lvds0 || info->config_lvds1
-		  || info->config_cvbs_out || info->config_hdmi_out)
+		  || info->config_vid_out || info->config_hdmi_out)
 		{
 			imx6q_add_v4l2_output(0);
 		}
@@ -1489,7 +1764,7 @@ static int __init ventana_model_setup(void)
 			imx6q_add_v4l2_capture(0, &capture_data[0]);
 
 		/* /dev/video1 ADV7180 Analog Video Decoder */
-		if (info->config_cvbs_in)
+		if (info->config_vid_in)
 			imx6q_add_v4l2_capture(1, &capture_data[1]);
 
 		/* MIPI input */
@@ -1499,12 +1774,6 @@ static int __init ventana_model_setup(void)
 		/* this clobbers CLKO used for sgtl150000 */
 		if (info->config_caam && 1 == caam_enabled)
 			imx6q_add_imx_caam();
-
-		/* SPI */
-		if (info->config_spifl0 || info->config_spifl1) {
-			imx6q_add_ecspi(0, &mx6q_ventana_spi_data);
-			spi_device_init();
-		}
 
 		/* GigE MAC */
 		if (info->config_eth0) {
@@ -1519,10 +1788,6 @@ static int __init ventana_model_setup(void)
 		if (info->config_sd2 /* 0-based */)
 			imx6q_add_sdhci_usdhc_imx(2, &mx6q_ventana_sd3_data);
 
-		/* SATA (only on mx6q) */
-		if (info->config_sata && cpu_is_mx6q())
-			imx6q_add_ahci(0, &mx6q_ventana_sata_data);
-
 		/* VPU */
 		if (info->config_vpu)
 			imx6q_add_vpu();
@@ -1535,6 +1800,13 @@ static int __init ventana_model_setup(void)
 			imx6q_add_asrc(&imx_asrc_data);
 		}
 
+		/* CANbus */
+		if (info->config_flexcan) {
+			mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_flexcan_pads,
+				ARRAY_SIZE(mx6q_ventana_flexcan_pads));
+			imx6q_add_flexcan0(&mx6q_ventana_flexcan0_pdata);
+		}
+
 		/* HDMI audio */
 		if (info->config_hdmi_in) {
 			imx6q_add_hdmi_soc();
@@ -1543,68 +1815,7 @@ static int __init ventana_model_setup(void)
 
 		/* PCIe RC interface */
 		if (info->config_pcie) {
-			gpio_request(MX6Q_VENTANA_PCIE_RESET, "pcie_reset");
-			gpio_export(MX6Q_VENTANA_PCIE_RESET, 0);
-			gpio_direction_output(MX6Q_VENTANA_PCIE_RESET, 0);
-			mdelay(1);
-			gpio_set_value(MX6Q_VENTANA_PCIE_RESET, 1);
-			gpio_free(MX6Q_VENTANA_PCIE_RESET);
 			imx6q_add_pcie(&mx6_ventana_pcie_data);
-		}
-
-		/*
-		 * Do any model specific setup not known by the EEPROM config
-		 * by matching the first 6 chars of model name (base product)
-		 */
-		if (strncmp(info->model, "GW5400", 6) == 0) {
-			/* release USB Hub reset */
-			gpio_set_value(MX6Q_VENTANA_USB_HUB_RESET, 1);
-
-			/*
-			 * Disable HannStar touch panel CABC function,
-			 * this function turns the panel's backlight automatically
-			 * according to the content shown on the panel which
-			 * may cause annoying unstable backlight issue.
-			 */
-			gpio_request(MX6Q_VENTANA_LVDS_BACK_EN, "cabc-en0");
-			gpio_export(MX6Q_VENTANA_LVDS_BACK_EN, 0);
-			gpio_direction_output(MX6Q_VENTANA_LVDS_BACK_EN, 0);
-
-			gpio_request(MX6Q_VENTANA_RS485_TXEN, "rs485-txen");
-			gpio_export(MX6Q_VENTANA_RS485_TXEN, 0);
-			gpio_direction_output(MX6Q_VENTANA_RS485_TXEN, 0);
-
-			/* User GPIO's */
-#ifndef MX6Q_VENTANA_DIO0_PWM
-			gpio_request(MX6Q_VENTANA_MX6_DIO0, "dio0");
-			gpio_export(MX6Q_VENTANA_MX6_DIO0, 1);
-			gpio_direction_input(MX6Q_VENTANA_MX6_DIO0);
-#endif
-#ifndef MX6Q_VENTANA_DIO1_PWM
-			gpio_request(MX6Q_VENTANA_MX6_DIO1, "dio1");
-			gpio_export(MX6Q_VENTANA_MX6_DIO1, 1);
-			gpio_direction_input(MX6Q_VENTANA_MX6_DIO1);
-#endif
-			gpio_request(MX6Q_VENTANA_MX6_DIO2, "dio2");
-			gpio_export(MX6Q_VENTANA_MX6_DIO2, 1);
-			gpio_direction_input(MX6Q_VENTANA_MX6_DIO2);
-			gpio_request(MX6Q_VENTANA_MX6_DIO3, "dio3");
-			gpio_export(MX6Q_VENTANA_MX6_DIO3, 1);
-			gpio_direction_input(MX6Q_VENTANA_MX6_DIO3);
-			gpio_request(MX6Q_VENTANA_UART2_EN, "uart2_en");
-			gpio_export(MX6Q_VENTANA_UART2_EN, 0);
-			gpio_direction_output(MX6Q_VENTANA_UART2_EN, 0);
-			gpio_request(MX6Q_VENTANA_I2CEXP_EN, "i2c_dis#");
-			gpio_export(MX6Q_VENTANA_I2CEXP_EN, 0);
-			gpio_direction_output(MX6Q_VENTANA_I2CEXP_EN, 0);
-			gpio_request(MX6Q_VENTANA_MEZZ_DIO0, "mezz_dio0");
-			gpio_export(MX6Q_VENTANA_MEZZ_DIO0, 1);
-			gpio_direction_input(MX6Q_VENTANA_MEZZ_DIO0);
-			gpio_request(MX6Q_VENTANA_MEZZ_DIO1, "mezz_dio1");
-			gpio_export(MX6Q_VENTANA_MEZZ_DIO1, 1);
-			gpio_direction_input(MX6Q_VENTANA_MEZZ_DIO1);
-
-			imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
 		}
 
 	} else {
