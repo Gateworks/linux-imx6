@@ -959,9 +959,9 @@ static struct imx_asrc_platform_data imx_asrc_data = {
 static void mx6q_ventana_flexcan0_switch(int enable)
 {
 	if (enable) {
-		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
-	} else {
 		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 0);
+	} else {
+		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
 	}
 }
 
@@ -1804,6 +1804,9 @@ static int __init ventana_model_setup(void)
 		if (info->config_flexcan) {
 			mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_flexcan_pads,
 				ARRAY_SIZE(mx6q_ventana_flexcan_pads));
+			gpio_request(MX6Q_VENTANA_CAN_STBY, "can0_stby");
+			gpio_direction_output(MX6Q_VENTANA_CAN_STBY, 0);
+			gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
 			imx6q_add_flexcan0(&mx6q_ventana_flexcan0_pdata);
 		}
 
