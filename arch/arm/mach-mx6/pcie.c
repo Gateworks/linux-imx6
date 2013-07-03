@@ -442,7 +442,7 @@ static u32 get_cfg_addr(struct pci_bus *bus, u32 devfn, int where)
 			return 0;
 		return ((u32)dbi_base) + (where & 0x0ffc);
 	}
-	if ((devfn > 0xff) || (bus->number > 15))
+	if ((devfn > 0xff) || (bus->number > 32))
 		return 0;
 	busnum = bus->number - 1;
 	if ((busnum < 3) && (devfn <= 3)) {
