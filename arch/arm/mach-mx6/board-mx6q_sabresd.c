@@ -1396,6 +1396,12 @@ static struct fsl_mxc_lcd_platform_data bt656_data = {
 	.default_ifmt = IPU_PIX_FMT_BT656,
 };
 
+static struct fsl_mxc_lcd_platform_data bt656_data = {
+	.ipu_id = 0, 
+	.disp_id = 0, 
+	.default_ifmt = IPU_PIX_FMT_BT656,
+};
+
 static struct max8903_pdata charger1_data = {
 	.dok = SABRESD_CHARGE_DOK_B,
 	.uok = SABRESD_CHARGE_UOK_B,
