@@ -123,6 +123,8 @@ obj-$(CONFIG_SENSORS_MAG3110)   += mag3110.o
 obj-$(CONFIG_SENSORS_MMA8X5X)       += mma8x5x.o
 obj-$(CONFIG_SENSORS_DA9052)	+= da9052-adc.o
 obj-$(CONFIG_SENSORS_IMX_AHCI)	+= imx_ahci_hwmon.o
+obj-$(CONFIG_SENSORS_GSC)       += gsc.o
+
 
 # PMBus drivers
 obj-$(CONFIG_PMBUS)		+= pmbus_core.o
