@@ -124,6 +124,8 @@ obj-$(CONFIG_MXC_MMA8450)       += mxc_mma8450.o
 obj-$(CONFIG_MXC_MMA8451)       += mxc_mma8451.o
 obj-$(CONFIG_SENSORS_DA9052)	+= da9052-adc.o
 obj-$(CONFIG_SENSORS_IMX_AHCI)	+= imx_ahci_hwmon.o
+obj-$(CONFIG_SENSORS_GSC)       += gsc.o
+
 
 # PMBus drivers
 obj-$(CONFIG_PMBUS)		+= pmbus_core.o
