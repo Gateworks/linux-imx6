@@ -175,7 +175,8 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
 {
 	if (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_RXAK) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
-		return -EIO;  /* No ACK */
+		//return -EIO;  /* No ACK */
+		return -EAGAIN; /* Try Again */
 	}
 
 	dev_dbg(&i2c_imx->adapter.dev, "<%s> ACK received\n", __func__);
@@ -538,6 +539,7 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
 	i2c_imx->adapter.algo		= &i2c_imx_algo;
 	i2c_imx->adapter.dev.parent	= &pdev->dev;
 	i2c_imx->adapter.nr 		= pdev->id;
+	i2c_imx->adapter.retries	= 5;
 	i2c_imx->irq			= irq;
 	i2c_imx->base			= base;
 	i2c_imx->res			= res;
