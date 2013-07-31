@@ -60,6 +60,9 @@
 #define DB_R1_RegisterResetMask 0xFFFFFFFF
 /* End of Register Definition for DB_R1 */
 
+#define PCIE_PL_MSIC_GPIO	0x888
+#define PCIE_RC_IOBLSSR     0x1c
+
 #define ATU_R_BaseAddress 0x900
 #define ATU_VIEWPORT_R (ATU_R_BaseAddress + 0x0)
 #define ATU_REGION_CTRL1_R (ATU_R_BaseAddress + 0x4)
@@ -197,19 +200,6 @@ static inline void imx_pcie_clrset(u32 mask, u32 val, void __iomem *addr)
 	writel(((readl(addr) & ~mask) | (val & mask)), addr);
 }
 
-static struct imx_pcie_port *bus_to_port(int bus)
-{
-	int i;
-
-	for (i = num_pcie_ports - 1; i >= 0; i--) {
-		int rbus = imx_pcie_port[i].root_bus_nr;
-		if (rbus != -1 && rbus == bus)
-			break;
-	}
-
-	return i >= 0 ? imx_pcie_port + i : NULL;
-}
-
 static int __init imx_pcie_setup(int nr, struct pci_sys_data *sys)
 {
 	struct imx_pcie_port *pp;
@@ -305,7 +295,9 @@ static int imx_pcie_link_up(void __iomem *dbi_base)
 
 static void imx_pcie_regions_setup(void __iomem *dbi_base)
 {
+	unsigned int bus;
 	unsigned int i;
+	unsigned untranslated_base = PCIE_ARB_END_ADDR +1 - SZ_1M;
 #ifdef CONFIG_PCI_MSI
 	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT;
 #endif
@@ -335,17 +327,23 @@ static void imx_pcie_regions_setup(void __iomem *dbi_base)
 			dbi_base + PCI_CLASS_REVISION);
 
 	/*
-	 * region0 outbound used to access target cfg
+	 * region0-3 outbound used to access target cfg
 	 */
-	writel(0, dbi_base + ATU_VIEWPORT_R);
-	writel(PCIE_ARB_END_ADDR - SZ_1M + 1, dbi_base + ATU_REGION_LOWBASE_R);
-	writel(PCIE_ARB_END_ADDR - SZ_64K, dbi_base + ATU_REGION_LIMIT_ADDR_R);
-	writel(0, dbi_base + ATU_REGION_UPBASE_R);
+	for (bus = 1; bus <= 4; bus++) {
+		writel(bus - 1, dbi_base + ATU_VIEWPORT_R);
+		writel(untranslated_base, dbi_base + ATU_REGION_LOWBASE_R);
+		untranslated_base += (1 << 18);
+		if (bus == 4)
+			untranslated_base -= (1 << 14); //(remove registers)
+		writel(untranslated_base - 1, dbi_base + ATU_REGION_LIMIT_ADDR_R);
+		writel(0, dbi_base + ATU_REGION_UPBASE_R);
 
-	writel(0, dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
-	writel(0, dbi_base + ATU_REGION_UP_TRGT_ADDR_R);
-	writel(CfgRdWr0, dbi_base + ATU_REGION_CTRL1_R);
-	writel((1<<31), dbi_base + ATU_REGION_CTRL2_R);
+		writel(bus << 24, dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
+		writel(0, dbi_base + ATU_REGION_UP_TRGT_ADDR_R);
+		writel((bus > 1) ? CfgRdWr1 : CfgRdWr0,
+				dbi_base + ATU_REGION_CTRL1_R);
+		writel((1<<31), dbi_base + ATU_REGION_CTRL2_R);
+	}
 
 #ifdef CONFIG_PCI_MSI
 	writel(MSI_MATCH_ADDR, dbi_base + PCIE_PL_MSICA);
@@ -422,96 +420,111 @@ unsigned int imx_pcie_msi_pending(unsigned int index)
 }
 #endif
 
+static char master_abort(struct pci_bus *bus, u32 devfn, int where)
+{
+	u32 reg;
+	int ret = 0;
+
+	reg = readl(dbi_base + PCIE_RC_IOBLSSR);
+	if (reg & 0x71000000) {
+		if (reg & 1<<30)
+			pr_err("%d:%02d.%d 0x%04x: parity error\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		if (reg & 1<<29) {
+//			pr_err("%d:%02d.%d 0x%04x: master abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+			ret = 1;
+		}
+		if (reg & 1<<28)
+			pr_err("%d:%02d.%d 0x%04x: target abort\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		if (reg & 1<<24)
+			pr_err("%d:%02d.%d 0x%04x: master data parity error\n", bus->number, PCI_SLOT(devfn), PCI_FUNC(devfn), where);
+		writel(reg, dbi_base + PCIE_RC_IOBLSSR);
+		udelay(1500); // without this delay subsequent reads through bridge can erroneously return 0???
+	}
+	return ret;
+}
+
+static u32 get_cfg_addr(struct pci_bus *bus, u32 devfn, int where)
+{
+	unsigned busnum;
+
+	if (!bus->number) {
+		if (devfn != 0)
+			return 0;
+		return ((u32)dbi_base) + (where & 0x0ffc);
+	}
+	if ((devfn > 0xff) || (bus->number > 32))
+		return 0;
+	busnum = bus->number - 1;
+	if ((busnum < 3) && (devfn <= 3)) {
+		return ((u32)base) + (busnum << 18) + (devfn << 16) + (where & 0xfffc);
+	}
+	writel(3, dbi_base + ATU_VIEWPORT_R);
+	writel((bus->number << 24) | (devfn << 16),
+			dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
+	writel((bus->number > 1) ? CfgRdWr1 : CfgRdWr0,
+			dbi_base + ATU_REGION_CTRL1_R);
+	return ((u32)base) + (3 << 18) + (where & 0xfffc);
+}
+
 static int imx_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
 			int size, u32 *val)
 {
-	struct imx_pcie_port *pp = bus_to_port(bus->number);
 	u32 va_address;
+	u32 v;
 
-	/*  Added to change transaction TYPE  */
-	if (bus->number < 2) {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-		writel(CfgRdWr0, dbi_base + ATU_REGION_CTRL1_R);
-	} else {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-		writel(CfgRdWr1, dbi_base + ATU_REGION_CTRL1_R);
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x\n", __func__, bus->number, devfn, where, size);
+	va_address = get_cfg_addr(bus, devfn, where);
+	if (!va_address) {
+		*val = 0xffffffff;
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
-
-	if (pp) {
-		if (devfn != 0) {
-			*val = 0xFFFFFFFF;
-			return PCIBIOS_DEVICE_NOT_FOUND;
-		}
-
-		va_address = (u32)dbi_base + (where & ~0x3);
-	} else {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-
-		writel((((PCIE_CONF_BUS(bus->number)
-				+ PCIE_CONF_DEV(PCI_SLOT(devfn))
-				+ PCIE_CONF_FUNC(PCI_FUNC(devfn)))) << 8),
-				dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
-		va_address = (u32)base + PCIE_CONF_REG(where);
+	v = readl(va_address);
+	if (master_abort(bus, devfn, where)) {
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	}
-
-	*val = readl(va_address);
-
-	if (size == 1)
-		*val = (*val >> (8 * (where & 3))) & 0xFF;
-	else if (size == 2)
-		*val = (*val >> (8 * (where & 3))) & 0xFFFF;
-
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x v=%x\n", __func__, bus->number, devfn, where, size, v);
+	if (size == 4) {
+		*val = v;
+	} else if (size == 1) {
+		*val = (v >> (8 * (where & 3))) & 0xFF;
+	} else if (size == 2) {
+		*val = (v >> (8 * (where & 3))) & 0xFFFF;
+	} else {
+		*val = 0xffffffff;
+		return PCIBIOS_BAD_REGISTER_NUMBER;
+	}
 	return PCIBIOS_SUCCESSFUL;
 }
 
 static int imx_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
 			int where, int size, u32 val)
 {
-	struct imx_pcie_port *pp = bus_to_port(bus->number);
-	u32 va_address = 0, mask = 0, tmp = 0;
-	int ret = PCIBIOS_SUCCESSFUL;
-
-	/*  Added to change transaction TYPE  */
-	if (bus->number < 2) {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-		writel(CfgRdWr0, dbi_base + ATU_REGION_CTRL1_R);
-	} else {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-		writel(CfgRdWr1, dbi_base + ATU_REGION_CTRL1_R);
-	}
-
-	if (pp) {
-		if (devfn != 0)
-			return PCIBIOS_DEVICE_NOT_FOUND;
-
-		va_address = (u32)dbi_base + (where & ~0x3);
-	} else {
-		writel(0, dbi_base + ATU_VIEWPORT_R);
-
-		writel((((PCIE_CONF_BUS(bus->number)
-				+ PCIE_CONF_DEV(PCI_SLOT(devfn))
-				+ PCIE_CONF_FUNC(PCI_FUNC(devfn)))) << 8),
-				dbi_base + ATU_REGION_LOW_TRGT_ADDR_R);
-		va_address = (u32)base + PCIE_CONF_REG(where);
-	}
-
+	u32 va_address, mask, tmp;
+	
+	if (0)
+		pr_info("%s: bus=%x, devfn=%x, where=%x size=%x val=%x\n", __func__, bus->number, devfn, where, size, val);
+	va_address = get_cfg_addr(bus, devfn, where);
+	if (!va_address)
+		return PCIBIOS_DEVICE_NOT_FOUND;
 	if (size == 4) {
 		writel(val, va_address);
-		goto exit;
+		return (master_abort(bus, devfn, where))
+			?PCIBIOS_DEVICE_NOT_FOUND:PCIBIOS_SUCCESSFUL;
 	}
-
 	if (size == 2)
 		mask = ~(0xFFFF << ((where & 0x3) * 8));
 	else if (size == 1)
 		mask = ~(0xFF << ((where & 0x3) * 8));
 	else
-		ret = PCIBIOS_BAD_REGISTER_NUMBER;
+		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	tmp = readl(va_address) & mask;
 	tmp |= val << ((where & 0x3) * 8);
 	writel(tmp, va_address);
-exit:
-	return ret;
+	return (master_abort(bus, devfn, where))
+		?PCIBIOS_DEVICE_NOT_FOUND:PCIBIOS_SUCCESSFUL;
 }
 
 static struct pci_ops imx_pcie_ops = {
