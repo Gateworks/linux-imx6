@@ -433,9 +433,14 @@ static int pfuze100_init(struct mc_pfuze *pfuze)
 	ret = pfuze_reg_read(pfuze, PFUZE100_DEVICEID, &value);
 	if (ret)
 		goto err;
-	if (value != 0x10) {
-		printk(KERN_ERR "wrong device id:%x!\n", value);
-		goto err;
+	switch (value & 0xf) {
+		case 0x0:
+		/* Freescale misprogramed 1-3% of parts prior to week 8 of 2013 this ID */
+		case 0x8:
+			break;
+		default:
+			printk(KERN_ERR "wrong device id:%x!\n", value);
+			goto err;
 	}
 
 	/*read Revision ID*/
