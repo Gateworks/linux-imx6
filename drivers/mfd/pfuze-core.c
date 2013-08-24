@@ -344,6 +344,12 @@ static int pfuze_identify(struct mc_pfuze *mc_pfuze, enum pfuze_id *id)
 	case 0x0:
 		*id = PFUZE_ID_PFUZE100;
 		break;
+	case 0x8:
+		/* Freescale misprogramed 1-3% of parts prior to week 8 of 2013 with 
+		 * this ID */
+		dev_info(&mc_pfuze->i2c_client->dev, "Assuming misprogrammed PFUZE100: %x\n", value & 0x0f);
+		*id = PFUZE_ID_PFUZE100;
+		break;
 	default:
 		*id = PFUZE_ID_INVALID;
 		dev_warn(&mc_pfuze->i2c_client->dev, "Illegal ID: %x\n", value);
