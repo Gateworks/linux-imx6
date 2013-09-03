@@ -55,3 +55,6 @@ obj-$(CONFIG_MXC_TVIN_ADV7180) += adv7180_tvin.o
 
 adv7280_tvin-objs := adv7280_mipi_tvin.o
 obj-$(CONFIG_MXC_MIPI_CSI2_TVIN_ADV7280) += adv7280_mipi_tvin.o
+
+tda1997x-video-objs := tda1997x.o
+obj-$(CONFIG_MXC_TVIN_TDA1997X) += tda1997x-video.o

@@ -213,6 +213,10 @@ enum {
 	/* Siliconfile sensors: reserved range 10100 - 10199 */
 	V4L2_IDENT_NOON010PC30	= 10100,
 
+	/* module tda19971/tda19973 */
+	V4L2_IDENT_TDA19971 = 19971,
+	V4L2_IDENT_TDA19973 = 19973,
+
 	/* module cx231xx and cx25840 */
 	V4L2_IDENT_CX2310X_AV = 23099, /* Integrated A/V decoder; not in '100 */
 	V4L2_IDENT_CX23100    = 23100,
