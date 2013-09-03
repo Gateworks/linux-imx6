@@ -100,6 +100,11 @@ config MXC_TVIN_ADV7180
 	---help---
 	  If you plan to use the adv7180 video decoder with your MXC system, say Y here.
 
+config MXC_TVIN_TDA1997X
+	tristate "NXP TDA1997x HDMI Receiver Input support"
+	depends on (MACH_MX6Q_SABREAUTO || MACH_MX6Q_ARM2 || MACH_GWVENTANA)
+	---help---
+	  If you plan to use the NXP tda1997x/tdf1997x HDMI reciever with your i.MX6 system, say Y here.
 
 config MXC_CAMERA_OV5640_MIPI
 	tristate "OmniVision ov5640 camera support using mipi"
