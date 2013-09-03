@@ -804,6 +804,15 @@ config MFD_MXC_HDMI
 	  This is the core driver for the i.Mx on-chip HDMI.  This MFD
 	  driver connects with the video and audio drivers for HDMI.
 
+config MFD_TDA1997X
+	tristate "TDA1997X HDMI Receiver Core"
+	depends on I2C=y
+	select MFD_CORE
+	default y
+	help
+		This is the core driver for the TDA1997X HDMI Reciver.  This MFD
+		driver connects with video and audio drivers for HDMI Input.
+
 endif # MFD_SUPPORT
 
 menu "Multimedia Capabilities Port drivers"

@@ -90,6 +90,7 @@ obj-$(CONFIG_MFD_VX855)		+= vx855.o
 obj-$(CONFIG_MFD_WL1273_CORE)	+= wl1273-core.o
 
 obj-$(CONFIG_MFD_MXC_HDMI)       += mxc-hdmi-core.o
+obj-$(CONFIG_MFD_TDA1997X)       += tda1997x-core.o
 obj-$(CONFIG_MFD_CS5535)	+= cs5535-mfd.o
 obj-$(CONFIG_MFD_MAX17135)  += max17135-core.o
 
