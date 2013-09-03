@@ -1130,6 +1130,14 @@ config MFD_WM8994
 	  core support for the WM8994, in order to use the actual
 	  functionaltiy of the device other drivers must be enabled.
 
+config MFD_TDA1997X
+	tristate "TDA1997X HDMI Receiver Core"
+	select MFD_CORE
+	depends on I2C=y
+	help
+		This is the core driver for the TDA1997X HDMI Reciver.  This MFD
+		driver connects with video and audio drivers for HDMI Input.
+
 endmenu
 endif
 
