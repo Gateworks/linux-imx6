@@ -1061,19 +1061,7 @@ static int debug = 0;
 module_param(debug, int, 0644);
 MODULE_PARM_DESC(debug, "Debug level");
 
-static time_t start_time = 0;
-void print_time(void) {
-	if (debug > 1) {
-		struct timeval now;
-		do_gettimeofday(&now);
-		if (start_time == 0)
-			start_time = now.tv_sec;
-
-		printk("[% 4ld.%06ld] ", now.tv_sec - start_time, now.tv_usec);
-	}
-}
-//#define DPRINTK(x, fmt, args...) { if (debug > x) printk(fmt, ## args); }
-#define DPRINTK(x, fmt, args...) { if (debug > x) { print_time(); printk(fmt, ## args); } }
+#define DPRINTK(x, fmt, args...) { if (debug>=x) printk(KERN_DEBUG fmt, ## args); }
 
 /* HPD modes */
 const char *hpd_names[] = {
@@ -1263,7 +1251,7 @@ static inline int io_read(u16 reg)
 
 	val = i2c_smbus_read_byte_data(tda1997x_data.client, reg&0xff);
 	if (!(reg == REG_INT_FLG_CLR_TOP && val == 0x00)) {
-		DPRINTK(1, "<< 0x%04x=0x%02x\n", reg, val);
+		DPRINTK(3, "<< 0x%04x=0x%02x\n", reg, val);
 	}
 	if (val < 0) {
 		dev_dbg(&tda1997x_data.client->dev,
@@ -1346,7 +1334,7 @@ static int io_write(u16 reg, u8 val)
 		goto out;
 	}
 
-	DPRINTK(1, "  >> 0x%04x=0x%02x\n", reg, val);
+	DPRINTK(3, ">> 0x%04x=0x%02x\n", reg, val);
 	ret = i2c_smbus_write_byte_data(tda1997x_data.client, reg&0xff, val);
 	if (ret < 0) {
 		dev_dbg(&tda1997x_data.client->dev,
@@ -2886,7 +2874,7 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 	u32 verticalPeriod;
 	u16 horizontalPeriod;
 	u16 hsWidth;
-	u8 vPerCmp = 0, hPerCmp = 0, hsWidthCmp = 0;
+	char vPerCmp = 0, hPerCmp = 0, hsWidthCmp = 0;
 	const resolution_data_t *res;
 	int i;
 
@@ -2897,12 +2885,12 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 	DPRINTK(0,"verticalPeriod=%d horizontalPeriod=%d hsWidth=%d\n",
 		verticalPeriod, horizontalPeriod, hsWidth);
 
-#if 0 // more details
+#if 1 // more details
 {
 	videoFormatDetails fmt;
 	videoFormatDetails *pFMT = &fmt;
-	u8 regs[20];
 	
+	/* read the FMT registers */
 	pFMT->vsPolarity = io_read(REG_V_PER) & 0x80;
 	pFMT->hsPolarity = io_read(REG_H_PER) & 0x80;
 	pFMT->videoFormat = io_read(REG_HS_WIDTH) & 0x80;
@@ -2920,24 +2908,38 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 	pFMT->verticalBackPorchWidthF2 = io_read(REG_FMT_V_BACK_F2);
 	pFMT->dataEnablePresent = io_read(REG_FMT_DE_ACT)&0x01;
 
-	/* read the FMT registers */
-	io_readn(REG_FMT_H_TOT, 20, regs);
+	DPRINTK(2,"vsPolarity=%d hsPolarity=%d videoFormat=%d\n"
+		"horizTotalPeriod=%d horizVideoActiveWidth=%d horizFrontPorchWidth=%d\n"
+		"horizSyncWidthPixClk=%d horizBackPorchWidth=%d\n"
+		"vertTotalPeriod=%d vertVideoActiveWidth=%d vertFrontPorchWidthF1=%d"
+		"vertFrontPorchWidthF2=%d\n"
+		"vertBackPorchWidthF1=%d vertBackPorchWidthF1=%d dataEnablePresent=%d\n",
+		pFMT->vsPolarity, pFMT->hsPolarity, pFMT->videoFormat,
+		pFMT->horizontalTotalPeriod, pFMT->horizontalVideoActiveWidth,
+		pFMT->horizontalFrontPorchWidth, pFMT->horizontalSyncWidthPixClk,
+		pFMT->horizontalBackPorchWidth,
+		pFMT->verticalTotalPeriod, pFMT->verticalVideoActiveWidth,
+		pFMT->verticalFrontPorchWidthF1, pFMT->verticalFrontPorchWidthF2,
+		pFMT->verticalBackPorchWidthF1,
+		pFMT->verticalBackPorchWidthF2,
+		pFMT->dataEnablePresent);
 }
 #endif
 
 	/* iterate over list of supported resolutions and find best match */
 	for (i = 0; i < ARRAY_SIZE(supported_res); i++) {
 		res = &supported_res[i];
-		DPRINTK(2,"\t%02d: %dx%d@%d%c\n", i, res->width, res->height, res->horizfreq,
-			res->interlaced?'i':'p');
 
-		vPerCmp = (u8) ((verticalPeriod >= res->verticalPeriodMin) &&
+		vPerCmp = (char) ((verticalPeriod >= res->verticalPeriodMin) &&
 						(verticalPeriod <= res->verticalPeriodMax));
-		hPerCmp = (u8) ((horizontalPeriod >= res->horizontalPeriodMin) &&
+		hPerCmp = (char) ((horizontalPeriod >= res->horizontalPeriodMin) &&
 						(horizontalPeriod <= res->horizontalPeriodMax));
-		hsWidthCmp = (u8) ((hsWidth >= res->hsWidthMin) &&
+		hsWidthCmp = (char) ((hsWidth >= res->hsWidthMin) &&
 						(hsWidth <= res->hsWidthMax));
 
+		DPRINTK(1,"\t%02d: %dx%d@%d%c: %d/%d/%d\n", i, res->width, res->height,
+			res->horizfreq, res->interlaced?'i':'p',
+ 			vPerCmp, hPerCmp, hsWidthCmp);
 		if (vPerCmp && hPerCmp && hsWidthCmp) {
 			tda1997x->resolutiontype = RESTYPE_SDTV;
 			if (res->width > 720)
@@ -3191,7 +3193,7 @@ static void tda1997x_work(struct work_struct *work)
 		interrupt_top_flags = io_read(REG_INT_FLG_CLR_TOP);
 		if (interrupt_top_flags == 0)
 			break;
-		DPRINTK(0,"\ninterrupt:0x%02x\n", interrupt_top_flags);
+		DPRINTK(0,"interrupt:0x%02x\n", interrupt_top_flags);
 
 		/* SUS interrupt source (Input activity events) */
 		if (interrupt_top_flags & INTERRUPT_SUS) {
@@ -3253,6 +3255,10 @@ static void tda1997x_work(struct work_struct *work)
 					tda1997x->video_mode.fps = res->horizfreq;
 					tda1997x->video_mode.interlaced = res->interlaced;
 					tda1997x->video_mode.signal = 1;
+
+					/* configure the active input to the given resolution */
+					tda1997x_configure_input_resolution(res->resolutionID);
+
 				} else {
 					tda1997x->video_mode.width = 0;
 					tda1997x->video_mode.height = 0;
@@ -3260,9 +3266,6 @@ static void tda1997x_work(struct work_struct *work)
 					tda1997x->video_mode.interlaced = 0;
 					tda1997x->video_mode.signal = 1;
 				}
-
-				/* configure the active input to the given resolution */
-				tda1997x_configure_input_resolution(res->resolutionID);
 
 				/* on 'input locked' event, RGB colorspace is forced (the AVI infoframe
 				 * is not received yet at this moment)
