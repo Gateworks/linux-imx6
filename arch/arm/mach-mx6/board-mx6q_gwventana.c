@@ -51,6 +51,7 @@
 #include <linux/regulator/machine.h>
 #include <linux/regulator/fixed.h>
 #include <linux/mfd/mxc-hdmi-core.h>
+#include <linux/mfd/tda1997x-core.h>
 #include <linux/pci.h>
 #include <linux/leds.h>
 #include <linux/leds_pwm.h>
@@ -298,7 +299,7 @@ static iomux_v3_cfg_t mx6dl_ventana_pads[] = {
 	MX6DL_PAD_KEY_COL4__USBOH3_USBOTG_OC,
 };
 
-/* IPU1_CSI0 */
+/* IPU1_CSI0 - Digital Video in */
 static iomux_v3_cfg_t mx6q_ventana_csi0_sensor_pads[] = {
 	MX6Q_PAD_CSI0_DAT12__IPU1_CSI0_D_12,
 	MX6Q_PAD_CSI0_DAT13__IPU1_CSI0_D_13,
@@ -567,7 +568,8 @@ static void spi_device_init(void)
 				ARRAY_SIZE(imx6_ventana_spi_nor_device));
 }
 
-static struct mxc_audio_platform_data mx6_ventana_audio_data;
+/* Analog Audio Codec */
+static struct mxc_audio_platform_data mx6_ventana_analog_audio_data;
 
 static int mx6_ventana_sgtl5000_init(void)
 {
@@ -592,26 +594,42 @@ static int mx6_ventana_sgtl5000_init(void)
 		return -1;
 	}
 
-	mx6_ventana_audio_data.sysclk = rate;
+	mx6_ventana_analog_audio_data.sysclk = rate;
 	clk_set_rate(clko, rate);
 	clk_enable(clko);
 	return 0;
 }
 
-static struct imx_ssi_platform_data mx6_ventana_ssi_pdata = {
+static struct imx_ssi_platform_data mx6_ventana_ssi1_pdata = {
 	.flags = IMX_SSI_DMA | IMX_SSI_SYN,
 };
 
-static struct mxc_audio_platform_data mx6_ventana_audio_data = {
-	.ssi_num = 1,
+static struct mxc_audio_platform_data mx6_ventana_analog_audio_data = {
+	/* codec-->aud4-->ssi2 */
 	.src_port = 2,
 	.ext_port = 4,
 	.init = mx6_ventana_sgtl5000_init,
 	.hp_gpio = -1,
 };
 
-static struct platform_device mx6_ventana_audio_device = {
+static struct platform_device mx6_ventana_analog_audio_device = {
 	.name = "imx-sgtl5000",
+};
+
+/* Digital Audio In */
+static struct imx_ssi_platform_data mx6_ventana_ssi2_pdata = {
+	.flags = IMX_SSI_DMA | IMX_SSI_SYN,
+};
+
+static struct mxc_audio_platform_data mx6_ventana_digital_audio_data = {
+	/* codec-->aud5-->ssi1 */
+	.src_port = 1,
+	.ext_port = 5,
+	.hp_gpio = -1,
+};
+
+static struct platform_device mx6_ventana_digital_audio_device = {
+	.name = "imx-tda1997x",
 };
 
 #ifdef CONFIG_PPS_CLIENT_GPIO
@@ -874,6 +892,46 @@ static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.csi = 1,
 };
 
+/* Digital Video In - IPU1_CSI0 */
+static struct fsl_mxc_tvin_platform_data mxc_tda1997x_video_pdata = {
+	.csi = 0,
+	.io_init = mx6_csi0_io_init,
+};
+static struct tda1997x_platform_data tda1997x_pdata = {
+	/* regulators */
+	.dvddio_reg = "VDD_DLY_3P3",
+	.dvdd_reg = "DVDD", /* VDD_1P8 */
+	.avdd_reg = "AVDD", /* VDD_1P8 */
+
+	/* Misc */
+	.hdcp = 1, /* enable HDCP */
+	.ddc_slave = 0x74, /* slave address of DDC channel */
+
+	/* Video Output */
+	.vidout_format = VIDEOFMT_422_CCIR, /* BT656 */
+	.vidout_trc = 1, /* insert timing codes (SAV/EAV) in stream */
+	.vidout_blc = 1, /* isnert blanking codes in stream */
+	.vidout_clkmode = CLOCK_SINGLE_EDGE, /* 1x clock */
+	/* Port Config: bits[0:12] hooked up to csi_data[8:16] */
+	.vidout_port_config = {
+		0x00, /* VP35_32_CTRL */
+		0x00, /* VP31_28_CTRL */
+		0x00, /* VP27_24_CTRL */
+		0x82, /* VP23_23_CTRL */
+		0x81, /* VP19_16_CTRL */
+		0x00, /* VP15_12_CTRL */
+		0x00, /* VP11_08_CTRL */
+		0x00, /* VP07_04_CTRL */
+		0x00, /* VP03_00_CTRL */
+	},
+	.vidout_port_config_no = 9,
+
+	/* Audio output */
+	.audout_format = AUDIO_FMT_I2S16,       /* I2S bus, 16bit per channel */
+	.audout_sysclk = AUDIO_SYSCLK_128FS,    /* 128fs clkmode */
+	.audout_layout = AUDIO_LAYOUT_FORCED_0, /* AP0,WS,A_CLK for up to 2ch audio */
+};
+
 static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 	/* Audio Codec */
 	{
@@ -887,13 +945,14 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 		.platform_data = (void *)&mma8451_position,
 	},
 
-	/* HDMI Video Decoder (Video In) */
+	/* HDMI Video Decoder (Digital Video In) */
 	{
-		I2C_BOARD_INFO("adv7611", 0x4c),
+		I2C_BOARD_INFO("tda1997x", 0x48),
 		.irq = gpio_to_irq(MX6Q_VENTANA_HDMIIN_IRQ),
+		.platform_data = (void *)&tda1997x_pdata,
 	},
 
-	/* Analog Video Decoder (Video In) */
+	/* Analog Video Decoder (Analog Video In) */
 	{
 		I2C_BOARD_INFO("adv7180", 0x20),
 		.platform_data = (void *)&adv7180_pdata,
@@ -1363,9 +1422,14 @@ static struct platform_device mx6_ventana_vdd_dly_3p3_device = {
  */
 static int imx6_init_audio(void)
 {
-	mxc_register_device(&mx6_ventana_audio_device,
-			    &mx6_ventana_audio_data);
-	imx6q_add_imx_ssi(1, &mx6_ventana_ssi_pdata);
+	mxc_register_device(&mx6_ventana_digital_audio_device,
+			    &mx6_ventana_digital_audio_data);
+	imx6q_add_imx_ssi(0, &mx6_ventana_ssi2_pdata);
+
+	mxc_register_device(&mx6_ventana_analog_audio_device,
+			    &mx6_ventana_analog_audio_data);
+	imx6q_add_imx_ssi(1, &mx6_ventana_ssi1_pdata);
+
 	return 0;
 }
 
@@ -1662,6 +1726,12 @@ static int __init ventana_model_setup(void)
 				mx6_ventana_gpio_leds[0].gpio = IMX_GPIO_NR(4,6);  // user1:panledg
 				mx6_ventana_gpio_leds[1].gpio = IMX_GPIO_NR(4,7);  // user2:panledr
 				mx6_ventana_gpio_leds[2].gpio = IMX_GPIO_NR(4,15); // user3:locled
+
+				/* i2s audio */
+				if (info->config_ssi1) {
+					mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_audmux5_pads,
+						ARRAY_SIZE(mx6q_ventana_audmux5_pads));
+				}
 
 				/* PWM4 (backlight control) */
 				mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO,
@@ -1972,6 +2042,18 @@ static int __init ventana_model_setup(void)
 			imx6q_add_v4l2_output(0);
 		}
 
+		/* /dev/video0 HDMI Receiver */
+		if (info->config_hdmi_in) {
+			/* add video driver */
+			platform_device_register_resndata(NULL, "tda1997x-video", 0, NULL, 0,
+				&mxc_tda1997x_video_pdata, sizeof(mxc_tda1997x_video_pdata));
+			imx6q_add_v4l2_capture(0, &capture_data[0]);
+			/* add audio driver */
+			platform_device_register_resndata(NULL, "tda1997x_codec", 0, NULL, 0,
+				NULL, 0);
+		}
+
+		/* /dev/video1 ADV7180 Analog Video Decoder */
 		if (info->config_csi0)
 			imx6q_add_v4l2_capture(0, &capture_data[0]);
 		if (info->config_csi1)
