@@ -3833,6 +3833,11 @@ static int tda1997x_probe(struct i2c_client *client,
 		return -EINVAL;
 	}
 
+	/* probe chip */
+	ret = i2c_smbus_read_byte_data(client, REG_CMTP_REG10);
+	if (ret < 0)
+		return -ENODEV;
+
 	if (pdata->io_init)
 		pdata->io_init();
 
