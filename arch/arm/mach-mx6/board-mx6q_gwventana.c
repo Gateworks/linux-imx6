@@ -100,6 +100,7 @@ static int caam_enabled;
 
 #define MX6Q_VENTANA_SD1_CMD_PADCFG (PAD_CTL_DSE_240ohm)
 #define MX6Q_VENTANA_DISP0_DIO_PADCFG (PAD_CTL_DSE_240ohm)
+#define MX6Q_VENTANA_USBOTGPEN_PADCFG (PAD_CTL_DSE_40ohm|PAD_CTL_PUE|PAD_CTL_PUS_100K_UP)
 
 /* AUDMUX4 */
 static iomux_v3_cfg_t mx6q_ventana_audmux4_pads[] = {
@@ -278,11 +279,11 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	/* USBOTG ID pin */
 	MX6Q_PAD_GPIO_1__USBOTG_ID,
 
+	/* USBOTG PWR EN */
+	NEW_PAD_CTRL(MX6Q_PAD_EIM_D22__GPIO_3_22, MX6Q_VENTANA_USBOTGPEN_PADCFG),
+
 	/* USBOTG OC pin */
 	MX6Q_PAD_KEY_COL4__USBOH3_USBOTG_OC,
-
-	/* USBOTG PWR EN */
-	MX6Q_PAD_EIM_D22__GPIO_3_22,
 };
 static iomux_v3_cfg_t mx6dl_ventana_pads[] = {
 	/* I2C3 */
@@ -293,7 +294,7 @@ static iomux_v3_cfg_t mx6dl_ventana_pads[] = {
 	MX6DL_PAD_GPIO_1__USBOTG_ID,
 
 	/* USBOTG PWR EN */
-	MX6DL_PAD_EIM_D22__GPIO_3_22,
+	NEW_PAD_CTRL(MX6DL_PAD_EIM_D22__GPIO_3_22, MX6Q_VENTANA_USBOTGPEN_PADCFG),
 
 	/* USBOTG OC pin */
 	MX6DL_PAD_KEY_COL4__USBOH3_USBOTG_OC,
