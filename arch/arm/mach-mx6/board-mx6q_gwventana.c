@@ -653,15 +653,12 @@ static struct platform_device mx6_ventana_pps_device = {
 static struct gpio_led mx6_ventana_gpio_leds[] = {
 	{
 		.name = "user1",
-		.default_trigger = "hearbeat",
-		.active_low = 1,
-		.default_state = LEDS_GPIO_DEFSTATE_ON,
+		.default_trigger = "heartbeat",
 		.gpio = -1,
 	},
 	{
 		.name = "user2",
-		.active_low = 1,
-		.default_state = LEDS_GPIO_DEFSTATE_ON,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
 		.gpio = -1,
 	},
 	{
