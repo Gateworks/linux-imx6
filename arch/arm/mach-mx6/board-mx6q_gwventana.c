@@ -1174,10 +1174,14 @@ static struct mipi_dsi_platform_data mipi_dsi_pdata = {
  */
 static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 	{
-		/* mxcfb0: Analog Video out
-		 * /dev/fb0 - primary display (BG/Graphics)
-		 * /dev/fb1 - overlay display (FG/Video)
-		 */
+		/* HDMI */
+		.disp_dev = "hdmi",
+		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
+		.mode_str = "1280x720M@60",
+		.default_bpp = 16,
+		.int_clk = false,
+	}, {
+		/* Analog Video */
 		.disp_dev = "adv739x",
 		.interface_pix_fmt = IPU_PIX_FMT_BT656,
 		.fb_pix_fmt = IPU_PIX_FMT_RGB565,
@@ -1185,24 +1189,14 @@ static struct ipuv3_fb_platform_data ventana_fb_data[] = {
 		.default_bpp = 16,
 		.int_clk = false,
 	}, {
-		/* mxcfb1: LVDS Freescale MXC-LVDS1
-		 * /dev/fb2 - primary display (BG/Graphics)
-		 * /dev/fb3 - overlay display (FG/Video)
-		 */
+		/* Freescale MXC-LVDS1 */
 		.disp_dev = "ldb",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
 		.mode_str = "LDB-XGA",
 		.default_bpp = 16,
 		.int_clk = false,
 	}, {
-		/* mxcfb2: /dev/fb4 */
-		.disp_dev = "hdmi",
-		.interface_pix_fmt = IPU_PIX_FMT_RGB666,
-		.mode_str = "1280x720M@60",
-		.default_bpp = 16,
-		.int_clk = false,
-	}, {
-		/* mxcfb3: MIPI DSI /dev/fb5 */
+		/* MIPI DSI */
 		.disp_dev = "mipi_dsi",
 		.interface_pix_fmt = IPU_PIX_FMT_RGB24,
 		.mode_str = "TRULY-WVGA",
@@ -1420,13 +1414,13 @@ static struct platform_device mx6_ventana_vdd_dly_3p3_device = {
  */
 static int imx6_init_audio(void)
 {
-	mxc_register_device(&mx6_ventana_digital_audio_device,
-			    &mx6_ventana_digital_audio_data);
-	imx6q_add_imx_ssi(0, &mx6_ventana_ssi2_pdata);
-
 	mxc_register_device(&mx6_ventana_analog_audio_device,
 			    &mx6_ventana_analog_audio_data);
 	imx6q_add_imx_ssi(1, &mx6_ventana_ssi1_pdata);
+
+	mxc_register_device(&mx6_ventana_digital_audio_device,
+			    &mx6_ventana_digital_audio_data);
+	imx6q_add_imx_ssi(0, &mx6_ventana_ssi2_pdata);
 
 	return 0;
 }
@@ -1711,7 +1705,6 @@ static int __init ventana_model_setup(void)
 			else if ( (strncmp(info->model, "GW5400", 6) == 0)
 		         || (strncmp(info->model, "GW5410", 6) == 0)
 			) {
-
 				/* UARTs */
 				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400b_uart_pads,
 					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
@@ -1755,6 +1748,10 @@ static int __init ventana_model_setup(void)
 				/* NAND */
 				if (info->config_nand)
 					imx6q_add_gpmi(&mx6q_gpmi_nand_platform_data);
+
+				/* Video out: Modify mxcfb array to better suit this board */
+				sprintf(ventana_fb_data[3].disp_dev, "off");
+
 			} /* end GW5400-B/GW5410-B */
 
 			/* Touchscreen IRQ */
@@ -1989,12 +1986,9 @@ static int __init ventana_model_setup(void)
 			mx6_ventana_pcie_data.pcie_rst = IMX_GPIO_NR(1, 0);
 
 			/* Video out: Modify mxcfb array to better suit this board */
-			sprintf(ventana_fb_data[0].disp_dev, "hdmi");
-			ventana_fb_data[0].interface_pix_fmt = IPU_PIX_FMT_RGB666;
-			ventana_fb_data[0].mode_str = "1280x720M@60";
-			ventana_fb_data[0].default_bpp = 16;
-			ventana_fb_data[0].int_clk = false;
 			sprintf(ventana_fb_data[1].disp_dev, "off");
+			sprintf(ventana_fb_data[2].disp_dev, "off");
+			sprintf(ventana_fb_data[3].disp_dev, "off");
 		}
 
 		else {
@@ -2045,10 +2039,10 @@ static int __init ventana_model_setup(void)
 			/* add video driver */
 			platform_device_register_resndata(NULL, "tda1997x-video", 0, NULL, 0,
 				&mxc_tda1997x_video_pdata, sizeof(mxc_tda1997x_video_pdata));
-			imx6q_add_v4l2_capture(0, &capture_data[0]);
 			/* add audio driver */
 			platform_device_register_resndata(NULL, "tda1997x_codec", 0, NULL, 0,
 				NULL, 0);
+			imx_add_platform_device("imx-tda1997x-dai", 0, NULL, 0, NULL, 0);
 		}
 
 		/* /dev/video1 ADV7180 Analog Video Decoder */
@@ -2128,13 +2122,6 @@ static int __init ventana_model_setup(void)
 		if (info->config_hdmi_out) {
 			imx6q_add_hdmi_soc();
 			imx6q_add_hdmi_soc_dai();
-		}
-
-		/* HDMI audio in */
-		if (info->config_hdmi_in) {
-			/* see platform-imx-hdmi-soc-dai.c if need to pass in a resource */
-			imx_add_platform_device("tda1997x_codec", 0, NULL, 0, NULL, 0);
-			imx_add_platform_device("imx-tda1997x-dai", 0, NULL, 0, NULL, 0);
 		}
 
 		/* PCIe RC interface */
