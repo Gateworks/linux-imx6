@@ -1657,9 +1657,12 @@ static int __init ventana_model_setup(void)
 				/* UARTs */
 				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400a_uart_pads,
 					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
-				imx6q_add_imx_uart(0, NULL);
-				imx6q_add_imx_uart(1, NULL);
-				imx6q_add_imx_uart(2, NULL);
+				if (info->config_uart0)
+					imx6q_add_imx_uart(0, NULL);
+				if (info->config_uart1)
+					imx6q_add_imx_uart(1, NULL);
+				if (info->config_uart2)
+					imx6q_add_imx_uart(2, NULL);
 
 				/* SPI FLASH */
 				if (info->config_spifl0 || info->config_spifl1) {
@@ -1708,9 +1711,12 @@ static int __init ventana_model_setup(void)
 				/* UARTs */
 				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400b_uart_pads,
 					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
-				imx6q_add_imx_uart(0, NULL);
-				imx6q_add_imx_uart(1, NULL);
-				imx6q_add_imx_uart(4, NULL);
+				if (info->config_uart0)
+					imx6q_add_imx_uart(0, NULL);
+				if (info->config_uart1)
+					imx6q_add_imx_uart(1, NULL);
+				if (info->config_uart4)
+					imx6q_add_imx_uart(4, NULL);
 
 				/* User LEDs */
 				mx6_ventana_led_pdata.num_leds = 3;
@@ -1883,10 +1889,14 @@ static int __init ventana_model_setup(void)
 			/* UARTs */
 			mxc_iomux_v3_setup_multiple_pads(mx6dl_gw51xx_uart_pads,
 				ARRAY_SIZE(mx6dl_gw51xx_uart_pads));
-			imx6q_add_imx_uart(0, NULL);
-			imx6q_add_imx_uart(1, NULL);
-			imx6q_add_imx_uart(2, NULL);
-			imx6q_add_imx_uart(4, NULL);
+			if (info->config_uart0)
+				imx6q_add_imx_uart(0, NULL);
+			if (info->config_uart1)
+				imx6q_add_imx_uart(1, NULL);
+			if (info->config_uart2)
+				imx6q_add_imx_uart(2, NULL);
+			if (info->config_uart4)
+				imx6q_add_imx_uart(4, NULL);
 
 			/* User LEDs */
 			mx6_ventana_led_pdata.num_leds = 2;
