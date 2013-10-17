@@ -869,12 +869,6 @@ static void __init add_pcie_port(void __iomem *base, void __iomem *dbi_base,
 static int imx6q_pcie_abort_handler(unsigned long addr,
 		unsigned int fsr, struct pt_regs *regs)
 {
-	/*
-	 * If it was an imprecise abort, then we need to correct the
-	 * return address to be _after_ the instruction.
-	 */
-	if (fsr & (1 << 10))
-		regs->ARM_pc += 4;
 	return 0;
 }
 
