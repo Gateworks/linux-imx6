@@ -234,14 +234,14 @@ static void adv7180_get_std(v4l2_std_id *std)
 	dev_dbg(&adv7180_data.sen.i2c_client->dev, "In adv7180_get_std\n");
 
 	/* Read the AD_RESULT to get the detect output video standard */
-	tmp = adv7180_read(ADV7180_STATUS_1) & 0x70;
+	tmp = adv7180_read(ADV7180_STATUS_1) & 0x71;
 
 	mutex_lock(&mutex);
-	if (tmp == 0x40) {
+	if (tmp == 0x41) {
 		/* PAL */
 		*std = V4L2_STD_PAL;
 		idx = ADV7180_PAL;
-	} else if (tmp == 0) {
+	} else if (tmp == 0x01) {
 		/*NTSC*/
 		*std = V4L2_STD_NTSC;
 		idx = ADV7180_NTSC;
