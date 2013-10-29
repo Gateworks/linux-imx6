@@ -615,13 +615,26 @@ imx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 
 static int __init imx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-       switch (pin) {
-       case 1: return MXC_INT_PCIE_3;
-       case 2: return MXC_INT_PCIE_2;
-       case 3: return MXC_INT_PCIE_1;
-       case 4: return MXC_INT_PCIE_0;
-       default: return -1;
-       }
+	/* TI XIO2001 PCIe-to-PCI bridge IRQs are flipped it seems */
+	if ( dev->bus && dev->bus->self
+	 && (dev->bus->self->vendor == 0x104c)
+	 && (dev->bus->self->device == 0x8240)) {
+		switch (pin) {
+		case 1: return MXC_INT_PCIE_0;
+		case 2: return MXC_INT_PCIE_1;
+		case 3: return MXC_INT_PCIE_2;
+		case 4: return MXC_INT_PCIE_3;
+		default: return -1;
+		}
+	} else {
+		switch (pin) {
+		case 1: return MXC_INT_PCIE_3;
+		case 2: return MXC_INT_PCIE_2;
+		case 3: return MXC_INT_PCIE_1;
+		case 4: return MXC_INT_PCIE_0;
+		default: return -1;
+		}
+	}
 }
 
 static struct hw_pci imx_pci __initdata = {
