@@ -820,7 +820,7 @@ static void adv7180_hard_reset(bool cvbs)
 	/* Datasheet recommends */
 	adv7180_write_reg(0x01, 0xc8);
 	adv7180_write_reg(0x02, 0x04);
-	adv7180_write_reg(0x03, 0x00);
+	adv7180_write_reg(0x03, 0x0c); // 8bit at LLC 4:2:2 ITU-R BT.656
 	adv7180_write_reg(0x04, 0x45);
 	adv7180_write_reg(0x05, 0x00);
 	adv7180_write_reg(0x06, 0x02);
@@ -1148,6 +1148,9 @@ static int adv7180_probe(struct i2c_client *client,
 	adv7180_data.sen.pix.pixelformat = V4L2_PIX_FMT_UYVY;  /* YUV422 */
 	adv7180_data.sen.pix.priv = 1;  /* 1 is used to indicate TV in */
 	adv7180_data.sen.on = true;
+	adv7180_data.sen.mclk = tvin_plat->mclk;
+	adv7180_data.sen.mclk_source = tvin_plat->mclk_source;
+	adv7180_data.sen.csi = tvin_plat->csi;
 
 	gpio_sensor_active();
 

@@ -4550,6 +4550,10 @@ static const struct net_device_ops sky2_netdev_ops[2] = {
 };
 
 /* Initialize network device */
+#ifdef CONFIG_MACH_GWVENTANA
+extern void ventana_getmacaddr(char *addr, int dev);
+#include <asm/mach-types.h>
+#endif
 static __devinit struct net_device *sky2_init_netdev(struct sky2_hw *hw,
 						     unsigned port,
 						     int highmem, int wol)
@@ -4612,7 +4616,12 @@ static __devinit struct net_device *sky2_init_netdev(struct sky2_hw *hw,
 	dev->features |= dev->hw_features;
 
 	/* read the mac address */
+#ifdef CONFIG_MACH_GWVENTANA
+	if (machine_is_gwventana())
+		ventana_getmacaddr(dev->dev_addr, 1);
+#else
 	memcpy_fromio(dev->dev_addr, hw->regs + B2_MAC_1 + port * 8, ETH_ALEN);
+#endif
 	memcpy(dev->perm_addr, dev->dev_addr, dev->addr_len);
 
 	return dev;

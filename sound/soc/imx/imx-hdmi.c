@@ -84,8 +84,15 @@ static void __exit imx_hdmi_exit(void)
 	platform_device_unregister(imx_hdmi_snd_device);
 }
 
+/* temporary workaround for the fact that hdmi video must be enabled first
+ * and this is done in a late_initcall for Ventana because its based on eeprom config
+ * data which is not present on early init */
+#if 0
 module_init(imx_hdmi_init);
 module_exit(imx_hdmi_exit);
+#else
+late_initcall(imx_hdmi_init);
+#endif
 
 MODULE_AUTHOR("Freescale Semiconductor, Inc.");
 MODULE_DESCRIPTION("IMX HDMI TX ASoC driver");

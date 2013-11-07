@@ -319,6 +319,9 @@ struct fsl_mxc_tvin_platform_data {
 	char *dvdd_reg;
 	char *avdd_reg;
 	char *pvdd_reg;
+	u32 mclk;
+	u8 mclk_source;
+	u32 csi;
 	void (*pwdn)(int pwdn);
 	void (*reset)(void);
 	void (*io_init)(void);

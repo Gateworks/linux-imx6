@@ -45,7 +45,8 @@ static int fec_get_mac_addr(unsigned char *mac)
 
 void __init imx6_init_fec(struct fec_platform_data fec_data)
 {
-	fec_get_mac_addr(fec_data.mac);
+	if (!machine_is_gwventana())
+		fec_get_mac_addr(fec_data.mac);
 	if (!is_valid_ether_addr(fec_data.mac))
 		random_ether_addr(fec_data.mac);
 
