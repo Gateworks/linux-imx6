@@ -1338,13 +1338,13 @@ static struct ion_platform_data imx_ion_data = {
 
 static struct fsl_mxc_capture_platform_data capture_data[] = {
 	{
-		/* /dev/video0: IPU1_CSI0 - HDMI In Digital Receiver */
+		/* /dev/video0: IPU1_CSI0 */
 		.csi = 0,
 		.ipu = 0,
 		.mclk_source = 0,
 		.is_mipi = 0,
 	}, {
-		/* /dev/video1: IPU2_CSI1 - ADV7180 Analog Video Decoder */
+		/* /dev/video1: IPU2_CSI1 */
 		.csi = 1,
 		.ipu = 1,
 		.mclk_source = 0,
@@ -2546,11 +2546,9 @@ static int __init ventana_model_setup(void)
 
 		/* /dev/video0 ADV7180 Analog Video Decoder */
 		if (info->config_csi0)
-			imx6q_add_v4l2_capture(0, &capture_data[1]);
-/*
+			imx6q_add_v4l2_capture(0, &capture_data[0]);
 		if (info->config_csi1)
-			imx6q_add_v4l2_capture(1, &capture_data[0]);
-*/
+			imx6q_add_v4l2_capture(1, &capture_data[1]);
 
 		/* MIPI input */
 		// NB: need to register pdata even if not using mipi as ipu_csi_enc looks for it
