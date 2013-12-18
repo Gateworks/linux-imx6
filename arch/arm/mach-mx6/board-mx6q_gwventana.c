@@ -84,7 +84,6 @@
 #include "ventana_eeprom.h"
 
 /* GPIO pins */
-#define MX6Q_VENTANA_CAN_STBY       IMX_GPIO_NR(1, 2)
 #define MX6Q_VENTANA_HDMIIN_IRQ     IMX_GPIO_NR(1, 7)
 #define MX6Q_VENTANA_ECSPI1_CS1     IMX_GPIO_NR(3, 19)
 #define MX6Q_VENTANA_USB_OTG_PWR    IMX_GPIO_NR(3, 22)
@@ -97,6 +96,7 @@ static struct clk *sata_clk;
 extern char *gp_reg_id;
 extern char *soc_reg_id;
 static int caam_enabled;
+static int gpio_can_stby = -1;
 
 #define MX6Q_VENTANA_SD1_CMD_PADCFG (PAD_CTL_DSE_240ohm)
 #define MX6Q_VENTANA_DISP0_DIO_PADCFG (PAD_CTL_DSE_240ohm)
@@ -184,12 +184,10 @@ static iomux_v3_cfg_t mx6dl_ventana_nand_pads[] = {
 static iomux_v3_cfg_t mx6q_ventana_flexcan_pads[] = {
 	MX6Q_PAD_KEY_COL2__CAN1_TXCAN,
 	MX6Q_PAD_KEY_ROW2__CAN1_RXCAN,
-	MX6Q_PAD_GPIO_2__GPIO_1_2,
 };
 static iomux_v3_cfg_t mx6dl_ventana_flexcan_pads[] = {
 	MX6DL_PAD_KEY_COL2__CAN1_TXCAN,
 	MX6DL_PAD_KEY_ROW2__CAN1_RXCAN,
-	MX6DL_PAD_GPIO_2__GPIO_1_2,
 };
 
 /* UART */
@@ -1125,9 +1123,9 @@ static struct imx_asrc_platform_data imx_asrc_data = {
 static void mx6q_ventana_flexcan0_switch(int enable)
 {
 	if (enable) {
-		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 0);
+		gpio_set_value(gpio_can_stby, 0);
 	} else {
-		gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
+		gpio_set_value(gpio_can_stby, 1);
 	}
 }
 
@@ -1907,6 +1905,14 @@ static int __init ventana_model_setup(void)
 				/* Accelerometer */
 				i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
+				/* CAN bus stby */
+				if (cpu_is_mx6q()) {
+					mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
+				} else if (cpu_is_mx6dl()) {
+					mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_2__GPIO_1_2);
+				}
+				gpio_can_stby = IMX_GPIO_NR(1,2);
+
 			} /* end GW54xx revB+ */
 
 			/* Touchscreen IRQ */
@@ -2184,6 +2190,14 @@ static int __init ventana_model_setup(void)
 			/* Accelerometer */
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
+			/* CAN bus stby */
+			if (cpu_is_mx6q()) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
+			} else if (cpu_is_mx6dl()) {
+				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_2__GPIO_1_2);
+			}
+			gpio_can_stby = IMX_GPIO_NR(1,2);
+
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
@@ -2346,6 +2360,14 @@ static int __init ventana_model_setup(void)
 
 			/* Accelerometer */
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
+
+			/* CAN bus stby */
+			if (cpu_is_mx6q()) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_9__GPIO_1_9);
+			} else if (cpu_is_mx6dl()) {
+				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_9__GPIO_1_9);
+			}
+			gpio_can_stby = IMX_GPIO_NR(1,9);
 
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
@@ -2606,15 +2628,16 @@ static int __init ventana_model_setup(void)
 		/* CANbus */
 		if (info->config_flexcan) {
 			if (cpu_is_mx6q()) {
-					mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_flexcan_pads,
-						ARRAY_SIZE(mx6q_ventana_flexcan_pads));
+				mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_flexcan_pads,
+					ARRAY_SIZE(mx6q_ventana_flexcan_pads));
 			} else if (cpu_is_mx6dl()) {
-					mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_flexcan_pads,
-						ARRAY_SIZE(mx6dl_ventana_flexcan_pads));
+				mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_flexcan_pads,
+					ARRAY_SIZE(mx6dl_ventana_flexcan_pads));
 			}
-			gpio_request(MX6Q_VENTANA_CAN_STBY, "can0_stby");
-			gpio_direction_output(MX6Q_VENTANA_CAN_STBY, 0);
-			gpio_set_value(MX6Q_VENTANA_CAN_STBY, 1);
+			gpio_request(gpio_can_stby, "can0_stby");
+			gpio_direction_output(gpio_can_stby, 0);
+			gpio_set_value(gpio_can_stby, 1);
+
 			imx6q_add_flexcan0(&mx6q_ventana_flexcan0_pdata);
 		}
 
