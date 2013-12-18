@@ -2369,6 +2369,16 @@ static int __init ventana_model_setup(void)
 			}
 			gpio_can_stby = IMX_GPIO_NR(1,9);
 
+			/* Wireless Disable */
+			if (cpu_is_mx6q()) {
+				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_17__GPIO_7_12);
+			} else if (cpu_is_mx6dl()) {
+				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_17__GPIO_7_12);
+			}
+			gpio_request(IMX_GPIO_NR(7,12), "pcieskt_wdis#");
+			gpio_export(IMX_GPIO_NR(7,12), 0);
+			gpio_direction_output(IMX_GPIO_NR(7,12), 1);
+
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
