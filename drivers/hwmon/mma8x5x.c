@@ -1,6 +1,6 @@
 /*
  *  mma8x5x.c - Linux kernel modules for 3-Axis Orientation/Motion
- *  Detection Sensor MMA8451/MMA8452/MMA8453/MMA8652/MMA8653
+ *  Detection Sensor MMA8451/MMA8452/MMA8453/MMA8652/MMA8653/FXOS8700
  *
  *  Copyright (C) 2012-2013 Freescale Semiconductor, Inc. All Rights Reserved.
  *
@@ -40,6 +40,7 @@
 #define MMA8453_ID                      0x3A
 #define MMA8652_ID                      0x4A
 #define MMA8653_ID                      0x5A
+#define FXOS8700_ID                     0xC7
 
 
 #define POLL_INTERVAL_MIN       1
@@ -149,6 +150,7 @@ static int mma8x5x_chip_id[] = {
 	MMA8453_ID,
 	MMA8652_ID,
 	MMA8653_ID,
+	FXOS8700_ID,
 };
 static char *mma8x5x_names[] = {
 	"mma8451",
@@ -156,6 +158,7 @@ static char *mma8x5x_names[] = {
 	"mma8453",
 	"mma8652",
 	"mma8653",
+	"fxos8700",
 };
 static int mma8x5x_position_setting[8][3][3] = {
 	{ { 0,	-1, 0  }, { 1,	0,  0	   }, { 0, 0, 1	     } },
@@ -202,7 +205,12 @@ static int mma8x5x_check_id(int id)
 }
 static char *mma8x5x_id2name(u8 id)
 {
-	return mma8x5x_names[(id >> 4) - 1];
+	int i;
+
+	for (i = 0; i < sizeof(mma8x5x_chip_id) / sizeof(mma8x5x_chip_id[0]); i++)
+		if (id == mma8x5x_chip_id[i])
+			return mma8x5x_names[i];
+	return NULL;
 }
 static int mma8x5x_device_init(struct i2c_client *client)
 {
@@ -412,9 +420,9 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 
 	if (!mma8x5x_check_id(chip_id)) {
 		dev_err(&client->dev,
-			"read chip ID 0x%x is not equal to 0x%x,0x%x,0x%x,0x%x,0x%x!\n",
+			"read chip ID 0x%x is not equal to 0x%x,0x%x,0x%x,0x%x,0x%x,0x%x!\n",
 			chip_id, MMA8451_ID, MMA8452_ID,
-			MMA8453_ID, MMA8652_ID, MMA8653_ID);
+			MMA8453_ID, MMA8652_ID, MMA8653_ID, FXOS8700_ID);
 		result = -EINVAL;
 		goto err_out;
 	}
