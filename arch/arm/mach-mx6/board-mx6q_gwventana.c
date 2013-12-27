@@ -821,9 +821,6 @@ static struct i2c_board_info mxc_i2c1_board_info[] __initdata = {
 };
 
 
-/* position 0-7 (alignment?) */
-static int mma8451_position = 1;
-
 void mx6_csi0_io_init(void)
 {
 	if (cpu_is_mx6q()) {
@@ -955,14 +952,16 @@ static struct i2c_board_info mxc_i2c2_board_info[] __initdata = {
 };
 
 /* Accelerometer */
+static int accel_position = 0; /* physical orientation of part on PCB (0-7) */
 static struct i2c_board_info ventana_mma8451_i2cinfo = {
-	I2C_BOARD_INFO("mma8451", 0x1c),
+	I2C_BOARD_INFO("mma8x5x", 0x1c),
 	.irq = gpio_to_irq(MX6Q_VENTANA_ACCEL_IRQ),
-	.platform_data = (void *)&mma8451_position,
+	.platform_data = (void *)&accel_position,
 };
 static struct i2c_board_info ventana_fxos8700_i2cinfo = {
-	I2C_BOARD_INFO("fxos8700", 0x1c),
+	I2C_BOARD_INFO("mma8x5x", 0x1e),
 	.irq = gpio_to_irq(MX6Q_VENTANA_ACCEL_IRQ),
+	.platform_data = (void *)&accel_position,
 };
 
 /* Audio Codec */
@@ -1843,6 +1842,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(4,9));
 
 				/* Accelerometer */
+				accel_position = 0;
 				i2c_new_device(i2c_get_adapter(2), &ventana_mma8451_i2cinfo);
 
 			} /* end GW5400-A */
@@ -1905,6 +1905,7 @@ static int __init ventana_model_setup(void)
 				sprintf(ventana_fb_data[3].disp_dev, "off");
 
 				/* Accelerometer */
+				accel_position = 0;
 				i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 			} /* end GW54xx revB+ */
@@ -2182,6 +2183,7 @@ static int __init ventana_model_setup(void)
 			}
 
 			/* Accelerometer */
+			accel_position = 3;
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 #ifdef CONFIG_SND_SOC_SGTL5000
@@ -2345,6 +2347,7 @@ static int __init ventana_model_setup(void)
 			}
 
 			/* Accelerometer */
+			accel_position = 3;
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 #ifdef CONFIG_SND_SOC_SGTL5000
