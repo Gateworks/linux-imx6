@@ -110,6 +110,16 @@ enum {
 	MMA8X5X_OFF_Y,
 	MMA8X5X_OFF_Z,
 
+	FXOS8700_M_DR_STATUS,
+	FXOS8700_M_OUT_X_MSB,
+	FXOS8700_M_OUT_X_LSB,
+	FXOS8700_M_OUT_Y_MSB,
+	FXOS8700_M_OUT_Y_LSB,
+	FXOS8700_M_OUT_Z_MSB,
+	FXOS8700_M_OUT_Z_LSB,
+
+	FXOS8700_M_CTRL_REG1 = 0x5B,
+
 	MMA8X5X_REG_END,
 };
 
@@ -127,6 +137,12 @@ enum {
 	MMA_STANDBY = 0,
 	MMA_ACTIVED,
 };
+enum {
+	FXOS_ACCEL_ONLY = 0,
+	FXOS_MAG_ONLY,
+	FXOS_NONE,
+	FXOS_HYBRID,
+};
 struct mma8x5x_data_axis {
 	short x;
 	short y;
@@ -135,11 +151,15 @@ struct mma8x5x_data_axis {
 struct mma8x5x_data {
 	struct i2c_client *client;
 	struct input_polled_dev *poll_dev;
+	struct input_polled_dev *m_poll_dev;
+	struct input_dev *m_cal_input;
+	int enable_mode;
 	struct mutex data_lock;
 	int active;
 	int position;
 	u8 chip_id;
 	int mode;
+
 };
 /* Addresses scanned */
 static const unsigned short normal_i2c[] = { 0x1c, 0x1d, I2C_CLIENT_END };
@@ -225,6 +245,11 @@ static int mma8x5x_device_init(struct i2c_client *client)
 					   pdata->mode);
 	if (result < 0)
 		goto out;
+
+	if (pdata->chip_id == FXOS8700_ID)
+//		i2c_smbus_write_byte_data(client, FXOS8700_M_CTRL_REG1, FXOS_ACCEL_ONLY);
+		i2c_smbus_write_byte_data(client, FXOS8700_M_CTRL_REG1, FXOS_HYBRID);
+
 	pdata->active = MMA_STANDBY;
 	msleep(MODE_CHANGE_DELAY_MS);
 	return 0;
@@ -242,13 +267,14 @@ static int mma8x5x_device_stop(struct i2c_client *client)
 }
 
 static int mma8x5x_read_data(struct i2c_client *client,
+		char reg,
 		struct mma8x5x_data_axis *data)
 {
 	u8 tmp_data[MMA8X5X_BUF_SIZE];
 	int ret;
 
 	ret = i2c_smbus_read_i2c_block_data(client,
-					    MMA8X5X_OUT_X_MSB,
+						reg,
 						MMA8X5X_BUF_SIZE, tmp_data);
 	if (ret < MMA8X5X_BUF_SIZE) {
 		dev_err(&client->dev, "i2c block read failed\n");
@@ -260,10 +286,12 @@ static int mma8x5x_read_data(struct i2c_client *client,
 	return 0;
 }
 
-static void mma8x5x_report_data(struct mma8x5x_data *pdata)
+static void mma8x5x_report_data(struct input_polled_dev *poll_dev)
 {
-	struct input_polled_dev *poll_dev = pdata->poll_dev;
+	struct mma8x5x_data *pdata = (struct mma8x5x_data *)poll_dev->private;
 	struct mma8x5x_data_axis data;
+	char reg = (poll_dev == pdata->m_poll_dev)?
+		FXOS8700_M_OUT_X_MSB:MMA8X5X_OUT_X_MSB;
 
 	mutex_lock(&pdata->data_lock);
 	if (pdata->active == MMA_STANDBY) {
@@ -272,7 +300,7 @@ static void mma8x5x_report_data(struct mma8x5x_data *pdata)
 		goto out;
 	} else if (poll_dev->poll_interval == POLL_STOP_TIME)
 		poll_dev->poll_interval = POLL_INTERVAL;
-	if (mma8x5x_read_data(pdata->client, &data) != 0)
+	if (mma8x5x_read_data(pdata->client, reg, &data) != 0)
 		goto out;
 	mma8x5x_data_convert(pdata, &data);
 	input_report_abs(poll_dev->input, ABS_X, data.x);
@@ -285,9 +313,7 @@ out:
 
 static void mma8x5x_dev_poll(struct input_polled_dev *dev)
 {
-	struct mma8x5x_data *pdata = (struct mma8x5x_data *)dev->private;
-
-	mma8x5x_report_data(pdata);
+	mma8x5x_report_data(dev);
 }
 
 static ssize_t mma8x5x_enable_show(struct device *dev,
@@ -297,14 +323,23 @@ static ssize_t mma8x5x_enable_show(struct device *dev,
 	struct mma8x5x_data *pdata = (struct mma8x5x_data *)(poll_dev->private);
 	struct i2c_client *client = pdata->client;
 	u8 val;
-	int enable;
+	int enable = 0;
 
 	mutex_lock(&pdata->data_lock);
 	val = i2c_smbus_read_byte_data(client, MMA8X5X_CTRL_REG1);
-	if ((val & 0x01) && pdata->active == MMA_ACTIVED)
-		enable = 1;
-	else
-		enable = 0;
+	if ((val & 0x01) && pdata->active == MMA_ACTIVED) {
+		if (pdata->chip_id == FXOS8700_ID) {
+			if (pdata->enable_mode == FXOS_HYBRID)
+				enable = 1;
+			else if (poll_dev == pdata->m_poll_dev
+			      && pdata->enable_mode == FXOS_MAG_ONLY)
+				enable = 1;
+			else if (poll_dev == pdata->poll_dev
+			      && pdata->enable_mode == FXOS_ACCEL_ONLY)
+				enable = 1;
+		} else
+			enable = 1;
+	}
 	mutex_unlock(&pdata->data_lock);
 	return sprintf(buf, "%d\n", enable);
 }
@@ -323,6 +358,47 @@ static ssize_t mma8x5x_enable_store(struct device *dev,
 	enable = simple_strtoul(buf, NULL, 10);
 	mutex_lock(&pdata->data_lock);
 	enable = (enable > 0) ? 1 : 0;
+	if (pdata->chip_id == FXOS8700_ID) {
+		val = pdata->enable_mode;
+		if (poll_dev == pdata->poll_dev) {     // Accellerometer
+			if (enable) {
+				if (val == FXOS_NONE)
+					val = FXOS_ACCEL_ONLY;
+				else if (val == FXOS_MAG_ONLY)
+					val = FXOS_HYBRID;
+			} else {
+				if (val == FXOS_HYBRID)
+					val = FXOS_MAG_ONLY;
+				else if (val == FXOS_ACCEL_ONLY)
+					val = FXOS_NONE;
+			}
+		} else {                               // Magnetometer
+			if (enable) {
+				if (val == FXOS_NONE)
+					val = FXOS_MAG_ONLY;
+				else if (val == FXOS_ACCEL_ONLY)
+					val = FXOS_HYBRID;
+			} else {
+				if (val == FXOS_HYBRID)
+					val = FXOS_ACCEL_ONLY;
+				else if (val == FXOS_MAG_ONLY)
+					val = FXOS_NONE;
+			}
+		}
+/*
+		if (val != FXOS_NONE) {
+			ret = i2c_smbus_write_byte_data(client,
+					FXOS8700_M_CTRL_REG1, val & 0x03);
+			if (!ret)
+				printk(KERN_INFO"mma set mode %d/%d\n", val & 0x03, val);
+		}
+*/
+		pdata->enable_mode = val;
+		if (pdata->enable_mode == FXOS_NONE)
+			enable = 0;
+		else
+			enable = 1;
+	}
 	if (enable && pdata->active == MMA_STANDBY) {
 		val = i2c_smbus_read_byte_data(client, MMA8X5X_CTRL_REG1);
 		ret = i2c_smbus_write_byte_data(client,
@@ -400,6 +476,46 @@ static int mma8x5x_detect(struct i2c_client *client,
 	strlcpy(info->type, "mma8x5x", I2C_NAME_SIZE);
 	return 0;
 }
+static int __devinit fxos8700_register_caldata_input(struct mma8x5x_data *pdata)
+{
+	struct input_dev *idev;
+	struct i2c_client *client = pdata->client;
+	int ret;
+
+	idev = input_allocate_device();
+	if (!idev) {
+		dev_err(&client->dev, "alloc calibrated data device error\n");
+		return -EINVAL;
+	}
+	idev->name = "eCompass";
+	idev->id.bustype = BUS_I2C;
+	idev->evbit[0] = BIT_MASK(EV_ABS);
+	input_set_abs_params(idev, ABS_X, -15000, 15000, 0, 0);
+	input_set_abs_params(idev, ABS_Y, -15000, 15000, 0, 0);
+	input_set_abs_params(idev, ABS_Z, -15000, 15000, 0, 0);
+	input_set_abs_params(idev, ABS_RX,         0, 36000, 0, 0);
+	input_set_abs_params(idev, ABS_RY, -18000, 18000, 0, 0);
+	input_set_abs_params(idev, ABS_RZ, -9000,  9000, 0, 0);
+	input_set_abs_params(idev, ABS_WHEEL, 0,     3, 0, 0);
+	ret = input_register_device(idev);
+	if (ret) {
+		dev_err(&client->dev, "register poll device failed!\n");
+		return -EINVAL;
+	}
+	pdata->m_cal_input = idev;
+	return 0;
+}
+static int fxos8700_unregister_caldata_input(struct mma8x5x_data *pdata)
+{
+	struct input_dev *idev = pdata->m_cal_input;
+
+	if (idev) {
+		input_unregister_device(idev);
+		input_free_device(idev);
+	}
+	pdata->m_cal_input = NULL;
+	return 0;
+}
 static int __devinit mma8x5x_probe(struct i2c_client *client,
 				   const struct i2c_device_id *id)
 {
@@ -408,6 +524,7 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 	struct mma8x5x_data *pdata;
 	struct i2c_adapter *adapter;
 	struct input_polled_dev *poll_dev;
+	struct input_polled_dev *m_poll_dev;
 
 	adapter = to_i2c_adapter(client->dev.parent);
 	result = i2c_check_functionality(adapter,
@@ -440,6 +557,8 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 	mutex_init(&pdata->data_lock);
 	i2c_set_clientdata(client, pdata);
 	mma8x5x_device_init(client);
+
+	/* create a polled input dev for accelerometer */
 	poll_dev = input_allocate_polled_device();
 	if (!poll_dev) {
 		result = -ENOMEM;
@@ -456,9 +575,9 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 	idev->uniq = mma8x5x_id2name(pdata->chip_id);
 	idev->id.bustype = BUS_I2C;
 	idev->evbit[0] = BIT_MASK(EV_ABS);
-	input_set_abs_params(idev, ABS_X, -0x7fff, 0x7fff, 0, 0);
-	input_set_abs_params(idev, ABS_Y, -0x7fff, 0x7fff, 0, 0);
-	input_set_abs_params(idev, ABS_Z, -0x7fff, 0x7fff, 0, 0);
+	input_set_abs_params(idev, ABS_X,   -15000, 15000, 0, 0);
+	input_set_abs_params(idev, ABS_Y,   -15000, 15000, 0, 0);
+	input_set_abs_params(idev, ABS_Z,   -15000, 15000, 0, 0);
 	pdata->poll_dev = poll_dev;
 	result = input_register_polled_device(pdata->poll_dev);
 	if (result) {
@@ -471,8 +590,52 @@ static int __devinit mma8x5x_probe(struct i2c_client *client,
 		result = -EINVAL;
 		goto err_create_sysfs;
 	}
+
+	/* create a polled input device for magnetometer */
+	if (chip_id == FXOS8700_ID) {
+		m_poll_dev = input_allocate_polled_device();
+		if (!m_poll_dev) {
+			result = -ENOMEM;
+			dev_err(&client->dev, "alloc poll device failed!\n");
+			goto err_create_sysfs;
+		}
+		m_poll_dev->poll = mma8x5x_dev_poll;
+		m_poll_dev->poll_interval = POLL_STOP_TIME;
+		m_poll_dev->poll_interval_min = POLL_INTERVAL_MIN;
+		m_poll_dev->poll_interval_max = POLL_INTERVAL_MAX;
+		m_poll_dev->private = pdata;
+		idev = m_poll_dev->input;
+		idev->name = "FreescaleMagnetometer";
+		idev->uniq = mma8x5x_id2name(pdata->chip_id);
+		idev->id.bustype = BUS_I2C;
+		idev->evbit[0] = BIT_MASK(EV_ABS);
+		input_set_abs_params(idev, ABS_X, -0x7fff, 0x7fff, 0, 0);
+		input_set_abs_params(idev, ABS_Y, -0x7fff, 0x7fff, 0, 0);
+		input_set_abs_params(idev, ABS_Z, -0x7fff, 0x7fff, 0, 0);
+		pdata->m_poll_dev = m_poll_dev;
+		pdata->enable_mode = FXOS_ACCEL_ONLY;
+		result = input_register_polled_device(pdata->m_poll_dev);
+		if (result) {
+			dev_err(&client->dev, "register poll device failed!\n");
+			goto err_register_polled_device1;
+		}
+		result = fxos8700_register_caldata_input(pdata);
+		result = sysfs_create_group(&idev->dev.kobj, &mma8x5x_attr_group);
+		if (result) {
+			dev_err(&client->dev, "create device file failed!\n");
+			result = -EINVAL;
+			goto err_create_sysfs1;
+		}
+	}
+
 	printk(KERN_INFO"mma8x5x device driver probe successfully\n");
 	return 0;
+
+err_create_sysfs1:
+	fxos8700_unregister_caldata_input(pdata);
+	input_unregister_polled_device(pdata->m_poll_dev);
+err_register_polled_device1:
+	input_free_polled_device(m_poll_dev);
 err_create_sysfs:
 	input_unregister_polled_device(pdata->poll_dev);
 err_register_polled_device:
