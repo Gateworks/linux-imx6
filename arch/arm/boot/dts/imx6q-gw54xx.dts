@@ -1,0 +1,146 @@
+/*
+ * Copyright 2013-2014 Gateworks Corporation
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+
+#include "imx6q.dtsi"
+#include "imx6qdl-gw54xx.dtsi"
+
+/ {
+	model = "Gateworks Ventana i.MX6 Dual/Quad GW54XX";
+	compatible = "gw,imx6q-gw54xx", "gw,ventana", "fsl,imx6q";
+};
+
+
+/* SoC interface for analog video out (ADV7393) */
+&bt656if {
+	ipu_id = <1>;
+	disp_id = <0>;
+	pinctrl-names = "default";
+	/* can be IPU1_DISP0 or IPU2_DISP0 */
+	pinctrl-0 = <&pinctrl_ipu2>; /* IPU2_DISP0 */
+	status = "okay";
+};
+
+/* /dev/video0: IPU1_CSI0 - HDMI in via tda1997x */
+&cap0 {
+	ipu_id = <0>;
+	csi_id = <0>;
+};
+
+/* /dev/video1: IPU2_CSI1 - Analog in via ADV7180 */
+&cap1 {
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+/* IPU1_CSI0 - HDMI in via tda1997x */
+&hdmi_video_in {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu1>; /* IPU1_CSI0 */
+	ipu_id = <0>;
+	csi_id = <0>;
+};
+
+&mxcfb3 {
+	status = "okay";
+};
+
+&sata {
+	status = "okay";
+};
+
+/* Analog VideoIn IPU2_CSI1 */
+&videoin {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu2_2>; /* IPU2_CSI1 8bit */
+	/* ipu_id/csi_id used to match up with v4l2_cap_<n> */
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+/* Analog VideoOut IPU2_DISP0 */
+&videoout {
+	compatible = "adi,adv7393";
+	reg = <0x2a>;
+	/* ipu_id/csi_id must match bt656 if */
+	ipu_id = <1>;
+	disp_id = <0>;
+};
+
+&iomuxc {
+	video {
+		pinctrl_ipu1: ipu1grp { /* IPU1_CSI0: 16-bit input */
+			fsl,pins = <
+				MX6QDL_PAD_CSI0_DAT4__IPU1_CSI0_DATA04   0x80000000
+				MX6QDL_PAD_CSI0_DAT5__IPU1_CSI0_DATA05   0x80000000
+				MX6QDL_PAD_CSI0_DAT6__IPU1_CSI0_DATA06   0x80000000
+				MX6QDL_PAD_CSI0_DAT7__IPU1_CSI0_DATA07   0x80000000
+				MX6QDL_PAD_CSI0_DAT8__IPU1_CSI0_DATA08   0x80000000
+				MX6QDL_PAD_CSI0_DAT9__IPU1_CSI0_DATA09   0x80000000
+				MX6QDL_PAD_CSI0_DAT10__IPU1_CSI0_DATA10  0x80000000
+				MX6QDL_PAD_CSI0_DAT11__IPU1_CSI0_DATA11  0x80000000
+				MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12  0x80000000
+				MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13  0x80000000
+				MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14  0x80000000
+				MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15  0x80000000
+				MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16  0x80000000
+				MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17  0x80000000
+				MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18  0x80000000
+				MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19  0x80000000
+				MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0x80000000
+				MX6QDL_PAD_CSI0_DATA_EN__IPU1_CSI0_DATA_EN 0x80000000
+				MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC    0x80000000
+				MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC   0x80000000
+			>;
+		};
+
+		pinctrl_ipu2: ipu2grp { /* IPU2_CSI1: 8-bit input */
+			fsl,pins = <
+				MX6QDL_PAD_EIM_EB2__IPU2_CSI1_DATA19 0x10
+				MX6QDL_PAD_EIM_D16__IPU2_CSI1_DATA18 0x10
+				MX6QDL_PAD_EIM_D18__IPU2_CSI1_DATA17 0x10
+				MX6QDL_PAD_EIM_D19__IPU2_CSI1_DATA16 0x10
+				MX6QDL_PAD_EIM_D20__IPU2_CSI1_DATA15 0x10
+				MX6QDL_PAD_EIM_D26__IPU2_CSI1_DATA14 0x10
+				MX6QDL_PAD_EIM_D27__IPU2_CSI1_DATA13 0x10
+				MX6QDL_PAD_EIM_A17__IPU2_CSI1_DATA12 0x10
+				MX6QDL_PAD_EIM_D29__IPU2_CSI1_VSYNC  0x10
+				MX6QDL_PAD_EIM_EB3__IPU2_CSI1_HSYNC  0x10
+				MX6QDL_PAD_EIM_A16__IPU2_CSI1_PIXCLK 0x10
+			>;
+		};
+
+		pinctrl_ipu2_2: ipu2grp_2 {
+			fsl,pins = <
+				MX6QDL_PAD_DI0_DISP_CLK__IPU2_DI0_DISP_CLK 0x10
+				MX6QDL_PAD_DI0_PIN2__IPU2_DI0_PIN02        0x10
+				MX6QDL_PAD_DI0_PIN3__IPU2_DI0_PIN03        0x10
+				MX6QDL_PAD_DISP0_DAT0__IPU2_DISP0_DATA00   0x10
+				MX6QDL_PAD_DISP0_DAT1__IPU2_DISP0_DATA01   0x10
+				MX6QDL_PAD_DISP0_DAT2__IPU2_DISP0_DATA02   0x10
+				MX6QDL_PAD_DISP0_DAT3__IPU2_DISP0_DATA03   0x10
+				MX6QDL_PAD_DISP0_DAT4__IPU2_DISP0_DATA04   0x10
+				MX6QDL_PAD_DISP0_DAT5__IPU2_DISP0_DATA05   0x10
+				MX6QDL_PAD_DISP0_DAT6__IPU2_DISP0_DATA06   0x10
+				MX6QDL_PAD_DISP0_DAT7__IPU2_DISP0_DATA07   0x10
+				MX6QDL_PAD_DISP0_DAT8__IPU2_DISP0_DATA08   0x10
+				MX6QDL_PAD_DISP0_DAT9__IPU2_DISP0_DATA09   0x10
+				MX6QDL_PAD_DISP0_DAT10__IPU2_DISP0_DATA10  0x10
+				MX6QDL_PAD_DISP0_DAT11__IPU2_DISP0_DATA11  0x10
+				MX6QDL_PAD_DISP0_DAT12__IPU2_DISP0_DATA12  0x10
+				MX6QDL_PAD_DISP0_DAT13__IPU2_DISP0_DATA13  0x10
+				MX6QDL_PAD_DISP0_DAT14__IPU2_DISP0_DATA14  0x10
+				MX6QDL_PAD_DISP0_DAT15__IPU2_DISP0_DATA15  0x10
+			>;
+		};
+	};
+};

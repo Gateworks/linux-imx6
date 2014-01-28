@@ -1,0 +1,59 @@
+/*
+ * Copyright 2013-2014 Gateworks Corporation
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+
+#include "imx6q.dtsi"
+#include "imx6qdl-gw52xx.dtsi"
+
+/ {
+	model = "Gateworks Ventana i.MX6 Dual/Quad GW52XX";
+	compatible = "gw,imx6q-gw52xx", "gw,ventana", "fsl,imx6q";
+};
+
+/* /dev/video0: IPU2_CSI1 - Analog in via ADV7180 */
+&cap0 {
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+&sata {
+	status = "okay";
+};
+
+/* Analog VideoIn IPU2_CSI1 */
+&videoin {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu2>; /* IPU2_CSI1 8bit */
+	/* ipu_id/csi_id used to match up with v4l2_cap_<n> */
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+&iomuxc {
+	videoin {
+		pinctrl_ipu2: ipu2grp { /* IPU2_CSI1: 8-bit input */
+			fsl,pins = <
+				MX6QDL_PAD_EIM_A17__IPU2_CSI1_DATA12	0x10
+				MX6QDL_PAD_EIM_D27__IPU2_CSI1_DATA13	0x10
+				MX6QDL_PAD_EIM_D26__IPU2_CSI1_DATA14	0x10
+				MX6QDL_PAD_EIM_D20__IPU2_CSI1_DATA15	0x10
+				MX6QDL_PAD_EIM_D19__IPU2_CSI1_DATA16	0x10
+				MX6QDL_PAD_EIM_D18__IPU2_CSI1_DATA17	0x10
+				MX6QDL_PAD_EIM_D16__IPU2_CSI1_DATA18	0x10
+				MX6QDL_PAD_EIM_EB2__IPU2_CSI1_DATA19	0x10
+				MX6QDL_PAD_EIM_A16__IPU2_CSI1_PIXCLK	0x10
+				MX6QDL_PAD_EIM_EB3__IPU2_CSI1_HSYNC	0x10
+				MX6QDL_PAD_EIM_D29__IPU2_CSI1_VSYNC	0x10
+			>;
+		};
+	};
+};

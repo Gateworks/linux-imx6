@@ -1,0 +1,100 @@
+/*
+ * Copyright 2013-2014 Gateworks Corporation
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+
+#include "imx6dl.dtsi"
+#include "imx6qdl-gw54xx.dtsi"
+
+/ {
+	model = "Gateworks Ventana i.MX6 Solo/DualLite GW54XX";
+	compatible = "gw,imx6dl-gw54xx", "gw,ventana", "fsl,imx6dl";
+};
+
+/* SoC interface for analog video out (ADV7393) */
+&bt656if {
+	ipu_id = <0>;
+	disp_id = <0>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu1_2>; /* IPU1_DISP0 */
+	status = "okay";
+};
+
+/* /dev/video0: IPU1_CSI0 - Analog in via ADV7180 */
+&cap0 {
+	ipu_id = <0>;
+	csi_id = <1>;
+};
+
+/* Analog VideoIn IPU1_CSI1 */
+&videoin {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu1>; /* IPU1_CSI1 8bit */
+	/* ipu_id/csi_id used to match up with v4l2_cap_<n> */
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+/* Analog VideoOut IPU1_DISP0 */
+&videoout {
+	compatible = "adi,adv7393";
+	reg = <0x2a>;
+	/* ipu_id/csi_id must match bt656 if */
+	ipu_id = <0>;
+	disp_id = <0>;
+};
+
+&iomuxc {
+	video {
+		pinctrl_ipu1: ipu1grp { /* IPU1_CSI1: 8-bit input */
+			fsl,pins = <
+				MX6QDL_PAD_EIM_A17__IPU1_CSI1_DATA12 0x8000000
+				MX6QDL_PAD_EIM_D27__IPU1_CSI1_DATA13 0x8000000
+				MX6QDL_PAD_EIM_D26__IPU1_CSI1_DATA14 0x8000000
+				MX6QDL_PAD_EIM_D20__IPU1_CSI1_DATA15 0x8000000
+				MX6QDL_PAD_EIM_D19__IPU1_CSI1_DATA16 0x8000000
+				MX6QDL_PAD_EIM_D18__IPU1_CSI1_DATA17 0x8000000
+				MX6QDL_PAD_EIM_D16__IPU1_CSI1_DATA18 0x8000000
+				MX6QDL_PAD_EIM_EB2__IPU1_CSI1_DATA19 0x8000000
+				MX6QDL_PAD_EIM_A16__IPU1_CSI1_PIXCLK 0x8000000
+				MX6QDL_PAD_EIM_EB3__IPU1_CSI1_HSYNC  0x8000000
+				MX6QDL_PAD_EIM_D29__IPU1_CSI1_VSYNC  0x8000000
+				MX6QDL_PAD_GPIO_7__GPIO1_IO07        0x001b0b0 /* HDMIIN_IRQ# */
+			>;
+		};
+
+		pinctrl_ipu1_2: ipu1grp_2 { /* 8/16bit output */
+			fsl,pins = <
+				MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
+				MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
+				MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
+				MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
+				MX6QDL_PAD_DI0_PIN4__IPU1_DI0_PIN04        0x80000000
+				MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
+				MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
+				MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
+				MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
+				MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
+				MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
+				MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
+				MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
+				MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
+				MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
+				MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
+				MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
+				MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
+				MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
+				MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
+				MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
+			>;
+		};
+	};
+};
