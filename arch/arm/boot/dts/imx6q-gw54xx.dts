@@ -1,0 +1,77 @@
+/*
+ * Copyright 2013-2014 Gateworks Corporation
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+
+#include "imx6q.dtsi"
+#include "imx6qdl-gw54xx.dtsi"
+
+/ {
+	model = "Gateworks Ventana i.MX6 Dual/Quad GW54XX";
+	compatible = "gw,imx6q-gw54xx", "gw,ventana", "fsl,imx6q";
+};
+
+
+/* SoC interface for analog video out (ADV7393) */
+&bt656if {
+	ipu_id = <1>;
+	disp_id = <0>;
+	pinctrl-names = "default";
+	/* can be IPU1_DISP0 or IPU2_DISP0 */
+	pinctrl-0 = <&pinctrl_ipu2_2>; /* IPU2_DISP0 */
+	status = "okay";
+};
+
+/* /dev/video0: IPU1_CSI0 - HDMI in via tda1997x */
+&cap0 {
+	ipu_id = <0>;
+	csi_id = <0>;
+};
+
+/* /dev/video1: IPU2_CSI1 - Analog in via ADV7180 */
+&cap1 {
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+/* IPU1_CSI0 - HDMI in via tda1997x */
+&hdmi_video_in {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu1_4>; /* IPU1_CSI0 */
+	ipu_id = <0>;
+	csi_id = <0>;
+};
+
+&mxcfb3 {
+	status = "okay";
+};
+
+&sata {
+	status = "okay";
+};
+
+/* Analog VideoIn IPU2_CSI1 */
+&videoin {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu2_3>; /* IPU2_CSI1 8bit */
+	/* ipu_id/csi_id used to match up with v4l2_cap_<n> */
+	ipu_id = <1>;
+	csi_id = <1>;
+};
+
+/* Analog VideoOut IPU2_DISP0 */
+&videoout {
+	compatible = "adi,adv7393";
+	reg = <0x2a>;
+	/* ipu_id/csi_id must match bt656 if */
+	ipu_id = <1>;
+	disp_id = <0>;
+};
