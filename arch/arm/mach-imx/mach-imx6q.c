@@ -136,6 +136,37 @@ static int __init imx6q_flexcan_fixup_auto(void)
 	return 0;
 }
 
+/*
+ * fixup for PLX PEX8909 bridge to configure GPIO1-7 as output High
+ * as they are used for slots1-7 PERST#
+ */
+static void mx6_ventana_pciesw_early_fixup(struct pci_dev *dev)
+{
+	u32 dw;
+
+	if (!of_machine_is_compatible("gw,ventana"))
+		return;
+
+	if (dev->devfn != 0)
+		return;
+
+	pci_read_config_dword(dev, 0x62c, &dw);
+	dw |= 0xaaa8; // GPIO1-7 outputs
+	pci_write_config_dword(dev, 0x62c, dw);
+
+	pci_read_config_dword(dev, 0x644, &dw);
+	dw |= 0xfe;   // GPIO1-7 output high
+	pci_write_config_dword(dev, 0x644, dw);
+
+	msleep(100);
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLX, 0x8609,
+	mx6_ventana_pciesw_early_fixup);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLX, 0x8606,
+	mx6_ventana_pciesw_early_fixup);
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_PLX, 0x8604,
+	mx6_ventana_pciesw_early_fixup);
+
 /* For imx6q sabrelite board: set KSZ9021RN RGMII pad skew */
 static int ksz9021rn_phy_fixup(struct phy_device *phydev)
 {
