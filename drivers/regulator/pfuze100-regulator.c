@@ -308,7 +308,12 @@ static int pfuze_identify(struct pfuze_chip *pfuze_chip)
 	if (ret)
 		return ret;
 
-	if (value & 0x0f) {
+	switch (value & 0x0f) {
+	case 0x0:
+	/* Freescale misprogramed 1-3% of parts prior to week 8 of 2013 */
+	case 0x08:
+		break;
+	default:
 		dev_warn(pfuze_chip->dev, "Illegal ID: %x\n", value);
 		return -ENODEV;
 	}
