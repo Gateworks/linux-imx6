@@ -22,3 +22,6 @@ obj-$(CONFIG_MXC_TVIN_ADV7180) += adv7180_tvin.o
 
 mxc_vadc_tvin-objs := mxc_vadc.o
 obj-$(CONFIG_MXC_VADC) += mxc_vadc_tvin.o
+
+tda1997x-video-objs := tda1997x.o
+obj-$(CONFIG_MXC_TVIN_TDA1997X) += tda1997x-video.o
