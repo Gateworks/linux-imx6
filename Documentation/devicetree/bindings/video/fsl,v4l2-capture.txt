@@ -44,6 +44,7 @@ Supported Sensor
 - ov5642
 - ov5640_mipi
 - adv7180
+- tda1997x
 
 
 Example for IPUv3 including capture settings on imx6q-sabresd.dts:
@@ -99,4 +100,31 @@ Examples for sensors:
 		mclk = <24000000>;
 		mclk_source = <0>;
 		cvbs = <1>;
+	};
+
+	tda1977x: tda1997x@21 {
+		compatible = "nxp,tda1997x";
+		reg = <0x48>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_ipu1_4>;
+		/* regulators */
+		DOVDD-supply = <&reg_3p3v>; /* 3.3v */
+		AVDD-supply = <&reg_3p3v>;  /* 1.8v */
+		DVDD-supply = <&reg_3p3v>;  /* 1.8v */
+		hdcp = <0>; /* HDCP disabled */
+		ddc_slave = <0x74>; /* DDC slave address */
+		/* video output format */
+		vidout_fmt = "442_ccir"; /* BT656 */
+		vidout_trc = <1>; /* insert timing codes (SAV/EAV) in stream */
+		vidout_blc = <1>; /* insert blanking codes in stream */
+		vidout_clkmode = "single_edge"; /* 1x clock */
+		vidout_portcfg = [ 00 00 00 82 81 00 00 00 00 ];
+		/* audio output format */
+		audout_fmt = "i2s16"; /* I2S bus, 16bit per ch */
+		audout_sysclk = <128>; /* 128fs clkmode */
+		audout_layout = <0>; /* AP0,WS,A_CLK for up to 2ch audio */
+		/* IPU mapping */
+		ipu_id = <0>;
+		csi_id = <0>;
+		status = "okay";
 	};
