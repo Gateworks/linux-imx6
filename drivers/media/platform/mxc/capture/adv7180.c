@@ -18,16 +18,20 @@
  *
  * @ingroup Camera
  */
+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/i2c.h>
 #include <linux/init.h>
+#include <linux/mfd/syscon.h>
+#include <linux/mfd/syscon/imx6q-iomuxc-gpr.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/pinctrl/consumer.h>
+#include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 #include <media/v4l2-chip-ident.h>
 #include "v4l2-int-device.h"
@@ -1199,10 +1203,11 @@ static int adv7180_probe(struct i2c_client *client,
 	u32 cvbs = true;
 	struct pinctrl *pinctrl;
 	struct device *dev = &client->dev;
+	struct regmap *gpr;
 
-	printk(KERN_ERR"DBG sensor data is at %p\n", &adv7180_data);
+	dev_dbg(dev, "%s\n", __func__);
 
-	/* ov5640 pinctrl */
+	/* pinctrl */
 	pinctrl = devm_pinctrl_get_select_default(dev);
 	if (IS_ERR(pinctrl)) {
 		dev_err(dev, "setup pinctrl failed\n");
@@ -1269,6 +1274,13 @@ static int adv7180_probe(struct i2c_client *client,
 		return ret;
 	}
 
+	ret = of_property_read_u32(dev->of_node, "ipu_id",
+					&(adv7180_data.sen.ipu_id));
+	if (ret) {
+		dev_err(dev, "ipu_id invalid\n");
+		return ret;
+	}
+
 	clk_prepare_enable(adv7180_data.sen.sensor_clk);
 
 	dev_dbg(&adv7180_data.sen.i2c_client->dev,
@@ -1287,9 +1299,30 @@ static int adv7180_probe(struct i2c_client *client,
 		cvbs = true;
 	}
 
+
+	/* enable parallel interface to IPU */
+	gpr = syscon_regmap_lookup_by_compatible("fsl,imx6q-iomuxc-gpr");
+	if (!IS_ERR(gpr)) {
+		if (of_machine_is_compatible("fsl,imx6q")) {
+			int mask = adv7180_data.sen.csi ? (1 << 20) : (1 << 19);
+
+			regmap_update_bits(gpr, IOMUXC_GPR1, mask, mask);
+		} else if (of_machine_is_compatible("fsl,imx6dl")) {
+			int mask = adv7180_data.sen.csi ? (7 << 3) : (7 << 0);
+			int val =  adv7180_data.sen.csi ? (4 << 3) : (4 << 0);
+
+			regmap_update_bits(gpr, IOMUXC_GPR13, mask, val);
+		}
+	} else {
+		pr_err("%s: failed to find fsl,imx6q-iomux-gpr regmap\n",
+		       __func__);
+	}
+
 	/*! ADV7180 initialization. */
 	adv7180_hard_reset(cvbs);
 
+	pr_debug("   IPU%d_CSI%d\n", adv7180_data.sen.ipu_id + 1, adv7180_data.sen.csi);
+	pr_debug("   mclk:%d %d\n", adv7180_data.sen.mclk, (u32)adv7180_data.sen.mclk_source);
 	pr_debug("   type is %d (expect %d)\n",
 		 adv7180_int_device.type, v4l2_int_type_slave);
 	pr_debug("   num ioctls is %d\n",
