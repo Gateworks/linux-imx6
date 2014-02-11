@@ -240,7 +240,7 @@ static int mxc_free_frame_buf(cam_data *cam)
 {
 	int i;
 
-	pr_debug("MVC: In mxc_free_frame_buf\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	for (i = 0; i < FRAME_NUM; i++) {
 		if (cam->frame[i].vaddress != 0) {
@@ -266,7 +266,7 @@ static int mxc_allocate_frame_buf(cam_data *cam, int count)
 {
 	int i;
 
-	pr_debug("In MVC:mxc_allocate_frame_buf - size=%d\n",
+	pr_debug("%s: %s size=%d\n", __func__, cam->sensor->name,
 		cam->v2f.fmt.pix.sizeimage);
 
 	for (i = 0; i < count; i++) {
@@ -305,7 +305,7 @@ static void mxc_free_frames(cam_data *cam)
 {
 	int i;
 
-	pr_debug("In MVC:mxc_free_frames\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	for (i = 0; i < FRAME_NUM; i++)
 		cam->frame[i].buffer.flags = V4L2_BUF_FLAG_MAPPED;
@@ -326,7 +326,7 @@ static void mxc_free_frames(cam_data *cam)
  */
 static int mxc_v4l2_buffer_status(cam_data *cam, struct v4l2_buffer *buf)
 {
-	pr_debug("In MVC:mxc_v4l2_buffer_status\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (buf->index < 0 || buf->index >= FRAME_NUM) {
 		pr_err("ERROR: v4l2 capture: mxc_v4l2_buffer_status buffers "
@@ -340,13 +340,13 @@ static int mxc_v4l2_buffer_status(cam_data *cam, struct v4l2_buffer *buf)
 
 static int mxc_v4l2_release_bufs(cam_data *cam)
 {
-	pr_debug("In MVC:mxc_v4l2_release_bufs\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 	return 0;
 }
 
 static int mxc_v4l2_prepare_bufs(cam_data *cam, struct v4l2_buffer *buf)
 {
-	pr_debug("In MVC:mxc_v4l2_prepare_bufs\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (buf->index < 0 || buf->index >= FRAME_NUM || buf->length <
 			PAGE_ALIGN(cam->v2f.fmt.pix.sizeimage)) {
@@ -407,12 +407,11 @@ static int mxc_streamon(cam_data *cam)
 	unsigned long lock_flags;
 	int err = 0;
 
-	pr_debug("In MVC:mxc_streamon\n");
-
 	if (NULL == cam) {
 		pr_err("ERROR! cam parameter is NULL\n");
 		return -1;
 	}
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (cam->capture_on) {
 		pr_err("ERROR: v4l2 capture: Capture stream has been turned "
@@ -493,7 +492,7 @@ static int mxc_streamoff(cam_data *cam)
 {
 	int err = 0;
 
-	pr_debug("In MVC:mxc_streamoff\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (cam->capture_on == false)
 		return 0;
@@ -540,7 +539,7 @@ static int verify_preview(cam_data *cam, struct v4l2_window *win)
 	bool foregound_fb = false;
 	mm_segment_t old_fs;
 
-	pr_debug("In MVC: verify_preview\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	do {
 		fbi = (struct fb_info *)registered_fb[i];
@@ -670,7 +669,7 @@ static int start_preview(cam_data *cam)
 {
 	int err = 0;
 
-	pr_debug("MVC: start_preview\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (cam->v4l2_fb.flags == V4L2_FBUF_FLAG_OVERLAY)
 	#ifdef CONFIG_MXC_IPU_PRP_VF_SDC
@@ -768,7 +767,7 @@ static int mxc_v4l2_g_fmt(cam_data *cam, struct v4l2_format *f)
 {
 	int retval = 0;
 
-	pr_debug("In MVC: mxc_v4l2_g_fmt type=%d\n", f->type);
+	pr_debug("%s: %s type=%d\n", __func__, cam->sensor->name, f->type);
 
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
@@ -816,7 +815,7 @@ static int mxc_v4l2_s_fmt(cam_data *cam, struct v4l2_format *f)
 	int bytesperline = 0;
 	int *width, *height;
 
-	pr_debug("In MVC: mxc_v4l2_s_fmt\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
@@ -979,7 +978,7 @@ static int mxc_v4l2_g_ctrl(cam_data *cam, struct v4l2_control *c)
 {
 	int status = 0;
 
-	pr_debug("In MVC:mxc_v4l2_g_ctrl\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	/* probably don't need to store the values that can be retrieved,
 	 * locally, but they are for now. */
@@ -1095,7 +1094,7 @@ static int mxc_v4l2_s_ctrl(cam_data *cam, struct v4l2_control *c)
 	int tmp_rotation = IPU_ROTATE_NONE;
 	struct sensor_data *sensor_data;
 
-	pr_debug("In MVC:mxc_v4l2_s_ctrl\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	switch (c->id) {
 	case V4L2_CID_HFLIP:
@@ -1294,7 +1293,7 @@ static int mxc_v4l2_s_param(cam_data *cam, struct v4l2_streamparm *parm)
 	u32 current_fps, parm_fps;
 	int err = 0;
 
-	pr_debug("In mxc_v4l2_s_param\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (parm->type != V4L2_BUF_TYPE_VIDEO_CAPTURE) {
 		pr_err(KERN_ERR "mxc_v4l2_s_param invalid type\n");
@@ -1429,8 +1428,7 @@ exit:
  */
 static int mxc_v4l2_s_std(cam_data *cam, v4l2_std_id e)
 {
-	pr_debug("In mxc_v4l2_s_std %Lx\n", e);
-
+	pr_debug("%s: %s %Lx\n", __func__, cam->sensor->name, e);
 	if (e == V4L2_STD_PAL) {
 		pr_debug("   Setting standard to PAL %Lx\n", V4L2_STD_PAL);
 		cam->standard.id = V4L2_STD_PAL;
@@ -1475,7 +1473,7 @@ static int mxc_v4l2_g_std(cam_data *cam, v4l2_std_id *e)
 {
 	struct v4l2_format tv_fmt;
 
-	pr_debug("In mxc_v4l2_g_std\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (cam->device_type == 1) {
 		/* Use this function to get what the TV-In device detects the
@@ -1515,7 +1513,7 @@ static int mxc_v4l_dqueue(cam_data *cam, struct v4l2_buffer *buf)
 	struct mxc_v4l_frame *frame;
 	unsigned long lock_flags;
 
-	pr_debug("In MVC:mxc_v4l_dqueue\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (!wait_event_interruptible_timeout(cam->enc_queue,
 					      cam->enc_counter != 0,
@@ -1584,8 +1582,8 @@ static int mxc_v4l_open(struct file *file)
 	int err = 0;
 	struct sensor_data *sensor;
 
-	pr_debug("\nIn MVC: mxc_v4l_open\n");
-	pr_debug("   device name is %s\n", dev->name);
+	pr_debug("%s: %s %s\n", __func__, dev->name,
+		(cam->sensor) ? cam->sensor->name : "");
 
 	if (!cam) {
 		pr_err("ERROR: v4l2 capture: Internal error, "
@@ -1734,8 +1732,8 @@ static int mxc_v4l_close(struct file *file)
 	int err = 0;
 	cam_data *cam = video_get_drvdata(dev);
 	struct sensor_data *sensor;
-	pr_debug("In MVC:mxc_v4l_close\n");
 
+	pr_debug("%s: %s\n", __func__, (cam->sensor) ? cam->sensor->name : "");
 	if (!cam) {
 		pr_err("ERROR: v4l2 capture: Internal error, "
 			"cam_data not found!\n");
@@ -1910,7 +1908,7 @@ static long mxc_v4l_do_ioctl(struct file *file,
 	int retval = 0;
 	unsigned long lock_flags;
 
-	pr_debug("In MVC: mxc_v4l_do_ioctl %x\n", ioctlnr);
+	pr_debug("%s: %s ioctl=%x\n", __func__, cam->sensor->name, ioctlnr);
 	wait_event_interruptible(cam->power_queue, cam->low_power == false);
 	/* make this _really_ smp-safe */
 	if (ioctlnr != VIDIOC_DQBUF)
@@ -2428,7 +2426,7 @@ static long mxc_v4l_do_ioctl(struct file *file,
 static long mxc_v4l_ioctl(struct file *file, unsigned int cmd,
 			 unsigned long arg)
 {
-	pr_debug("In MVC:mxc_v4l_ioctl\n");
+	pr_debug("%s\n", __func__);
 	return video_usercopy(file, cmd, arg, mxc_v4l_do_ioctl);
 }
 
@@ -2448,7 +2446,7 @@ static int mxc_mmap(struct file *file, struct vm_area_struct *vma)
 	int res = 0;
 	cam_data *cam = video_get_drvdata(dev);
 
-	pr_debug("In MVC:mxc_mmap\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 	pr_debug("   pgoff=0x%lx, start=0x%lx, end=0x%lx\n",
 		 vma->vm_pgoff, vma->vm_start, vma->vm_end);
 
@@ -2490,7 +2488,7 @@ static unsigned int mxc_poll(struct file *file, struct poll_table_struct *wait)
 	wait_queue_head_t *queue = NULL;
 	int res = POLLIN | POLLRDNORM;
 
-	pr_debug("In MVC:mxc_poll\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (down_interruptible(&cam->busy_lock))
 		return -EINTR;
@@ -2548,7 +2546,7 @@ static void camera_callback(u32 mask, void *dev)
 	if (cam == NULL)
 		return;
 
-	pr_debug("In MVC:camera_callback\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	spin_lock(&cam->queue_int_lock);
 	spin_lock(&cam->dqueue_int_lock);
@@ -2629,7 +2627,7 @@ static int init_camera_struct(cam_data *cam, struct platform_device *pdev)
 	int ret = 0;
 	struct v4l2_device *v4l2_dev;
 
-	pr_debug("In MVC: init_camera_struct\n");
+	pr_debug("%s\n", __func__);
 
 	ret = of_property_read_u32(np, "ipu_id", &ipu_id);
 	if (ret) {
@@ -2793,6 +2791,17 @@ static ssize_t show_csi(struct device *dev,
 }
 static DEVICE_ATTR(fsl_csi_property, S_IRUGO, show_csi, NULL);
 
+static ssize_t show_slave(struct device *dev,
+			  struct device_attribute *attr, char *buf)
+{
+	struct video_device *video_dev = container_of(dev,
+						struct video_device, dev);
+	cam_data *cam = video_get_drvdata(video_dev);
+
+	return sprintf(buf, "%s\n", (cam->sensor)?cam->sensor->name : "");
+}
+static DEVICE_ATTR(fsl_slave_property, S_IRUGO, show_slave, NULL);
+
 /*!
  * This function is called to probe the devices if registered.
  *
@@ -2842,6 +2851,11 @@ static int mxc_v4l2_probe(struct platform_device *pdev)
 			&dev_attr_fsl_csi_property))
 		dev_err(&pdev->dev, "Error on creating sysfs file"
 			" for csi number\n");
+
+	if (device_create_file(&cam->video_dev->dev,
+			&dev_attr_fsl_slave_property))
+		dev_err(&pdev->dev, "Error on creating sysfs file"
+			" for slave device name\n");
 
 	return 0;
 }
@@ -2900,11 +2914,10 @@ static int mxc_v4l2_suspend(struct platform_device *pdev, pm_message_t state)
 {
 	cam_data *cam = platform_get_drvdata(pdev);
 
-	pr_debug("In MVC:mxc_v4l2_suspend\n");
-
 	if (cam == NULL)
 		return -1;
 
+	pr_debug("%s: %s\n", __func__, (cam->sensor) ? cam->sensor->name : "");
 	down(&cam->busy_lock);
 
 	cam->low_power = true;
@@ -2942,11 +2955,10 @@ static int mxc_v4l2_resume(struct platform_device *pdev)
 {
 	cam_data *cam = platform_get_drvdata(pdev);
 
-	pr_debug("In MVC:mxc_v4l2_resume\n");
-
 	if (cam == NULL)
 		return -1;
 
+	pr_debug("%s: %s\n", __func__, (cam->sensor) ? cam->sensor->name : "");
 	down(&cam->busy_lock);
 
 	cam->low_power = false;
@@ -3000,9 +3012,11 @@ static int mxc_v4l2_master_attach(struct v4l2_int_device *slave)
 	int i;
 	struct sensor_data *sdata = slave->priv;
 
-	pr_debug("In MVC: mxc_v4l2_master_attach\n");
-	pr_debug("   slave.name = %s\n", slave->name);
-	pr_debug("   master.name = %s\n", slave->u.slave->master->name);
+	pr_debug("%s\n", __func__);
+	pr_debug("   slave.name = %s IPU%d_CSI%d\n", slave->name,
+		 sdata->ipu_id + 1, sdata->csi);
+	pr_debug("   master.name = %s IPU%d_CSI%d\n",
+		 slave->u.slave->master->name, sdata->ipu_id + 1, cam->csi);
 
 	if (slave == NULL) {
 		pr_err("ERROR: v4l2 capture: slave parameter not valid.\n");
@@ -3079,7 +3093,7 @@ static void mxc_v4l2_master_detach(struct v4l2_int_device *slave)
 	unsigned int i;
 	cam_data *cam = slave->u.slave->master->priv;
 
-	pr_debug("In MVC:mxc_v4l2_master_detach\n");
+	pr_debug("%s: %s\n", __func__, cam->sensor->name);
 
 	if (cam->sensor_index > 1) {
 		for (i = 0; i < cam->sensor_index; i++) {
@@ -3110,7 +3124,7 @@ static __init int camera_init(void)
 {
 	u8 err = 0;
 
-	pr_debug("In MVC:camera_init\n");
+	pr_debug("%s\n", __func__);
 
 	/* Register the device driver structure. */
 	err = platform_driver_register(&mxc_v4l2_driver);
@@ -3128,7 +3142,7 @@ static __init int camera_init(void)
  */
 static void __exit camera_exit(void)
 {
-	pr_debug("In MVC: camera_exit\n");
+	pr_debug("%s\n", __func__);
 
 	platform_driver_unregister(&mxc_v4l2_driver);
 }
