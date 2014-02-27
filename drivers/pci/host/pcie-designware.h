@@ -38,6 +38,7 @@ struct pcie_port {
 	int			irq;
 	u32			lanes;
 	struct pcie_host_ops	*ops;
+	u8			(*swizzle)(struct pci_dev *, u8 *);
 };
 
 struct pcie_host_ops {
