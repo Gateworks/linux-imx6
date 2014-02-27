@@ -406,6 +406,25 @@ static int imx6_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
+{
+	/* TI XIO2001 PCIe-to-PCI bridge on GW16082 has IRQs reversed */
+	if ( dev->bus && dev->bus->self &&
+	    (dev->bus->self->vendor == 0x104c) &&
+	    (dev->bus->self->device == 0x8240))
+	{
+		u8 slot = PCI_SLOT(dev->devfn);
+
+		/* swap and swizzle backwards */
+		*pin = (15 - slot) + 1;
+
+		/* offset by slot to negate 1st common swizzle */
+		*pin = (*pin + 16 - slot) % 4;
+	}
+
+	return pci_common_swizzle(dev, pin);
+}
+
 static int __init imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie;
@@ -528,6 +547,10 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "unable to find iomuxc registers\n");
 		ret = PTR_ERR(imx6_pcie->iomuxc_gpr);
 		goto err;
+	}
+
+	if (of_machine_is_compatible("gw,ventana")) {
+		pp->swizzle = ventana_swizzle;
 	}
 
 	ret = imx6_add_pcie_port(pp, pdev);
