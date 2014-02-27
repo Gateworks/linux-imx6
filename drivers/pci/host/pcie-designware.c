@@ -585,6 +585,9 @@ int __init dw_pcie_host_init(struct pcie_port *pp)
 			return ret;
 	}
 
+	if (pp->swizzle)
+		dw_pci.swizzle = pp->swizzle;
+
 	dw_pcie_wr_own_conf(pp, PCI_BASE_ADDRESS_0, 4, 0);
 
 	dw_pcie_rd_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, &val);
