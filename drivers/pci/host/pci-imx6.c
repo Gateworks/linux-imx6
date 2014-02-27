@@ -545,6 +545,39 @@ static int __init imx6_add_pcie_port(struct pcie_port *pp,
 	return 0;
 }
 
+/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
+u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
+{
+	u8 i = 0;
+	struct pci_dev *pdev = dev;
+
+	/* count number of TI XIO2001 bridges on bus */
+	while (!pci_is_root_bus(pdev->bus)) {
+		if (pdev->bus && pdev->bus->self &&
+		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+			i++;
+		}
+		pdev = pdev->bus->self;
+	}
+	while (!pci_is_root_bus(dev->bus)) {
+		/* if we are directly downstream from 1st TI XIO2001 bridge */
+		if (dev->bus && dev->bus->self &&
+		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+			if (--i == 0) {
+				/* swap IRQs and swizzle backwards */
+				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
+				dev = dev->bus->self;
+				continue;
+			}
+		}
+		*pin = pci_swizzle_interrupt_pin(dev, *pin);
+		dev = dev->bus->self;
+	}
+	return PCI_SLOT(dev->devfn);
+}
+
 static int __init imx6_pcie_probe(struct platform_device *pdev)
 {
 	struct imx6_pcie *imx6_pcie;
@@ -609,6 +642,9 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "unable to find iomuxc registers\n");
 		return PTR_ERR(imx6_pcie->iomuxc_gpr);
 	}
+
+	if (of_machine_is_compatible("gw,ventana"))
+		pp->swizzle = ventana_swizzle;
 
 	ret = imx6_add_pcie_port(pp, pdev);
 	if (ret < 0)
