@@ -2812,6 +2812,8 @@ static DEVICE_ATTR(fsl_slave_property, S_IRUGO, show_slave, NULL);
  */
 static int mxc_v4l2_probe(struct platform_device *pdev)
 {
+	int err;
+
 	/* Create cam and initialize it. */
 	cam_data *cam = kmalloc(sizeof(cam_data), GFP_KERNEL);
 	if (cam == NULL) {
@@ -2819,7 +2821,9 @@ static int mxc_v4l2_probe(struct platform_device *pdev)
 		return -1;
 	}
 
-	init_camera_struct(cam, pdev);
+	err = init_camera_struct(cam, pdev);
+	if (err)
+		return err;
 	pdev->dev.release = camera_platform_release;
 
 	/* Set up the v4l2 device and register it*/
