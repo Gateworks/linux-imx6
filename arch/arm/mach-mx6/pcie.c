@@ -33,6 +33,7 @@
 
 #include <mach/pcie.h>
 
+#include <asm/mach-types.h>
 #include <asm/sizes.h>
 #include <asm/signal.h>
 
@@ -296,9 +297,9 @@ static int imx_pcie_link_up(void __iomem *dbi_base)
 static void imx_pcie_regions_setup(void __iomem *dbi_base)
 {
 	unsigned int bus;
-	unsigned int i;
 	unsigned untranslated_base = PCIE_ARB_END_ADDR +1 - SZ_1M;
 #ifdef CONFIG_PCI_MSI
+	unsigned int i;
 	void __iomem *p = dbi_base + PCIE_PL_MSIC_INT;
 #endif
 
@@ -547,28 +548,54 @@ imx_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 	return bus;
 }
 
+/* TI XIO2001 PCIe-to-PCI bridge on GW16082 exp card has IRQs reversed */
+static u8 ventana_swizzle(struct pci_dev *dev, u8 *pin)
+{
+	u8 i = 0;
+	struct pci_dev *pdev = dev;
+
+	/* count number of TI XIO2001 bridges on bus */
+	while (!pci_is_root_bus(pdev->bus)) {
+		if (pdev->bus && pdev->bus->self &&
+		    (pdev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+		    (pdev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+			i++;
+		}
+		pdev = pdev->bus->self;
+	}
+	while (!pci_is_root_bus(dev->bus)) {
+		/* if we are directly downstream from 1st TI XIO2001 bridge */
+		if (dev->bus && dev->bus->self &&
+		    (dev->bus->self->vendor == PCI_VENDOR_ID_TI) &&
+		    (dev->bus->self->device == PCI_DEVICE_ID_TI_XIO2001)) {
+			if (--i == 0) {
+				/* swap IRQs and swizzle backwards */
+				*pin = (15 - PCI_SLOT(dev->devfn)) + 1;
+				dev = dev->bus->self;
+				continue;
+			}
+		}
+		*pin = pci_swizzle_interrupt_pin(dev, *pin);
+		dev = dev->bus->self;
+	}
+	return PCI_SLOT(dev->devfn);
+}
+
 static int __init imx_pcie_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
-	/* TI XIO2001 PCIe-to-PCI bridge IRQs are flipped it seems */
-	if ( dev->bus && dev->bus->self
-	 && (dev->bus->self->vendor == 0x104c)
-	 && (dev->bus->self->device == 0x8240)) {
-		switch (pin) {
-		case 1: return MXC_INT_PCIE_0;
-		case 2: return MXC_INT_PCIE_1;
-		case 3: return MXC_INT_PCIE_2;
-		case 4: return MXC_INT_PCIE_3;
-		default: return -1;
-		}
-	} else {
-		switch (pin) {
-		case 1: return MXC_INT_PCIE_3;
-		case 2: return MXC_INT_PCIE_2;
-		case 3: return MXC_INT_PCIE_1;
-		case 4: return MXC_INT_PCIE_0;
-		default: return -1;
-		}
+	int irq;
+
+	switch (pin) {
+	case 1: irq = MXC_INT_PCIE_3; break;
+	case 2: irq = MXC_INT_PCIE_2; break;
+	case 3: irq = MXC_INT_PCIE_1; break;
+	case 4: irq = MXC_INT_PCIE_0; break;
+	default: irq = -1; break;
 	}
+	dev_info(&dev->dev, "map_irq: %04x:%04x slot%d pin%d irq%d\n",
+		 dev->vendor, dev->device, slot, pin, irq);
+
+	return irq;
 }
 
 static struct hw_pci imx_pci __initdata = {
@@ -861,6 +888,8 @@ static int __devinit imx_pcie_pltfm_probe(struct platform_device *pdev)
 	/* add the pcie port */
 	add_pcie_port(base, dbi_base, pdata);
 
+	if (machine_is_gwventana())
+		imx_pci.swizzle = ventana_swizzle;
 
 	pci_common_init(&imx_pci);
 	return 0;
