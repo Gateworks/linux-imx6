@@ -98,9 +98,37 @@ extern char *soc_reg_id;
 static int caam_enabled;
 static int gpio_can_stby = -1;
 
-#define MX6Q_VENTANA_SD1_CMD_PADCFG (PAD_CTL_DSE_240ohm)
-#define MX6Q_VENTANA_DISP0_DIO_PADCFG (PAD_CTL_DSE_240ohm)
-#define MX6Q_VENTANA_USBOTGPEN_PADCFG (PAD_CTL_DSE_40ohm|PAD_CTL_PUE|PAD_CTL_PUS_100K_UP)
+#define SETUP_PAD(x) {							\
+	if (cpu_is_mx6q()) 						\
+		mxc_iomux_v3_setup_pad(MX6Q_##x);			\
+	else								\
+		mxc_iomux_v3_setup_pad(MX6DL_##x);			\
+}
+#define SETUP_PAD_CFG(x,y) {						\
+	if (cpu_is_mx6q()) 						\
+		mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_##x, y));	\
+	else								\
+		mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6DL_##x, y));	\
+}
+#define SETUP_PADS(x) {							\
+	if (cpu_is_mx6q()) {						\
+		mxc_iomux_v3_setup_multiple_pads(mx6q_##x,		\
+			ARRAY_SIZE(mx6q_##x));				\
+	} else {							\
+		mxc_iomux_v3_setup_multiple_pads(mx6dl_##x,		\
+			ARRAY_SIZE(mx6dl_##x));				\
+	}								\
+}
+#define GET_PAD(x, y) {							\
+	if (cpu_is_mx6q())						\
+		x = MX6Q_##y;						\
+	else								\
+		x = MX6DL_##y;						\
+	mxc_iomux_v3_get_pad(&x);					\
+}
+
+#define VENTANA_DIO_PADCFG (PAD_CTL_DSE_240ohm)
+#define VENTANA_USBOTGPEN_PADCFG (PAD_CTL_DSE_40ohm|PAD_CTL_PUE|PAD_CTL_PUS_100K_UP)
 
 /* AUDMUX4 */
 static iomux_v3_cfg_t mx6q_ventana_audmux4_pads[] = {
@@ -158,8 +186,8 @@ static iomux_v3_cfg_t mx6q_ventana_nand_pads[] = {
 	MX6Q_PAD_NANDF_CLE__RAWNAND_CLE,
 	MX6Q_PAD_NANDF_WP_B__RAWNAND_RESETN,
 	MX6Q_PAD_NANDF_RB0__RAWNAND_READY0,
-  MX6Q_PAD_SD4_CMD__RAWNAND_RDN,
-  MX6Q_PAD_SD4_CLK__RAWNAND_WRN,
+	MX6Q_PAD_SD4_CMD__RAWNAND_RDN,
+	MX6Q_PAD_SD4_CLK__RAWNAND_WRN,
 };
 static iomux_v3_cfg_t mx6dl_ventana_nand_pads[] = {
 	MX6DL_PAD_NANDF_D0__RAWNAND_D0,
@@ -176,8 +204,8 @@ static iomux_v3_cfg_t mx6dl_ventana_nand_pads[] = {
 	MX6DL_PAD_NANDF_CLE__RAWNAND_CLE,
 	MX6DL_PAD_NANDF_WP_B__RAWNAND_RESETN,
 	MX6DL_PAD_NANDF_RB0__RAWNAND_READY0,
-  MX6DL_PAD_SD4_CMD__RAWNAND_RDN,
-  MX6DL_PAD_SD4_CLK__RAWNAND_WRN,
+	MX6DL_PAD_SD4_CMD__RAWNAND_RDN,
+	MX6DL_PAD_SD4_CLK__RAWNAND_WRN,
 };
 
 /* CANbus */
@@ -205,7 +233,7 @@ static iomux_v3_cfg_t mx6q_gw5400a_uart_pads[] = {
 	MX6Q_PAD_SD4_CLK__UART3_RXD,
 };
 
-static iomux_v3_cfg_t mx6q_gw5400b_uart_pads[] = {
+static iomux_v3_cfg_t mx6q_gw54xx_uart_pads[] = {
 	/* UART1: RS485  */
 	MX6Q_PAD_SD3_DAT7__UART1_TXD,
 	MX6Q_PAD_SD3_DAT6__UART1_RXD,
@@ -218,7 +246,33 @@ static iomux_v3_cfg_t mx6q_gw5400b_uart_pads[] = {
 	MX6Q_PAD_KEY_COL1__UART5_TXD,
 	MX6Q_PAD_KEY_ROW1__UART5_RXD,
 };
+static iomux_v3_cfg_t mx6dl_gw54xx_uart_pads[] = {
+	/* UART1: RS485  */
+	MX6DL_PAD_SD3_DAT7__UART1_TXD,
+	MX6DL_PAD_SD3_DAT6__UART1_RXD,
 
+	/* UART2: Console */
+	MX6DL_PAD_SD4_DAT7__UART2_TXD,
+	MX6DL_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART5: GPS */
+	MX6DL_PAD_KEY_COL1__UART5_TXD,
+	MX6DL_PAD_KEY_ROW1__UART5_RXD,
+};
+
+static iomux_v3_cfg_t mx6q_gw52xx_uart_pads[] = {
+	/* UART1: GPS */
+	MX6Q_PAD_SD3_DAT7__UART1_TXD,
+	MX6Q_PAD_SD3_DAT6__UART1_RXD,
+
+	/* UART2: Console */
+	MX6Q_PAD_SD4_DAT7__UART2_TXD,
+	MX6Q_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART5: App header */
+	MX6Q_PAD_KEY_COL1__UART5_TXD, // J11.3
+	MX6Q_PAD_KEY_ROW1__UART5_RXD, // J11.4
+};
 static iomux_v3_cfg_t mx6dl_gw52xx_uart_pads[] = {
 	/* UART1: GPS */
 	MX6DL_PAD_SD3_DAT7__UART1_TXD,
@@ -233,6 +287,23 @@ static iomux_v3_cfg_t mx6dl_gw52xx_uart_pads[] = {
 	MX6DL_PAD_KEY_ROW1__UART5_RXD, // J11.4
 };
 
+static iomux_v3_cfg_t mx6q_gw51xx_uart_pads[] = {
+	/* UART1: GPS */
+	MX6Q_PAD_SD3_DAT7__UART1_TXD,
+	MX6Q_PAD_SD3_DAT6__UART1_RXD,
+
+	/* UART2: Console */
+	MX6Q_PAD_SD4_DAT7__UART2_TXD,
+	MX6Q_PAD_SD4_DAT4__UART2_RXD,
+
+	/* UART3: App header */
+	MX6Q_PAD_EIM_D24__UART3_TXD,  // J11.1
+	MX6Q_PAD_EIM_D25__UART3_RXD,  // J11.2
+
+	/* UART5: App header */
+	MX6Q_PAD_KEY_COL1__UART5_TXD, // J11.3
+	MX6Q_PAD_KEY_ROW1__UART5_RXD, // J11.4
+};
 static iomux_v3_cfg_t mx6dl_gw51xx_uart_pads[] = {
 	/* UART1: GPS */
 	MX6DL_PAD_SD3_DAT7__UART1_TXD,
@@ -250,6 +321,7 @@ static iomux_v3_cfg_t mx6dl_gw51xx_uart_pads[] = {
 	MX6DL_PAD_KEY_COL1__UART5_TXD, // J11.3
 	MX6DL_PAD_KEY_ROW1__UART5_RXD, // J11.4
 };
+
 
 
 /* IPU2_DISP0 */
@@ -292,7 +364,7 @@ static iomux_v3_cfg_t mx6q_ventana_pads[] = {
 	MX6Q_PAD_GPIO_1__USBOTG_ID,
 
 	/* USBOTG PWR EN */
-	NEW_PAD_CTRL(MX6Q_PAD_EIM_D22__GPIO_3_22, MX6Q_VENTANA_USBOTGPEN_PADCFG),
+	NEW_PAD_CTRL(MX6Q_PAD_EIM_D22__GPIO_3_22, VENTANA_USBOTGPEN_PADCFG),
 
 	/* USBOTG OC pin */
 	MX6Q_PAD_KEY_COL4__USBOH3_USBOTG_OC,
@@ -309,7 +381,7 @@ static iomux_v3_cfg_t mx6dl_ventana_pads[] = {
 	MX6DL_PAD_GPIO_1__USBOTG_ID,
 
 	/* USBOTG PWR EN */
-	NEW_PAD_CTRL(MX6DL_PAD_EIM_D22__GPIO_3_22, MX6Q_VENTANA_USBOTGPEN_PADCFG),
+	NEW_PAD_CTRL(MX6DL_PAD_EIM_D22__GPIO_3_22, VENTANA_USBOTGPEN_PADCFG),
 
 	/* USBOTG OC pin */
 	MX6DL_PAD_KEY_COL4__USBOH3_USBOTG_OC,
@@ -376,8 +448,8 @@ static iomux_v3_cfg_t mx6dl_ventana_csi1_sensor_pads[] = {
 };
 
 static iomux_v3_cfg_t mx6q_ventana_hdmi_ddc_pads[] = {
-  MX6Q_PAD_KEY_COL3__HDMI_TX_DDC_SCL,
-  MX6Q_PAD_KEY_ROW3__HDMI_TX_DDC_SDA,
+	MX6Q_PAD_KEY_COL3__HDMI_TX_DDC_SCL,
+	MX6Q_PAD_KEY_ROW3__HDMI_TX_DDC_SDA,
 };
 
 static iomux_v3_cfg_t mx6q_ventana_i2c2_pads[] = {
@@ -482,14 +554,8 @@ static const struct esdhc_platform_data mx6q_ventana_sd3_data __initconst = {
 
 static int __init gpmi_nand_platform_init(void)
 {
-	if (cpu_is_mx6q()) {
-		return mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_nand_pads,
-			ARRAY_SIZE(mx6q_ventana_nand_pads));
-	} else if (cpu_is_mx6dl()) {
-		return mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_nand_pads,
-			ARRAY_SIZE(mx6dl_ventana_nand_pads));
-	}
-	return -EINVAL;
+	SETUP_PADS(ventana_nand_pads);
+	return 0;
 }
 
 static struct mtd_partition imx6_ventana_nand_partitions[] = {
@@ -821,9 +887,8 @@ static struct i2c_board_info mxc_i2c1_board_info[] __initdata = {
 
 void mx6_csi0_io_init(void)
 {
+	SETUP_PADS(ventana_csi0_sensor_pads);
 	if (cpu_is_mx6q()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_csi0_sensor_pads,
-			ARRAY_SIZE(mx6q_ventana_csi0_sensor_pads));
 		/* set IPU1 Mux to parallel interface
 		 * IOMUX_GPR1 bit19 and bit20 meaning:
 		 * Bit19:       0 - Enable mipi to IPU1 CSI0
@@ -840,8 +905,6 @@ void mx6_csi0_io_init(void)
 		 */
 		mxc_iomux_set_gpr_register(1, 19, 1, 1); /* GPR1[19] = 1 */
 	} else if (cpu_is_mx6dl()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_csi0_sensor_pads,
-			ARRAY_SIZE(mx6dl_ventana_csi0_sensor_pads));
 		/* IPU_CSI0_MUX (GRP13[0:2]):
 		 *   0 - MIPI_CSI0
 		 *   1 - MIPI_CSI1
@@ -856,9 +919,8 @@ EXPORT_SYMBOL(mx6_csi0_io_init);
 
 static void mx6_csi1_io_init(void)
 {
+	SETUP_PADS(ventana_csi1_sensor_pads);
 	if (cpu_is_mx6q()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_csi1_sensor_pads,
-			ARRAY_SIZE(mx6q_ventana_csi1_sensor_pads));
 		/* set IPU1 Mux to parallel interface
 		 * IOMUX_GPR1 bit19 and bit20 meaning:
 		 * Bit19:       0 - Enable mipi to IPU1 CSI0
@@ -875,8 +937,6 @@ static void mx6_csi1_io_init(void)
 		 */
 		mxc_iomux_set_gpr_register(1, 20, 1, 1); /* GPR1[20] = 1 */
 	} else if (cpu_is_mx6dl()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_csi1_sensor_pads,
-			ARRAY_SIZE(mx6dl_ventana_csi1_sensor_pads));
 		/* IPU_CSI1_MUX (GRP13[3:5]):
 		 *   0 - MIPI_CSI0
 		 *   1 - MIPI_CSI1
@@ -1251,24 +1311,12 @@ static void hdmi_init(int ipu_id, int disp_id)
  */
 static void hdmi_enable_ddc_pin(void)
 {
-	if (cpu_is_mx6q()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_hdmi_ddc_pads,
-			ARRAY_SIZE(mx6q_ventana_hdmi_ddc_pads));
-	} else if (cpu_is_mx6dl()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_hdmi_ddc_pads,
-			ARRAY_SIZE(mx6dl_ventana_hdmi_ddc_pads));
-	}
+	SETUP_PADS(ventana_hdmi_ddc_pads);
 }
 
 static void hdmi_disable_ddc_pin(void)
 {
-	if (cpu_is_mx6q()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_i2c2_pads,
-			ARRAY_SIZE(mx6q_ventana_i2c2_pads));
-	} else if (cpu_is_mx6dl()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_i2c2_pads,
-			ARRAY_SIZE(mx6dl_ventana_i2c2_pads));
-	}
+	SETUP_PADS(ventana_i2c2_pads);
 }
 
 /* Platform data for mxc_hdmi driver */
@@ -1671,14 +1719,7 @@ static void __init mx6_ventana_board_init(void)
 	int rate;
 
 	memset(&ventana_board_info, 0, sizeof(ventana_board_info));
-
-	if (cpu_is_mx6q()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_pads,
-						ARRAY_SIZE(mx6q_ventana_pads));
-	} else if (cpu_is_mx6dl()) {
-		mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_pads,
-						ARRAY_SIZE(mx6dl_ventana_pads));
-	}
+	SETUP_PADS(ventana_pads);
 
 	/* Delayed 3.3V supply */
 	platform_device_register(&mx6_ventana_vdd_dly_3p3_device);
@@ -1791,7 +1832,7 @@ static int __init ventana_model_setup(void)
 
 				/* UARTs */
 				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400a_uart_pads,
-					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
+					ARRAY_SIZE(mx6q_gw5400a_uart_pads));
 				if (info->config_uart0)
 					imx6q_add_imx_uart(0, NULL);
 				if (info->config_uart1)
@@ -1801,13 +1842,7 @@ static int __init ventana_model_setup(void)
 
 				/* SPI FLASH */
 				if (info->config_spifl0 || info->config_spifl1) {
-					if (cpu_is_mx6q()) {
-						mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_spi_pads,
-							ARRAY_SIZE(mx6q_ventana_spi_pads));
-					} else if (cpu_is_mx6dl()) {
-						mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_spi_pads,
-							ARRAY_SIZE(mx6dl_ventana_spi_pads));
-					}
+					SETUP_PADS(ventana_spi_pads);
 					imx6q_add_ecspi(0, &mx6q_ventana_spi_data);
 					spi_device_init();
 				}
@@ -1819,12 +1854,12 @@ static int __init ventana_model_setup(void)
 				mx6_ventana_gpio_leds[2].gpio = IMX_GPIO_NR(4,15);   // user3:locled
 
 				/* VIDDEC_IRQ# */
-				//mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
+				//SETUP_PAD(PAD_GPIO_2__GPIO_1_2);
 
 				/* MIPI DSI */
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT3__GPIO_1_21); // MIPI GP DIO	
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD2_CMD__GPIO_1_11);  // MIPI BK_EN
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD1_DAT1__PWM3_PWMO); // BL brightness
+				SETUP_PAD(PAD_SD1_DAT3__GPIO_1_21); // MIPI GP DIO	
+				SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);  // MIPI BK_EN
+				SETUP_PAD(PAD_SD1_DAT1__PWM3_PWMO); // BL brightness
 
 				/* UART1 Transmit Enable */
 				gpio_request(IMX_GPIO_NR(3,24), "rs485-txen");
@@ -1849,8 +1884,7 @@ static int __init ventana_model_setup(void)
 		         || (strncmp(info->model, "GW5410", 6) == 0)
 			) {
 				/* UARTs */
-				mxc_iomux_v3_setup_multiple_pads(mx6q_gw5400b_uart_pads,
-					ARRAY_SIZE(mx6q_gw5400b_uart_pads));
+				SETUP_PADS(gw54xx_uart_pads);
 				if (info->config_uart0)
 					imx6q_add_imx_uart(0, NULL);
 				if (info->config_uart1)
@@ -1866,19 +1900,17 @@ static int __init ventana_model_setup(void)
 
 				/* i2s audio */
 				if (info->config_ssi1) {
-					mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_audmux5_pads,
-						ARRAY_SIZE(mx6q_ventana_audmux5_pads));
+					SETUP_PADS(ventana_audmux5_pads);
 				}
 
 				/* PWM4 (backlight control) */
-				mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO,
-					MX6Q_VENTANA_SD1_CMD_PADCFG));
-
+				SETUP_PAD_CFG(PAD_SD1_CMD__PWM4_PWMO,
+					      VENTANA_DIO_PADCFG);
 				/* VIDDEC_IRQ# */
-				//mxc_iomux_v3_setup_pad(MX6Q_PAD_EIM_A17__GPIO_2_21);
+				//SETUP_PAD(PAD_EIM_A17__GPIO_2_21);
 
 				/* UART1 Transmit Enable */
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_SD3_DAT4__GPIO_7_1),
+				SETUP_PAD(PAD_SD3_DAT4__GPIO_7_1);
 				gpio_request(IMX_GPIO_NR(7,1), "rs485-txen");
 				gpio_export(IMX_GPIO_NR(7,1), 0);
 				gpio_direction_output(IMX_GPIO_NR(7,1), 0);
@@ -1907,21 +1939,17 @@ static int __init ventana_model_setup(void)
 				i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 				/* CAN bus stby */
-				if (cpu_is_mx6q()) {
-					mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
-				} else if (cpu_is_mx6dl()) {
-					mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_2__GPIO_1_2);
-				}
+				SETUP_PAD(PAD_GPIO_2__GPIO_1_2);
 				gpio_can_stby = IMX_GPIO_NR(1,2);
 
 			} /* end GW54xx revB+ */
 
 			/* Touchscreen IRQ */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_17__GPIO_7_12);
+			SETUP_PAD(PAD_GPIO_17__GPIO_7_12);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(7, 12));
 
 			/* Digital Video Decoder (HDMI IN) IRQ */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_7__GPIO_1_7);
+			SETUP_PAD(PAD_GPIO_7__GPIO_1_7);
 
 			/* release USB Hub reset */
 			gpio_set_value(IMX_GPIO_NR(1, 16), 1);
@@ -1932,7 +1960,7 @@ static int __init ventana_model_setup(void)
 			 * according to the content shown on the panel which
 			 * may cause annoying unstable backlight issue.
 			 */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_SD2_CLK__GPIO_1_10);
+			SETUP_PAD(PAD_SD2_CLK__GPIO_1_10);
 			gpio_request(IMX_GPIO_NR(1,10), "cabc-en0");
 			gpio_export(IMX_GPIO_NR(1,10), 0);
 			gpio_direction_output(IMX_GPIO_NR(1,10), 0);
@@ -1942,8 +1970,7 @@ static int __init ventana_model_setup(void)
 			 */
 			pr_info("Registering UserIO:\n");
 			/* DIO0 */
-			pad = MX6Q_PAD_GPIO_9__PWM1_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_GPIO_9__PWM1_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 4) // ALT4
 			{
 				pr_info("DIO0: PWM1\n");
@@ -1957,8 +1984,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,9));
 			}
 			/* DIO1 */
-			pad = MX6Q_PAD_SD1_DAT2__PWM2_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT2__PWM2_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 3) // ALT3
 			{
 				pr_info("DIO1: PWM2\n");
@@ -1972,8 +1998,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,19));
 			}
 			/* DIO2 */
-			pad = MX6Q_PAD_SD4_DAT1__PWM3_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD4_DAT1__PWM3_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO2: PWM3\n");
@@ -1987,8 +2012,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(2,9));
 			}
 			/* DIO2 */
-			pad = MX6Q_PAD_SD4_DAT2__PWM4_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD4_DAT2__PWM4_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO3: PWM4\n");
@@ -2013,7 +2037,7 @@ static int __init ventana_model_setup(void)
 
 #ifdef CONFIG_PPS_CLIENT_GPIO
 			/* PPS source from GPS */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_5__GPIO_1_5);
+			SETUP_PAD(PAD_GPIO_5__GPIO_1_5);
 			mx6_ventana_pps_device.dev.platform_data.gpio_pin = IMX_GPIO_NR(1, 5);
 			platform_device_register(&mx6_ventana_pps_device);
 #endif
@@ -2024,7 +2048,7 @@ static int __init ventana_model_setup(void)
 			gpio_direction_output(IMX_GPIO_NR(2,11), 0);
 
 			/* i2c switch enable */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_19__GPIO_4_5);
+			SETUP_PAD(PAD_GPIO_19__GPIO_4_5);
 			gpio_request(IMX_GPIO_NR(4,5), "i2c_dis#");
 			gpio_export(IMX_GPIO_NR(4,5), 0);
 			gpio_direction_output(IMX_GPIO_NR(4,5), 0);
@@ -2034,9 +2058,10 @@ static int __init ventana_model_setup(void)
 				imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
 
 			/* analog display out */
-			mxc_iomux_v3_setup_multiple_pads(mx6q_disp0_pads,
+			if (cpu_is_mx6q()) {					\
+				mxc_iomux_v3_setup_multiple_pads(mx6q_disp0_pads,
 					ARRAY_SIZE(mx6q_disp0_pads));
-
+			}
 			/* PCIe */
 			mx6_ventana_pcie_data.pcie_rst	= IMX_GPIO_NR(1, 29);
 		} /* end GW54xx */
@@ -2044,8 +2069,7 @@ static int __init ventana_model_setup(void)
 		else if (strncmp(info->model, "GW53", 4) == 0) {
 
 			/* UARTs (same as GW52xx) */
-			mxc_iomux_v3_setup_multiple_pads(mx6dl_gw52xx_uart_pads,
-				ARRAY_SIZE(mx6dl_gw52xx_uart_pads));
+			SETUP_PADS(gw52xx_uart_pads);
 			if (info->config_uart0)
 				imx6q_add_imx_uart(0, NULL);
 			if (info->config_uart1)
@@ -2090,8 +2114,7 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(1,16), 1);
 			gpio_direction_input(IMX_GPIO_NR(1,16));
 			/* DIO1 */
-			pad = MX6DL_PAD_SD1_DAT2__PWM2_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT2__PWM2_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 3) // ALT3
 			{
 				pr_info("DIO1: PWM2\n");
@@ -2105,8 +2128,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,19));
 			}
 			/* DIO2 */
-			pad = MX6DL_PAD_SD1_DAT1__PWM3_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT1__PWM3_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO2: PWM3\n");
@@ -2134,7 +2156,7 @@ static int __init ventana_model_setup(void)
 			/* GPIO controller */
 			platform_device_register(&mx6_ventana_leds_gpio_device);
 
-			mxc_iomux_v3_setup_pad(MX6DL_PAD_ENET_RXD1__GPIO_1_26);
+			SETUP_PAD(PAD_ENET_RXD1__GPIO_1_26);
 			gpio_request(IMX_GPIO_NR(1,26), "gps_pps");
 			gpio_export(IMX_GPIO_NR(1,26), 0);
 			gpio_direction_input(IMX_GPIO_NR(1,26));
@@ -2165,26 +2187,21 @@ static int __init ventana_model_setup(void)
 			 * according to the content shown on the panel which
 			 * may cause annoying unstable backlight issue.
 			 */
-			mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD2_CLK__GPIO_1_10,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
+			SETUP_PAD_CFG(PAD_SD2_CLK__GPIO_1_10,
+				      VENTANA_DIO_PADCFG);
 			gpio_request(IMX_GPIO_NR(1,10), "cabc-en0");
 			gpio_export(IMX_GPIO_NR(1,10), 0);
 			gpio_direction_output(IMX_GPIO_NR(1,10), 0);
 
 			/* Touchscreen IRQ */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_SD2_CMD__GPIO_1_11);
+			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
 				/* PWM4 (backlight control) */
-				if (cpu_is_mx6q()) {
-					mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
-				} else {
-					mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6DL_PAD_SD1_CMD__PWM4_PWMO,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
-				}
+				SETUP_PAD_CFG(PAD_SD1_CMD__PWM4_PWMO,
+					      VENTANA_DIO_PADCFG);
 				imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
 			}
 
@@ -2193,11 +2210,7 @@ static int __init ventana_model_setup(void)
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 			/* CAN bus stby */
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_2__GPIO_1_2);
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_2__GPIO_1_2);
-			}
+			SETUP_PAD(PAD_GPIO_2__GPIO_1_2);
 			gpio_can_stby = IMX_GPIO_NR(1,2);
 
 #ifdef CONFIG_SND_SOC_SGTL5000
@@ -2209,8 +2222,7 @@ static int __init ventana_model_setup(void)
 		else if (strncmp(info->model, "GW52", 4) == 0) {
 
 			/* UARTs */
-			mxc_iomux_v3_setup_multiple_pads(mx6dl_gw52xx_uart_pads,
-				ARRAY_SIZE(mx6dl_gw52xx_uart_pads));
+			SETUP_PADS(gw52xx_uart_pads);
 			if (info->config_uart0)
 				imx6q_add_imx_uart(0, NULL);
 			if (info->config_uart1)
@@ -2255,8 +2267,7 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(1,16), 1);
 			gpio_direction_input(IMX_GPIO_NR(1,16));
 			/* DIO1 */
-			pad = MX6DL_PAD_SD1_DAT2__PWM2_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT2__PWM2_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 3) // ALT3
 			{
 				pr_info("DIO1: PWM2\n");
@@ -2270,8 +2281,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,19));
 			}
 			/* DIO2 */
-			pad = MX6DL_PAD_SD1_DAT1__PWM3_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT1__PWM3_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO2: PWM3\n");
@@ -2299,7 +2309,7 @@ static int __init ventana_model_setup(void)
 			/* GPIO controller */
 			platform_device_register(&mx6_ventana_leds_gpio_device);
 
-			mxc_iomux_v3_setup_pad(MX6DL_PAD_ENET_RXD1__GPIO_1_26);
+			SETUP_PAD(PAD_ENET_RXD1__GPIO_1_26);
 			gpio_request(IMX_GPIO_NR(1,26), "gps_pps");
 			gpio_export(IMX_GPIO_NR(1,26), 0);
 			gpio_direction_input(IMX_GPIO_NR(1,26));
@@ -2313,8 +2323,8 @@ static int __init ventana_model_setup(void)
 			mx6_ventana_pcie_data.pcie_rst = IMX_GPIO_NR(1, 29);
 
 			/* USB OTG Select (Front-Panel vs J8) */
-			mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6DL_PAD_GPIO_2__GPIO_1_2,
-					MX6Q_VENTANA_SD1_CMD_PADCFG));
+			SETUP_PAD_CFG(PAD_GPIO_2__GPIO_1_2,
+				      VENTANA_DIO_PADCFG);
 			gpio_request(IMX_GPIO_NR(1,2), "usbotg_pcisel");
 			gpio_export(IMX_GPIO_NR(1,2), 0);
 			gpio_direction_output(IMX_GPIO_NR(1,2), 0);
@@ -2337,26 +2347,21 @@ static int __init ventana_model_setup(void)
 			 * according to the content shown on the panel which
 			 * may cause annoying unstable backlight issue.
 			 */
-			mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD2_CLK__GPIO_1_10,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
+			SETUP_PAD_CFG(PAD_SD2_CLK__GPIO_1_10,
+				      VENTANA_DIO_PADCFG);
 			gpio_request(IMX_GPIO_NR(1,10), "cabc-en0");
 			gpio_export(IMX_GPIO_NR(1,10), 0);
 			gpio_direction_output(IMX_GPIO_NR(1,10), 0);
 
 			/* Touchscreen IRQ */
-			mxc_iomux_v3_setup_pad(MX6Q_PAD_SD2_CMD__GPIO_1_11);
+			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
 				/* PWM4 (backlight control) */
-				if (cpu_is_mx6q()) {
-					mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6Q_PAD_SD1_CMD__PWM4_PWMO,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
-				} else {
-					mxc_iomux_v3_setup_pad(NEW_PAD_CTRL(MX6DL_PAD_SD1_CMD__PWM4_PWMO,
-						MX6Q_VENTANA_SD1_CMD_PADCFG));
-				}
+				SETUP_PAD_CFG(PAD_SD1_CMD__PWM4_PWMO,
+					      VENTANA_DIO_PADCFG);
 				imx6q_add_mxc_pwm_backlight(3, &mx6_ventana_pwm_backlight_data);
 			}
 
@@ -2365,19 +2370,11 @@ static int __init ventana_model_setup(void)
 			i2c_new_device(i2c_get_adapter(2), &ventana_fxos8700_i2cinfo);
 
 			/* CAN bus stby */
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_9__GPIO_1_9);
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_9__GPIO_1_9);
-			}
+			SETUP_PAD(PAD_GPIO_9__GPIO_1_9);
 			gpio_can_stby = IMX_GPIO_NR(1,9);
 
 			/* Wireless Disable */
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_17__GPIO_7_12);
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_17__GPIO_7_12);
-			}
+			SETUP_PAD(PAD_GPIO_17__GPIO_7_12);
 			gpio_request(IMX_GPIO_NR(7,12), "pcieskt_wdis#");
 			gpio_export(IMX_GPIO_NR(7,12), 0);
 			gpio_direction_output(IMX_GPIO_NR(7,12), 1);
@@ -2391,8 +2388,7 @@ static int __init ventana_model_setup(void)
 		else if (strncmp(info->model, "GW51", 4) == 0) {
 
 			/* UARTs */
-			mxc_iomux_v3_setup_multiple_pads(mx6dl_gw51xx_uart_pads,
-				ARRAY_SIZE(mx6dl_gw51xx_uart_pads));
+			SETUP_PADS(gw51xx_uart_pads);
 			if (info->config_uart0)
 				imx6q_add_imx_uart(0, NULL);
 			if (info->config_uart1)
@@ -2436,8 +2432,7 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(1,16), 1);
 			gpio_direction_input(IMX_GPIO_NR(1,16));
 			/* DIO1 */
-			pad = MX6DL_PAD_SD1_DAT2__PWM2_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT2__PWM2_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 3) // ALT3
 			{
 				pr_info("DIO1: PWM2\n");
@@ -2451,8 +2446,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,19));
 			}
 			/* DIO2 */
-			pad = MX6DL_PAD_SD1_DAT1__PWM3_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_DAT1__PWM3_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO2: PWM3\n");
@@ -2466,8 +2460,7 @@ static int __init ventana_model_setup(void)
 				gpio_direction_input(IMX_GPIO_NR(1,17));
 			}
 			/* DIO3 */
-			pad = MX6DL_PAD_SD1_CMD__PWM4_PWMO;
-			mxc_iomux_v3_get_pad(&pad);
+			GET_PAD(pad, PAD_SD1_CMD__PWM4_PWMO);
 			if ( ((pad & MUX_MODE_MASK) >> MUX_MODE_SHIFT) == 2) // ALT2
 			{
 				pr_info("DIO3: PWM4\n");
@@ -2497,10 +2490,7 @@ static int __init ventana_model_setup(void)
 #endif
 
 			/* PCI Reset */
-			if (cpu_is_mx6q())
-				mxc_iomux_v3_setup_pad(MX6Q_PAD_GPIO_0__GPIO_1_0);
-			else
-				mxc_iomux_v3_setup_pad(MX6DL_PAD_GPIO_0__GPIO_1_0);
+			SETUP_PAD(PAD_GPIO_0__GPIO_1_0);
 			mx6_ventana_pcie_data.pcie_rst = IMX_GPIO_NR(1, 0);
 
 			/* Video out: Modify mxcfb array to better suit this board */
@@ -2614,22 +2604,10 @@ static int __init ventana_model_setup(void)
 		/* Audio */
 		if (info->config_ssi0) {
 			i2c_new_device(i2c_get_adapter(2), &ventana_sgtl5000_i2cinfo);
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_audmux4_pads,
-					ARRAY_SIZE(mx6q_ventana_audmux4_pads));
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_audmux4_pads,
-					ARRAY_SIZE(mx6dl_ventana_audmux4_pads));
-			}
+			SETUP_PADS(ventana_audmux4_pads);
 		}
 		if (info->config_ssi1) {
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_audmux5_pads,
-					ARRAY_SIZE(mx6q_ventana_audmux5_pads));
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_audmux5_pads,
-					ARRAY_SIZE(mx6dl_ventana_audmux5_pads));
-			}
+			SETUP_PADS(ventana_audmux5_pads);
 		}
 		if (info->config_ssi0 || info->config_ssi1) {
 			imx6_init_audio();
@@ -2640,13 +2618,7 @@ static int __init ventana_model_setup(void)
 
 		/* CANbus */
 		if (info->config_flexcan) {
-			if (cpu_is_mx6q()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6q_ventana_flexcan_pads,
-					ARRAY_SIZE(mx6q_ventana_flexcan_pads));
-			} else if (cpu_is_mx6dl()) {
-				mxc_iomux_v3_setup_multiple_pads(mx6dl_ventana_flexcan_pads,
-					ARRAY_SIZE(mx6dl_ventana_flexcan_pads));
-			}
+			SETUP_PADS(ventana_flexcan_pads);
 			gpio_request(gpio_can_stby, "can0_stby");
 			gpio_direction_output(gpio_can_stby, 0);
 			gpio_set_value(gpio_can_stby, 1);
