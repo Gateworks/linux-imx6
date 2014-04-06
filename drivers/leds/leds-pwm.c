@@ -127,6 +127,7 @@ static struct led_pwm_priv *led_pwm_create_of(struct platform_device *pdev)
 
 		led_dat->cdev.default_trigger = of_get_property(child,
 						"linux,default-trigger", NULL);
+		led_dat->active_low = of_property_read_bool(child, "active-low");
 		of_property_read_u32(child, "max-brightness",
 				     &led_dat->cdev.max_brightness);
 
