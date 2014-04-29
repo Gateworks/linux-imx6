@@ -2729,7 +2729,7 @@ static void __init mx6q_ventana_reserve(void)
 /*
  * initialize __mach_desc_GWVENTANA data structure.
  */
-MACHINE_START(GWVENTANA, "Gateworks i.MX6Q/DL Ventana Board")
+MACHINE_START(GWVENTANA, "Gateworks i.MX6 Ventana Board")
 	/* Maintainer: Gateworks Corporation */
 	.boot_params = MX6_PHYS_OFFSET + 0x100,
 	.fixup = fixup_mxc_board,
