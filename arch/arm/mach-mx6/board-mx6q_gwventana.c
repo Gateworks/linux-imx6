@@ -95,7 +95,6 @@ static struct clk *sata_clk;
 
 extern char *gp_reg_id;
 extern char *soc_reg_id;
-static int caam_enabled;
 static int gpio_can_stby = -1;
 
 #define SETUP_PAD(x) {							\
@@ -1631,16 +1630,6 @@ static struct mipi_csi2_platform_data mipi_csi2_pdata = {
 };
 
 
-/* Crypto enable/disable - default disabled as it seems to take over CLKO
- */
-static int __init caam_setup(char *__unused)
-{
-	caam_enabled = 1;
-	return 1;
-}
-early_param("caam", caam_setup);
-
-
 /* PCIe
  */
 static struct imx_pcie_platform_data mx6_ventana_pcie_data = {
@@ -2585,8 +2574,7 @@ static int __init ventana_model_setup(void)
 		//if (info->config_mipi_csi)
 			imx6q_add_mipi_csi2(&mipi_csi2_pdata);
 
-		/* this clobbers CLKO used for sgtl150000 */
-		if (info->config_caam && 1 == caam_enabled)
+		/* if (info->config_caam) */
 			imx6q_add_imx_caam();
 
 		/* GigE MAC */
