@@ -1880,9 +1880,7 @@ static int __init ventana_model_setup(void)
 
 			} /* end GW5400-A */
 
-			else if ( (strncmp(info->model, "GW5400", 6) == 0)
-		         || (strncmp(info->model, "GW5410", 6) == 0)
-			) {
+			else {
 				/* UARTs */
 				SETUP_PADS(gw54xx_uart_pads);
 				if (info->config_uart0)
