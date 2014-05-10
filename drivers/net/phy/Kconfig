@@ -193,6 +193,14 @@ config MDIO_BUS_MUX_MMIOREG
 
 	  Currently, only 8-bit registers are supported.
 
+config GATEWORKS_GW16083
+	tristate "Gateworks GW16083 Ethernet Expansion Mezzanine"
+	---help---
+	  The Gateworks GW16083 Ethernet Expansion Mezzanine connects to a
+	  Gateworks Ventana baseboard and provides a 7-port GbE managed
+	  Ethernet switch with 4 dedicated GbE RJ45 ports, and 2 Gbe/SFP
+	  ports"
+
 endif # PHYLIB
 
 config MICREL_KS8995MA
