@@ -158,6 +158,11 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
+
+	gw16083: gw16083@52 {
+		compatible = "gateworks,gw16083";
+		reg = <0x52>;
+	};
 };
 
 &i2c3 {
