@@ -56,8 +56,21 @@ struct dp_csc_param_t {
 #define DC_MCODE_BT656_DATA_W		173
 #define DC_MCODE_BT656_NL				179
 
-#define BT656_IF_DI_MSB			23  /* For 8 bits BT656: 23 for DISP_DAT23 ~ DISP_DAT16; 7 for DISP_DAT7 ~ DISP_DAT0 */
-								      /* For 16 bits BT1120: 23 for DISP_DAT23 ~ DISP_DAT8; 15 for DISP_DAT15 ~ DISP_DAT0 */
+/* For 8 bits BT656:
+ *    23 for DISP_DAT23 ~ DISP_DAT16
+ *    15 for DISP_DAT15 ~ DISP_DAT8
+ *     7 for DISP_DAT7 ~ DISP_DAT0
+ * For 16 bits BT1120:
+ *    23 for DISP_DAT23 ~ DISP_DAT8
+ *    15 for DISP_DAT15 ~ DISP_DAT0
+ */
+#if defined(CONFIG_FB_MXC_BT656_IF_DI_MSB) && CONFIG_FB_MXC_BT656_IF_DI_MSB == 23
+#elif defined(CONFIG_FB_MXC_BT656_IF_DI_MSB) && CONFIG_FB_MXC_BT656_IF_DI_MSB == 15
+#elif defined(CONFIG_FB_MXC_BT656_IF_DI_MSB) && CONFIG_FB_MXC_BT656_IF_DI_MSB == 7
+#else
+#error "CONFIG_FB_MXC_BT656_IF_DI_MSB must be 23, 15, or 7"
+#endif
+#define BT656_IF_DI_MSB  CONFIG_FB_MXC_BT656_IF_DI_MSB
 
 int dmfc_type_setup;
 
