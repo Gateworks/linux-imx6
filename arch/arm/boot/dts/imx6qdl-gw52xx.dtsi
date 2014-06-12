@@ -297,9 +297,9 @@
 	touchscreen: egalax_ts@04 {
 		compatible = "eeti,egalax_ts";
 		reg = <0x04>;
-		interrupt-parent = <&gpio7>;
-		interrupts = <12 2>; /* gpio7_12 active low */
-		wakeup-gpios = <&gpio7 12 0>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <11 2>;
+		wakeup-gpios = <&gpio1 11 0>;
 	};
 
 	videoin: adv7180@20 {
@@ -325,7 +325,7 @@
 				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26 0x80000000 /* GPS_PPS */
 				MX6QDL_PAD_GPIO_0__CCM_CLKO1     0x000130b0 /* AUD4_MCK */
 				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x80000000 /* USB_SEL_PCI */
-				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000 /* TOUCH_IRQ# */
+				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000 /* PCIESKT_WDIS# */
 				MX6QDL_PAD_KEY_COL0__GPIO4_IO06  0x80000000 /* user1 led */
 				MX6QDL_PAD_KEY_ROW0__GPIO4_IO07  0x80000000 /* user2 led */
 				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x80000000 /* user3 led */
