@@ -2489,7 +2489,7 @@ tda1997x_set_video_outputformat(struct tda1997x_platform_data *pdata)
 	reg = 0x00; /* filters off */
 	/* 4:2:2 mode requires conversion */
 	if ((pdata->vidout_format == VIDEOFMT_422_SMP)
-	 || (pdata->vidout_format == VIDEOFMT_422_SMP))
+	 || (pdata->vidout_format == VIDEOFMT_422_CCIR))
 		reg = 0x0f; /* 27taps for Rv and Bu */
 	io_write(REG_FILTERS_CTRL, reg);
 
