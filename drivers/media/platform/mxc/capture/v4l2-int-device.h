@@ -123,6 +123,7 @@ enum v4l2_if_type_bt656_mode {
 	V4L2_IF_TYPE_BT656_MODE_NOBT_8BIT,
 	V4L2_IF_TYPE_BT656_MODE_NOBT_10BIT,
 	V4L2_IF_TYPE_BT656_MODE_NOBT_12BIT,
+	V4L2_IF_TYPE_BT656_MODE_NOBT_16BIT,
 	/*
 	 * Use Bt synchronisation codes. The vertical and horizontal
 	 * synchronisation is done based on synchronisation codes.
