@@ -94,7 +94,7 @@ static int ioctl_g_ifparm(struct v4l2_int_device *s, struct v4l2_ifparm *p)
 
 	if (tda1997x_get_vidout_fmt(&fmt))
 		return -ENODEV;
-	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.height, fmt.width,
+	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.width, fmt.height,
 		fmt.interlaced?'i':'p', fmt.fps);
 
 	/* Initialize structure to 0s then set any non-0 values. */
@@ -219,7 +219,7 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 	if (tda1997x_get_vidout_fmt(&fmt))
 		return -ENODEV;
 
-	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.height, fmt.width,
+	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.width, fmt.height,
 		fmt.interlaced?'i':'p', fmt.fps);
 	sensor->sen.pix.height = fmt.height;
 	sensor->sen.pix.width = fmt.width;
