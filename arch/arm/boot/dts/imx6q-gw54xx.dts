@@ -45,7 +45,7 @@
 /* IPU1_CSI0 - HDMI in via tda1997x */
 &hdmi_video_in {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_ipu1_4>; /* IPU1_CSI0 */
+	pinctrl-0 = <&pinctrl_ipu1_3>; /* IPU1_CSI0 16bit */
 	ipu_id = <0>;
 	csi_id = <0>;
 };
