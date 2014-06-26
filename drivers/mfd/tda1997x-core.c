@@ -1684,6 +1684,8 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 	return rz;
 }
 
+static int tda1997x_load_edid_data(const u8 *edid, const u16 *spa, u8 spa_offset);
+
 static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t count)
 {
@@ -1695,6 +1697,8 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 	if (strcasecmp(name, "edid") == 0) {
 		for (i = 0; i < count; i++)
 			edid_block[i] = buf[i];
+		printk(KERN_INFO "TDA1997x-core: New EDID being loaded\n");
+		tda1997x_load_edid_data(edid_block, spa_edid, ddc_config1[0]);
 	} else if (strcasecmp(name, "reg") == 0) {
 			i = sscanf(buf, "%x %x", &reg, &val);
 			if (i == 2) {
@@ -1761,17 +1765,14 @@ static struct attribute_group attr_group = {
  * @spa_offset - offset of the first SPA byte inside EDID block 1
  *			   (same for all HDMI inputs: A, B, C and D)
  */
-static int tda1997x_load_edid_data(struct tda1997x_data *tda1997x,
-	const u8 *edid, const u16 *spa, u8 spa_offset)
+static int tda1997x_load_edid_data(const u8 *edid, const u16 *spa,
+				   u8 spa_offset)
 {
 	u8 chksum[5];
 	u8 intermediate_chksum = 0;
 	int i;
 
 	DPRINTK(0,"%s\n", __func__);
-	if (!tda1997x->internal_edid)
-		return -EPERM;
-
 	for (i = 0; i < 5; i++)
 		chksum[i] = 0;
 	for (i = 0; i < 127; i++)
@@ -4439,7 +4440,7 @@ static int tda1997x_probe(struct i2c_client *client,
 	/* Internal EDIDs are enabled - we can now load EDID */
 	if (tda1997x->internal_edid) {
 		/* Load EDID into embedded memory */
-		tda1997x_load_edid_data(tda1997x, edid_block, spa_edid, ddc_config1[0]);
+		tda1997x_load_edid_data(edid_block, spa_edid, ddc_config1[0]);
 
 		/* Load DDC and RT data into embedded memory */
 		tda1997x_load_config_data(tda1997x, ddc_config0, rt_config);
