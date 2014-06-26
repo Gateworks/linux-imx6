@@ -1611,6 +1611,7 @@ u8 rt_config[6] = {
 	0x10, /* i2c_cec_a0=1 */
 };
 
+static u32 reg = 0;
 
 /*
  * sysfs hooks
@@ -1672,6 +1673,9 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 				rz += sprintf(buf + strlen(buf), "\n");
 		}
 		rz += sprintf(buf + strlen(buf), "\n}\n");
+	} else if (strcasecmp(name, "reg") == 0) {
+		rz = sprintf(buf, "%02x\n", io_read(reg) );
+		printk(KERN_INFO "TDA1997x-core: Register %02x = %s\n", reg, buf);
 	} else {
 		rz = sprintf(buf, "invalid attr\n");
 	}
@@ -1687,10 +1691,18 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 	const char *name = attr->attr.name;
 	int i;
 
-	sscanf(buf, "%d", &val);
+
 	if (strcasecmp(name, "edid") == 0) {
 		for (i = 0; i < count; i++)
 			edid_block[i] = buf[i];
+	} else if (strcasecmp(name, "reg") == 0) {
+			i = sscanf(buf, "%x %x", &reg, &val);
+			if (i == 2) {
+				io_write( (u16)reg, (u8)val);
+				printk(KERN_INFO "TDA1997x-core: Register %02x, %02x\n", reg, val);
+			} else {
+				printk(KERN_INFO "TDA1997x-core: Register %02x\n", reg);
+			}
 	} else {
 		printk(KERN_ERR "invalid name '%s'\n", attr->attr.name);
 	}
@@ -1720,6 +1732,8 @@ static struct device_attribute attr_edid_ascii =
 	__ATTR(edid-ascii, 0660, b_show, NULL);
 static struct device_attribute attr_colorspace =
 	__ATTR(colorspace, 0660, b_show, NULL);
+static struct device_attribute attr_reg =
+	__ATTR(reg, 0660, b_show, b_store);
 
 static struct attribute *tda1997x_attrs[] = {
 	&attr_state.attr,
@@ -1731,6 +1745,7 @@ static struct attribute *tda1997x_attrs[] = {
 	&attr_edid.attr,
 	&attr_edid_ascii.attr,
 	&attr_colorspace.attr,
+	&attr_reg.attr,
 	NULL
 };
 
