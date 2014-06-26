@@ -2075,7 +2075,7 @@ static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x)
 						/* YCbCr ITU601 is used */
 						DPRINTK(0,"assuming ITU601 (non-HDTV)\n");
 						tda1997x_set_colorconversion_matrix(tda1997x,
-							COLORCONVERSION_PREDEFINED_2, /* YCbCr601_RGBLimited */
+							COLORCONVERSION_BYPASS,
 							NULL, &RGBBlankingCode);
 					}
 					break;
@@ -2083,7 +2083,7 @@ static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x)
 					/* YCbCr ITU601 is used */
 					DPRINTK(0,"ITU601\n");
 					tda1997x_set_colorconversion_matrix(tda1997x,
-						COLORCONVERSION_PREDEFINED_2, /* YCbCr601_RGBLimited */
+						COLORCONVERSION_BYPASS,
 						NULL, &RGBBlankingCode);
 					break;
 				case COLORIMETRY_ITU709:
