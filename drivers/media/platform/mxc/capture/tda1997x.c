@@ -58,6 +58,7 @@
  */
 struct sensor {
 	struct sensor_data sen;
+	tda1997x_videofmt_t vidfmt;
 } tda1997x_data;
 
 /***********************************************************************
@@ -85,6 +86,7 @@ struct sensor {
  */
 static int ioctl_g_ifparm(struct v4l2_int_device *s, struct v4l2_ifparm *p)
 {
+	struct sensor *sensor = s->priv;
 	tda1997x_vidout_fmt_t fmt;
 
 	if (s == NULL) {
@@ -100,8 +102,17 @@ static int ioctl_g_ifparm(struct v4l2_int_device *s, struct v4l2_ifparm *p)
 	/* Initialize structure to 0s then set any non-0 values. */
 	memset(p, 0, sizeof(*p));
 	p->if_type = V4L2_IF_TYPE_BT656; /* This is the only possibility. */
-	p->u.bt656.clock_curr = (fmt.interlaced)?0:1;
-	p->u.bt656.mode = V4L2_IF_TYPE_BT656_MODE_NOBT_8BIT;
+
+	if (sensor->vidfmt == VIDEOFMT_422_SMP) { /* YCbCr 4:2:2 semi-planar */
+		p->u.bt656.nobt_vs_inv = 0;
+		p->u.bt656.nobt_hs_inv = 1;
+		p->u.bt656.bt_sync_correct = 1;
+		p->u.bt656.mode = V4L2_IF_TYPE_BT656_MODE_NOBT_16BIT;
+		p->u.bt656.clock_curr = -1; /* gated clock mode */
+	} else if (sensor->vidfmt == VIDEOFMT_422_CCIR) { /* YCbCr 4:2:2 CCIR656 */
+		p->u.bt656.mode = V4L2_IF_TYPE_BT656_MODE_NOBT_8BIT;
+		p->u.bt656.clock_curr = (fmt.interlaced)?0:1;
+	}
 
 	return 0;
 }
@@ -230,6 +241,7 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 		pr_debug("   Returning size of %dx%d\n",
 			 sensor->sen.pix.width, sensor->sen.pix.height);
 		f->fmt.pix = sensor->sen.pix;
+		pr_debug("   Returning format of %s\n", (char*)&f->fmt.pix.pixelformat);
 		break;
 
 	case V4L2_BUF_TYPE_PRIVATE: {
@@ -284,10 +296,15 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
  */
 static int ioctl_g_chip_ident(struct v4l2_int_device *s, int *id)
 {
+	struct sensor *sensor = s->priv;
 	((struct v4l2_dbg_chip_ident *)id)->match.type =
 					V4L2_CHIP_MATCH_I2C_DRIVER;
-	strcpy(((struct v4l2_dbg_chip_ident *)id)->match.name,
-						"tda1997x_decoder");
+	if (sensor->vidfmt == VIDEOFMT_422_SMP) { /* YCbCr 4:2:2 semi-planar */
+		strcpy(((struct v4l2_dbg_chip_ident *)id)->match.name,
+						"tda1997x_decoder_yuv422");
+	} else
+		strcpy(((struct v4l2_dbg_chip_ident *)id)->match.name,
+						"tda1997x_decoder_bt656");
 	((struct v4l2_dbg_chip_ident *)id)->ident = V4L2_IDENT_TDA19971;
 
 	return 0;
@@ -334,6 +351,7 @@ static int tda1997x_video_probe(struct platform_device *pdev)
 	struct pinctrl *pinctrl;
 	struct device *dev = &pdev->dev;
 	struct regmap *gpr;
+	tda1997x_vidout_fmt_t fmt;
 	int ret;
 
 	dev_dbg(dev, "%s\n", __func__);
@@ -347,11 +365,17 @@ static int tda1997x_video_probe(struct platform_device *pdev)
 
 	/* Set initial values for the sensor struct. */
 	memset(sens, 0, sizeof(tda1997x_data));
+	if (tda1997x_get_vidout_fmt(&fmt))
+		return -ENODEV;
+	sens->vidfmt = fmt.sensor_vidfmt;
 	sens->sen.streamcap.timeperframe.denominator = 0;
 	sens->sen.streamcap.timeperframe.numerator = 0;
 	sens->sen.pix.width = 0;
 	sens->sen.pix.height = 0;
-	sens->sen.pix.pixelformat = V4L2_PIX_FMT_UYVY;  /* YUV422 */
+	if (sens->vidfmt == VIDEOFMT_422_SMP)
+		sens->sen.pix.pixelformat = IPU_PIX_FMT_GENERIC_16;
+	else
+		sens->sen.pix.pixelformat = V4L2_PIX_FMT_UYVY;
 	sens->sen.on = true;
 
 	ret = of_property_read_u32(dev->of_node, "csi_id",
