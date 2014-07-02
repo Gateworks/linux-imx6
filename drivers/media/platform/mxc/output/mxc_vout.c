@@ -496,6 +496,7 @@ static int set_field_fmt(struct mxc_vout_output *vout, enum v4l2_field field)
 
 static bool is_pp_bypass(struct mxc_vout_output *vout)
 {
+#if 0 // always use CC
 	if ((IPU_PIX_FMT_TILED_NV12 == vout->task.input.format) ||
 		(IPU_PIX_FMT_TILED_NV12F == vout->task.input.format))
 		return false;
@@ -525,6 +526,7 @@ static bool is_pp_bypass(struct mxc_vout_output *vout)
 		else if (!need_csc(vout->task.input.format, vout->disp_fmt))
 			return true;
 	}
+#endif
 	return false;
 }
 
