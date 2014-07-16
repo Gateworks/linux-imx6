@@ -1237,6 +1237,8 @@ tda1997x_get_vidout_fmt(tda1997x_vidout_fmt_t *fmt)
 	dev_dbg(&tda1997x_data.client->dev, "%s\n", __func__);
 	spin_lock_irqsave(&tda1997x->lock, flags);
 	memcpy(fmt, &(tda1997x->video_mode), sizeof(*fmt));
+	fmt->sensor_vidfmt = tda1997x->pdata->vidout_format;
+	fmt->sensor_clkmode = tda1997x->pdata->vidout_clkmode;
 	spin_unlock_irqrestore(&tda1997x->lock, flags);
 
 	return 0;
@@ -4017,6 +4019,15 @@ static int tda1997x_get_of_property(struct device *dev,
 	u32 audout_clk, audout_layout;
 	int err;
 
+	/* defaults (use inverted vs/hs/de) */
+	/* TODO: add of bindings for these */
+	pdata->vidout_sel_vs = 1;
+	pdata->vidout_invert_vs =1;
+	pdata->vidout_sel_hs = 1;
+	pdata->vidout_invert_hs =1;
+	pdata->vidout_sel_de = 1;
+	pdata->vidout_invert_de =1;
+
 	/* enable HDCP */
 	err = of_property_read_u32(np, "hdcp", &hdcp);
 	if (err) {
@@ -4042,7 +4053,7 @@ static int tda1997x_get_of_property(struct device *dev,
 		dev_err(dev, "get of property vidout_trc fail\n");
 		return err;
 	}
-  	/* insert blanking codes in stream */
+	/* insert blanking codes in stream */
 	err = of_property_read_u32(np, "vidout_blc", &blc);
 	if (err) {
 		dev_err(dev, "get of property vidout_blc fail\n");
