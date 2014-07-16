@@ -651,7 +651,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	init_ldb_clks(pll2_pfd0_352m);
 	clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
 	clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
+	clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll3_pfd1_540m]); /* for CVBS 27MHz clock */
 	clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
 	clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
 	clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);
@@ -659,8 +659,8 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	clk_set_parent(clk[ipu2_di1_sel], clk[ipu2_di1_pre]);
 	if (cpu_is_imx6dl()) {
 		clk_set_rate(clk[pll3_pfd1_540m], 540000000);
-		clk_set_parent(clk[ipu1_sel], clk[pll3_pfd1_540m]);
-		clk_set_parent(clk[axi_sel], clk[pll3_pfd1_540m]);
+		clk_set_parent(clk[ipu1_sel], clk[mmdc_ch0_axi]);
+		clk_set_parent(clk[axi_sel], clk[periph]);
 		/* set epdc/pxp axi clock to 200Mhz */
 		clk_set_parent(clk[ipu2_sel], clk[pll2_pfd2_396m]);
 		clk_set_rate(clk[ipu2], 200000000);
