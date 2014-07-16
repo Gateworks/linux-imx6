@@ -120,13 +120,18 @@ typedef enum
 	SYNCOUTPUT_FREF_HDMI   = 0x02, /* FREF from HDMI */
 } tda1997x_sync_output_de_t;
 
-/* video resolution data */
+/* video details */
 typedef struct {
+	/* video input data (input to the HDMI receiver) */
 	int	width;
 	int height;
 	int fps;
 	bool interlaced;
 	bool signal;
+
+	/* video output data (output from the HDMI receiver) */
+	tda1997x_videofmt_t sensor_vidfmt;
+	tda1997x_videoclkmode_t sensor_clkmode;
 } tda1997x_vidout_fmt_t;
 
 /** Obtain current video format details from core */
