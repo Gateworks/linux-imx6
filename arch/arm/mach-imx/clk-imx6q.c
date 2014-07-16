@@ -713,7 +713,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	init_ldb_clks();
 	imx_clk_set_parent(clk[ipu1_di0_pre_sel], clk[pll5_video_div]);
 	imx_clk_set_parent(clk[ipu1_di1_pre_sel], clk[pll5_video_div]);
-	imx_clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll5_video_div]);
+	imx_clk_set_parent(clk[ipu2_di0_pre_sel], clk[pll3_pfd1_540m]); /* CVBS 27MHz clock */
 	imx_clk_set_parent(clk[ipu2_di1_pre_sel], clk[pll5_video_div]);
 	imx_clk_set_parent(clk[ipu1_di0_sel], clk[ipu1_di0_pre]);
 	imx_clk_set_parent(clk[ipu1_di1_sel], clk[ipu1_di1_pre]);

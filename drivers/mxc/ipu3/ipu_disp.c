@@ -1869,6 +1869,8 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 
 			rounded_pixel_clk =
 				clk_round_rate(ipu->di_clk[disp], pixel_clk);
+			if (pixel_fmt == IPU_PIX_FMT_BT656)
+				rounded_pixel_clk = 108000000;
 			ret = clk_set_rate(ipu->di_clk[disp],
 						rounded_pixel_clk);
 			if (ret) {
