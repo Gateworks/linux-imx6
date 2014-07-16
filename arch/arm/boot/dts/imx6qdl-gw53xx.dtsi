@@ -196,7 +196,7 @@
 	arm-supply = <&sw1_reg>;
 	soc-supply = <&sw3_reg>;
 */
-	pu-supply = <&pu_dummy>; /* use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&reg_pu>; /* use pu_dummy if VDDSOC share with VDDPU */
 };
 
 &flexcan1 {
@@ -221,7 +221,7 @@
 	fsl,cpu_pdnscr_iso = <0x1>;
 	fsl,ldo-bypass = <1>; /* use ldo-bypass, u-boot will check it and configure */
 	fsl,wdog-reset = <2>; /* watchdog select of reset source */
-	pu-supply = <&pu_dummy>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
 };
 
 &gpmi {
@@ -231,7 +231,7 @@
 };
 
 &gpu {
-	pu-supply = <&pu_dummy>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
 };
 
 &hdmi_audio {
@@ -538,5 +538,5 @@
 };
 
 &vpu {
-	pu-supply = <&pu_dummy>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
 };
