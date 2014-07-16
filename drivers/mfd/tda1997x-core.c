@@ -2037,6 +2037,16 @@ static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x)
 	const char *colorname = "";
 
 	DPRINTK(0,"%s\n", __func__);
+	if (tda1997x->colorspace > COLORSPACE_FUTURE ||
+	    tda1997x->colorimetry > COLORIMETRY_XVYCC) {
+		printk(KERN_ERR "%s: invalid colorspace/colorimetry %d/%d\n",
+		       KBUILD_MODNAME,
+		       tda1997x->colorspace, tda1997x->colorimetry);
+	} else {
+		printk(KERN_INFO "%s: %s Colorspace %s\n", KBUILD_MODNAME,
+		       colorspace_names[tda1997x->colorspace],
+		       colorimetry_names[tda1997x->colorimetry]);
+	}
 
 	switch (tda1997x->colorspace) {
 		case COLORSPACE_RGB:
