@@ -1645,7 +1645,9 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 		} else
 			rz = sprintf(buf, "no signal\n");
 	} else if (strcasecmp(name, "colorspace") == 0) {
-		rz = sprintf(buf, "%s\n", colorspace_names[tda1997x->colorspace]);
+		rz = sprintf(buf, "%s %s\n",
+			     colorspace_names[tda1997x->colorspace],
+			     colorimetry_names[tda1997x->colorimetry]);
 	} else if (strcasecmp(name, "audmode") == 0) {
 		if (tda1997x->state == STATE_LOCKED) {
 			rz = sprintf(buf, "%dHz\n", tda1997x->audio_mode.samplerate);
