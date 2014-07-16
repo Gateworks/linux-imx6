@@ -196,8 +196,8 @@
 	 * IMX6DL: can be IPU1_DISP0
 	 * thus we override it in the q/dl dts to enable and select pinctrl
 	 */
-	bt656: bt656@0 {
-		compatible = "fsl,bt656";
+	bt656if: lcd@0 {
+		compatible = "fsl,lcd";
 		default_ifmt = "BT656";
 		status = "disabled";
 	};

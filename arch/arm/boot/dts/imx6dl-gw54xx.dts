@@ -20,7 +20,7 @@
 };
 
 /* SoC interface for analog video out (ADV7393) */
-&bt656 {
+&bt656if {
 	ipu_id = <0>;
 	disp_id = <0>;
 	pinctrl-names = "default";

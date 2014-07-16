@@ -68,8 +68,8 @@ struct mxcfb_info {
 	ipu_channel_t ipu_ch;
 	int ipu_id;
 	int ipu_di;
-	u32 fb_pix_fmt;
 	u32 ipu_di_pix_fmt;
+	u32 fb_pix_fmt;
 	bool ipu_int_clk;
 	bool overlay;
 	bool alpha_chan_en;
@@ -226,6 +226,30 @@ static int check_var_pixfmt(struct fb_var_screeninfo *var)
 		}
 	}
 	return ret;
+}
+
+static uint32_t fbi_to_pixfmt(struct fb_info *fbi)
+{
+	int i;
+	uint32_t pixfmt = 0;
+
+	if (fbi->var.nonstd)
+		return fbi->var.nonstd;
+
+	for (i = 0; i < ARRAY_SIZE(mxcfb_pfmts); i++) {
+		if (bitfield_is_equal(fbi->var.red, mxcfb_pfmts[i].red) &&
+		    bitfield_is_equal(fbi->var.green, mxcfb_pfmts[i].green) &&
+		    bitfield_is_equal(fbi->var.blue, mxcfb_pfmts[i].blue) &&
+		    bitfield_is_equal(fbi->var.transp, mxcfb_pfmts[i].transp)) {
+			pixfmt = mxcfb_pfmts[i].fb_pix_fmt;
+			break;
+		}
+	}
+
+	if (pixfmt == 0)
+		dev_err(fbi->device, "cannot get pixel format\n");
+
+	return pixfmt;
 }
 
 static struct fb_info *found_registered_fb(ipu_channel_t ipu_ch, int ipu_id)
@@ -436,6 +460,7 @@ static int mxcfb_set_par(struct fb_info *fbi)
 	u32 mem_len, alpha_mem_len;
 	ipu_di_signal_cfg_t sig_cfg;
 	struct mxcfb_info *mxc_fbi = (struct mxcfb_info *)fbi->par;
+	ipu_channel_params_t params;
 
 	int16_t ov_pos_x = 0, ov_pos_y = 0;
 	int ov_pos_ret = 0;
@@ -464,6 +489,20 @@ static int mxcfb_set_par(struct fb_info *fbi)
 	if (fbi->var.xres == 0 || fbi->var.yres == 0)
 		return 0;
 
+	if (mxc_fbi->ipu_ch == MEM_DC_SYNC) {
+		if (!((mxc_fbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT656) || (mxc_fbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT1120)))
+			mxc_fbi->fb_pix_fmt = fbi_to_pixfmt(fbi);
+		params.mem_dc_sync.di = mxc_fbi->ipu_di;
+	} else {
+		mxc_fbi->fb_pix_fmt = fbi_to_pixfmt(fbi);
+		params.mem_dp_bg_sync.di = mxc_fbi->ipu_di;
+	}
+
+	if ((mxc_fbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT656) || (mxc_fbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT1120)) {
+		if (mxc_fbi->dispdrv && mxc_fbi->dispdrv->drv->disable)
+			mxc_fbi->dispdrv->drv->disable(mxc_fbi->dispdrv);
+	}
+
 	if (ovfbi_enable) {
 		ov_pos_ret = ipu_disp_get_window_pos(
 						mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch,
@@ -477,7 +516,7 @@ static int mxcfb_set_par(struct fb_info *fbi)
 		ipu_clear_irq(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch_nf_irq);
 		ipu_disable_irq(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch_nf_irq);
 		ipu_disable_channel(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch, true);
-		ipu_uninit_channel(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch);
+		ipu_uninit_channel(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch, NULL);
 	}
 
 	ipu_clear_irq(mxc_fbi->ipu, mxc_fbi->ipu_ch_irq);
@@ -485,7 +524,7 @@ static int mxcfb_set_par(struct fb_info *fbi)
 	ipu_clear_irq(mxc_fbi->ipu, mxc_fbi->ipu_ch_nf_irq);
 	ipu_disable_irq(mxc_fbi->ipu, mxc_fbi->ipu_ch_nf_irq);
 	ipu_disable_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, true);
-	ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch);
+	ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, &params);
 
 	/*
 	 * Disable IPU hsp clock if it is enabled for an
@@ -630,7 +669,7 @@ static int mxcfb_set_par(struct fb_info *fbi)
 
 	retval = _setup_disp_channel2(fbi);
 	if (retval) {
-		ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch);
+		ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, &params);
 		return retval;
 	}
 
@@ -641,8 +680,8 @@ static int mxcfb_set_par(struct fb_info *fbi)
 					ov_pos_x, ov_pos_y);
 		retval = _setup_disp_channel2(mxc_fbi->ovfbi);
 		if (retval) {
-			ipu_uninit_channel(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch);
-			ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch);
+			ipu_uninit_channel(mxc_fbi_fg->ipu, mxc_fbi_fg->ipu_ch, NULL);
+			ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, &params);
 			return retval;
 		}
 	}
@@ -673,10 +712,17 @@ static int _swap_channels(struct fb_info *fbi_from,
 	struct fb_info *ovfbi;
 	struct mxcfb_info *mxc_fbi_from = (struct mxcfb_info *)fbi_from->par;
 	struct mxcfb_info *mxc_fbi_to = (struct mxcfb_info *)fbi_to->par;
+	ipu_channel_params_t params;
+
+	if (mxc_fbi_to->ipu_ch == MEM_DC_SYNC) {
+		params.mem_dc_sync.di = mxc_fbi_to->ipu_di;
+	} else {
+		params.mem_dp_bg_sync.di = mxc_fbi_to->ipu_di;
+	}
 
 	if (both_on) {
 		ipu_disable_channel(mxc_fbi_to->ipu, mxc_fbi_to->ipu_ch, true);
-		ipu_uninit_channel(mxc_fbi_to->ipu, mxc_fbi_to->ipu_ch);
+		ipu_uninit_channel(mxc_fbi_to->ipu, mxc_fbi_to->ipu_ch, &params);
 	}
 
 	/* switch the mxc fbi parameters */
@@ -698,9 +744,15 @@ static int _swap_channels(struct fb_info *fbi_from,
 	if (retval)
 		return retval;
 
+	if (mxc_fbi_from->ipu_ch == MEM_DC_SYNC) {
+		params.mem_dc_sync.di = mxc_fbi_from->ipu_di;
+	} else {
+		params.mem_dp_bg_sync.di = mxc_fbi_from->ipu_di;
+	}
+
 	/* switch between dp and dc, disable old idmac, enable new idmac */
 	retval = ipu_swap_channel(mxc_fbi_from->ipu, old_ch, mxc_fbi_from->ipu_ch);
-	ipu_uninit_channel(mxc_fbi_from->ipu, old_ch);
+	ipu_uninit_channel(mxc_fbi_from->ipu, old_ch, &params);
 
 	if (both_on) {
 		_setup_disp_channel1(fbi_to);
@@ -1381,6 +1433,7 @@ static int mxcfb_ioctl(struct fb_info *fbi, unsigned int cmd, unsigned long arg)
 static int mxcfb_blank(int blank, struct fb_info *info)
 {
 	struct mxcfb_info *mxc_fbi = (struct mxcfb_info *)info->par;
+	ipu_channel_params_t params;
 	int ret = 0;
 
 	dev_dbg(info->device, "blank = %d\n", blank);
@@ -1400,7 +1453,12 @@ static int mxcfb_blank(int blank, struct fb_info *info)
 		ipu_disable_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, true);
 		if (mxc_fbi->ipu_di >= 0)
 			ipu_uninit_sync_panel(mxc_fbi->ipu, mxc_fbi->ipu_di);
-		ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch);
+		if (mxc_fbi->ipu_ch == MEM_DC_SYNC) {
+			params.mem_dc_sync.di = mxc_fbi->ipu_di;
+		} else {
+			params.mem_dp_bg_sync.di = mxc_fbi->ipu_di;
+		}
+		ipu_uninit_channel(mxc_fbi->ipu, mxc_fbi->ipu_ch, &params);
 		break;
 	case FB_BLANK_UNBLANK:
 		info->var.activate = (info->var.activate & ~FB_ACTIVATE_MASK) |
@@ -1914,6 +1972,175 @@ static ssize_t show_disp_dev(struct device *dev,
 }
 static DEVICE_ATTR(fsl_disp_dev_property, S_IRUGO, show_disp_dev, NULL);
 
+static ssize_t show_disp_interface(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct fb_info *info = dev_get_drvdata(dev);
+	struct mxcfb_info *mxcfbi = (struct mxcfb_info *)info->par;
+
+	if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_RGB24)
+		return sprintf(buf, "RGB24\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_BGR24)
+		return sprintf(buf, "BGR24\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_GBR24)
+		return sprintf(buf, "GBR24\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_RGB565)
+		return sprintf(buf, "RGB565\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_RGB666)
+		return sprintf(buf, "RGB666\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_YUV444)
+		return sprintf(buf, "YUV444\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_LVDS666)
+		return sprintf(buf, "LVDS666\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_YUYV)
+		return sprintf(buf, "YUYV16\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_UYVY)
+		return sprintf(buf, "UYVY16\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_YVYU)
+		return sprintf(buf, "YVYU16\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_VYUY)
+		return sprintf(buf, "VYUY16\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT656)
+		return sprintf(buf, "BT656\n");
+	else if (mxcfbi->ipu_di_pix_fmt == IPU_PIX_FMT_BT1120)
+		return sprintf(buf, "BT1120\n");
+	else
+		return sprintf(buf, "Unknow\n");
+}
+
+static ssize_t set_disp_interface(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct fb_info *info = dev_get_drvdata(dev);
+	struct mxcfb_info *mxcfbi = (struct mxcfb_info *)info->par;
+
+	if (mxcfbi->overlay)
+		return 0;
+
+	if (!strncmp(buf, "RGB24", 5))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_RGB24;
+	else if (!strncmp(buf, "BGR24", 5))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_BGR24;
+	else if (!strncmp(buf, "GBR24", 5))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_GBR24;
+	else if (!strncmp(buf, "RGB565", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_RGB565;
+	else if (!strncmp(buf, "RGB666", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_RGB666;
+	else if (!strncmp(buf, "YUV444", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_YUV444;
+	else if (!strncmp(buf, "LVDS666", 7))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_LVDS666;
+	else if (!strncmp(buf, "YUYV16", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_YUYV;
+	else if (!strncmp(buf, "UYVY16", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_UYVY;
+	else if (!strncmp(buf, "YVYU16", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_YVYU;
+	else if (!strncmp(buf, "VYUY16", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_VYUY;
+	else if (!strncmp(buf, "BT656", 5))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_BT656;
+	else if (!strncmp(buf, "BT1120", 6))
+		mxcfbi->ipu_di_pix_fmt = IPU_PIX_FMT_BT1120;
+	else
+		return 0;
+
+	return count;
+}
+static DEVICE_ATTR(fsl_disp_interface, S_IWUSR | S_IRUGO,
+		   show_disp_interface, set_disp_interface);
+
+static ssize_t show_disp_fb_format(struct device *dev,
+			     struct device_attribute *attr, char *buf)
+{
+	struct fb_info *info = dev_get_drvdata(dev);
+	struct mxcfb_info *mxcfbi = (struct mxcfb_info *)info->par;
+
+	if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_RGB24)
+		return sprintf(buf, "RGB24\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_BGR24)
+		return sprintf(buf, "BGR24\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_GBR24)
+		return sprintf(buf, "GBR24\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_RGB565)
+		return sprintf(buf, "RGB565\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_BGR32)
+		return sprintf(buf, "BGR32\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_BGRA32)
+		return sprintf(buf, "BGRA32\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_RGB32)
+		return sprintf(buf, "RBG32\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_RGBA32)
+		return sprintf(buf, "BGRA32\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_ABGR32)
+		return sprintf(buf, "ABGR32\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_YUYV)
+		return sprintf(buf, "YUYV16\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_UYVY)
+		return sprintf(buf, "UYVY16\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_YVYU)
+		return sprintf(buf, "YVYU16\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_VYUY)
+		return sprintf(buf, "VYUY16\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_YUV444)
+		return sprintf(buf, "YUV444\n");
+	else if (mxcfbi->fb_pix_fmt == IPU_PIX_FMT_NV12)
+		return sprintf(buf, "NV12\n");
+	else
+		return sprintf(buf, "Unknow\n");
+}
+
+static ssize_t set_disp_fb_format(struct device *dev,
+			      struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct fb_info *info = dev_get_drvdata(dev);
+	struct mxcfb_info *mxcfbi = (struct mxcfb_info *)info->par;
+
+	if (!strncmp(buf, "RGB24", 5))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_RGB24;
+	else if (!strncmp(buf, "BGR24", 5))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_BGR24;
+	else if (!strncmp(buf, "GBR24", 5))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_GBR24;
+	else if (!strncmp(buf, "RGB565", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_RGB565;
+	else if (!strncmp(buf, "BGR32", 5))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_BGR32;
+	else if (!strncmp(buf, "BGRA32", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_BGRA32;
+	else if (!strncmp(buf, "RGB32", 5))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_RGB32;
+	else if (!strncmp(buf, "RGBA32", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_RGBA32;
+	else if (!strncmp(buf, "ABGR32", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_ABGR32;
+	else if (!strncmp(buf, "YUV444", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_YUV444;
+	else if (!strncmp(buf, "NV12", 4))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_NV12;
+	else if (!strncmp(buf, "YUYV16", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_YUYV;
+	else if (!strncmp(buf, "UYVY16", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_UYVY;
+	else if (!strncmp(buf, "YVYU16", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_YVYU;
+	else if (!strncmp(buf, "VYUY16", 6))
+		mxcfbi->fb_pix_fmt = IPU_PIX_FMT_VYUY;
+	else
+		return 0;
+
+	info->var.bits_per_pixel = fmt_to_bpp(mxcfbi->fb_pix_fmt);
+	info->var.nonstd = mxcfbi->fb_pix_fmt;
+	mxcfb_set_par(info);
+
+	return count;
+}
+static DEVICE_ATTR(fsl_disp_fb_format, S_IWUSR | S_IRUGO,
+		   show_disp_fb_format, set_disp_fb_format);
+
 static int mxcfb_dispdrv_init(struct platform_device *pdev,
 		struct fb_info *fbi)
 {
@@ -2091,6 +2318,7 @@ static int mxcfb_register(struct fb_info *fbi)
 	char bg0_id[] = "DISP3 BG";
 	char bg1_id[] = "DISP3 BG - DI1";
 	char fg_id[] = "DISP3 FG";
+	ipu_channel_params_t params;
 
 	if (mxcfbi->ipu_di == 0) {
 		bg0_id[4] += mxcfbi->ipu_id;
@@ -2188,7 +2416,12 @@ err5:
 		else {
 			ipu_disable_channel(mxcfbi->ipu, mxcfbi->ipu_ch,
 					    true);
-			ipu_uninit_channel(mxcfbi->ipu, mxcfbi->ipu_ch);
+			if (mxcfbi->ipu_ch == MEM_DC_SYNC) {
+				params.mem_dc_sync.di = mxcfbi->ipu_di;
+			} else {
+				params.mem_dp_bg_sync.di = mxcfbi->ipu_di;
+			}
+			ipu_uninit_channel(mxcfbi->ipu, mxcfbi->ipu_ch, &params);
 		}
 		console_unlock();
 	}
@@ -2320,32 +2553,32 @@ static int mxcfb_get_of_property(struct platform_device *pdev,
 
 	err = of_property_read_string(np, "disp_dev", &disp_dev);
 	if (err < 0) {
-		dev_err(&pdev->dev, "get of property disp_dev fail\n");
+		dev_dbg(&pdev->dev, "get of property disp_dev fail\n");
 		return err;
 	}
 	err = of_property_read_string(np, "mode_str", &mode_str);
 	if (err < 0) {
-		dev_err(&pdev->dev, "get of property mode_str fail\n");
+		dev_dbg(&pdev->dev, "get of property mode_str fail\n");
 		return err;
 	}
 	err = of_property_read_string(np, "interface_pix_fmt", &pixfmt);
 	if (err) {
-		dev_err(&pdev->dev, "get of property pix fmt fail\n");
+		dev_dbg(&pdev->dev, "get of property pix fmt fail\n");
 		return err;
 	}
 	err = of_property_read_u32(np, "default_bpp", &bpp);
 	if (err) {
-		dev_err(&pdev->dev, "get of property bpp fail\n");
+		dev_dbg(&pdev->dev, "get of property bpp fail\n");
 		return err;
 	}
 	err = of_property_read_u32(np, "int_clk", &int_clk);
 	if (err) {
-		dev_err(&pdev->dev, "get of property int_clk fail\n");
+		dev_dbg(&pdev->dev, "get of property int_clk fail\n");
 		return err;
 	}
 	err = of_property_read_u32(np, "late_init", &late_init);
 	if (err) {
-		dev_err(&pdev->dev, "get of property late_init fail\n");
+		dev_dbg(&pdev->dev, "get of property late_init fail\n");
 		return err;
 	}
 
@@ -2439,6 +2672,7 @@ static int mxcfb_probe(struct platform_device *pdev)
 	mxcfbi = (struct mxcfb_info *)fbi->par;
 	mxcfbi->ipu_int_clk = plat_data->int_clk;
 	mxcfbi->late_init = plat_data->late_init;
+	mxcfbi->fb_pix_fmt = plat_data->fb_pix_fmt;
 	mxcfbi->first_set_par = true;
 	ret = mxcfb_dispdrv_init(pdev, fbi);
 	if (ret < 0)
@@ -2520,6 +2754,20 @@ static int mxcfb_probe(struct platform_device *pdev)
 			dev_err(mxcfbi->ovfbi->dev, "Error %d on creating "
 						    "file for disp device "
 						    "propety\n", ret);
+
+		ret = device_create_file(mxcfbi->ovfbi->dev,
+					 &dev_attr_fsl_disp_interface);
+		if (ret)
+			dev_err(mxcfbi->ovfbi->dev, "Error %d on creating "
+							"file for disp interface "
+							"propety\n", ret);
+
+                ret = device_create_file(mxcfbi->ovfbi->dev,
+                                         &dev_attr_fsl_disp_fb_format);
+                if (ret)
+                        dev_err(mxcfbi->ovfbi->dev, "Error %d on creating "
+                                                        "file for disp fb format "
+                                                        "propety\n", ret);
 	} else {
 		mxcfbi->ipu_ch_irq = IPU_IRQ_DC_SYNC_EOF;
 		mxcfbi->ipu_ch_nf_irq = IPU_IRQ_DC_SYNC_NFACK;
@@ -2543,6 +2791,16 @@ static int mxcfb_probe(struct platform_device *pdev)
 	if (ret)
 		dev_err(&pdev->dev, "Error %d on creating file for disp "
 				    " device propety\n", ret);
+
+	ret = device_create_file(fbi->dev, &dev_attr_fsl_disp_interface);
+	if (ret)
+		dev_err(&pdev->dev, "Error %d on creating file for disp "
+				    " interface propety\n", ret);
+
+        ret = device_create_file(fbi->dev, &dev_attr_fsl_disp_fb_format);
+        if (ret)
+                dev_err(&pdev->dev, "Error %d on creating file for disp "
+                                    " fb format propety\n", ret);
 
 	return 0;
 

@@ -2252,10 +2252,10 @@ static void uninit_ic(struct ipu_soc *ipu, struct ipu_task_entry *t)
 		CHECK_RETCODE_CONT(ret < 0, "ipu_unlink_ch vdoa_ic",
 				STATE_UNLINK_CHAN_FAIL, ret);
 	}
-	ipu_uninit_channel(ipu, t->set.ic_chan);
+	ipu_uninit_channel(ipu, t->set.ic_chan, NULL);
 	if (deinterlace_3_field(t)) {
-		ipu_uninit_channel(ipu, t->set.vdi_ic_p_chan);
-		ipu_uninit_channel(ipu, t->set.vdi_ic_n_chan);
+		ipu_uninit_channel(ipu, t->set.vdi_ic_p_chan, NULL);
+		ipu_uninit_channel(ipu, t->set.vdi_ic_n_chan, NULL);
 	}
 }
 
@@ -2336,7 +2336,7 @@ done:
 
 static void uninit_rot(struct ipu_soc *ipu, struct ipu_task_entry *t)
 {
-	ipu_uninit_channel(ipu, t->set.rot_chan);
+	ipu_uninit_channel(ipu, t->set.rot_chan, NULL);
 }
 
 static int get_irq(struct ipu_task_entry *t)

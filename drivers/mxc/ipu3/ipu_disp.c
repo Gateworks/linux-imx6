@@ -668,9 +668,29 @@ void _ipu_dc_init(struct ipu_soc *ipu, int dc_chan, int di, bool interlaced, uin
 				_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOFIELD, DC_MCODE_BT656_EOFIELD, 3);
 				_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_DATA, DC_MCODE_BT656_DATA_W, 0);
 			} else {
-				_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NL, 0, 3);
-				_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOL, 0, 2);
-				_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_DATA, 0, 1);
+				if (di) {
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NL, 1, 3);
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOL, 1, 2);
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_DATA, 1, 1);
+					if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
+					(pixel_fmt == IPU_PIX_FMT_UYVY) ||
+					(pixel_fmt == IPU_PIX_FMT_YVYU) ||
+					(pixel_fmt == IPU_PIX_FMT_VYUY)) {
+						_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, 9, 5);
+						_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, 8, 5);
+					}
+				} else {
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NL, 0, 3);
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOL, 0, 2);
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_DATA, 0, 1);
+					if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
+					(pixel_fmt == IPU_PIX_FMT_UYVY) ||
+					(pixel_fmt == IPU_PIX_FMT_YVYU) ||
+					(pixel_fmt == IPU_PIX_FMT_VYUY)) {
+						_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, 10, 5);
+						_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, 11, 5);
+					}
+				}
 			}
 		} else {
 			if (di) {
@@ -704,22 +724,19 @@ void _ipu_dc_init(struct ipu_soc *ipu, int dc_chan, int di, bool interlaced, uin
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_CHAN, 0, 0);
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR, 0, 0);
 
-			// config DC_UGDEx_0 for DC event 0: new line, disable autorepeat, enable odd mode, set event 0 priority to 1
-			reg = (0x1 << 25) | (0x1 << 3);
-			reg |= (DC_MCODE_BT656_DATA_W << 16);
-			if(pixel_fmt == IPU_PIX_FMT_BT656)
-				reg |= ((DC_MCODE_BT656_DATA_W + 3) << 8);
-			else if(pixel_fmt == IPU_PIX_FMT_BT1120)
-				reg |= ((DC_MCODE_BT656_DATA_W + 1) << 8);
-
-			if(dc_chan == 1)
-				reg |= (0x1 << 0);
-			else if(dc_chan == 5)
-				reg |= (0x3 << 0);
-
-			ipu_dc_write(ipu, reg, DC_UGDE_0(DC_DISP_ID_SYNC(di)));
-			ipu_dc_write(ipu, 0, DC_UGDE_1(DC_DISP_ID_SYNC(di)));
-			ipu_dc_write(ipu, 0, DC_UGDE_2(DC_DISP_ID_SYNC(di)));
+			if (di) {
+				_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, DC_MCODE_BT656_DATA_W, 1);
+				if(pixel_fmt == IPU_PIX_FMT_BT656)
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, DC_MCODE_BT656_DATA_W + 3, 1);
+				else
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, DC_MCODE_BT656_DATA_W + 1, 1);
+			} else {
+				_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, DC_MCODE_BT656_DATA_W, 1);
+				if(pixel_fmt == IPU_PIX_FMT_BT656)
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, DC_MCODE_BT656_DATA_W + 3, 1);
+				else
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, DC_MCODE_BT656_DATA_W + 1, 1);
+			}
 		} else {
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NF, 0, 0);
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NFIELD, 0, 0);
@@ -749,7 +766,7 @@ void _ipu_dc_init(struct ipu_soc *ipu, int dc_chan, int di, bool interlaced, uin
 	ipu_dc_write(ipu, 0x00000084, DC_GEN);
 }
 
-void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan)
+void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan, int di)
 {
 	if ((dc_chan == 1) || (dc_chan == 5)) {
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NL, 0, 0);
@@ -761,10 +778,13 @@ void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan)
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOFIELD, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_CHAN, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, 0, 0);
+		if (di == 0) {
+			_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, 0, 0);
+			_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, 0, 0);
+		} else if (di == 1) {
+			_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, 0, 0);
+			_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, 0, 0);
+		}
 	} else if ((dc_chan == 8) || (dc_chan == 9)) {
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR_W_0, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR_W_1, 0, 0);
@@ -1002,7 +1022,7 @@ void _ipu_init_dc_mappings(struct ipu_soc *ipu)
 	_ipu_dc_map_config(ipu, 6, 1, 7, 0xFF);
 	_ipu_dc_map_config(ipu, 6, 2, 15, 0xFF);
 
-	/* IPU_PIX_FMT_UYUV 16bit width */
+	/* IPU_PIX_FMT_UYVY 16bit width */
 	_ipu_dc_map_clear(ipu, 7);
 	_ipu_dc_map_link(ipu, 7, 6, 0, 6, 1, 6, 2);
 	_ipu_dc_map_clear(ipu, 8);
@@ -1799,6 +1819,8 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 	}
 
 	/* Init clocking */
+	dev_dbg(ipu->dev, "pixel clk = %d\n", pixel_clk);
+
 	di_parent = clk_get_parent(ipu->di_clk_sel[disp]);
 	if (!di_parent) {
 		dev_err(ipu->dev, "get di clk parent fail\n");
@@ -1839,7 +1861,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		 * we will only use 1/2 fraction for ipu clk,
 		 * so if the clk rate is not fit, try ext clk.
 		 */
-		if ((!sig.int_clk &&
+		if (!(sig.int_clk &&
 			((rounded_pixel_clk >= pixel_clk + pixel_clk/200) ||
 			(rounded_pixel_clk <= pixel_clk - pixel_clk/200))) ||
 			(pixel_fmt == IPU_PIX_FMT_BT656) || (pixel_fmt == IPU_PIX_FMT_BT1120)) {
@@ -1910,7 +1932,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 	ipu_di_write(ipu, disp, di_gen, DI_GENERAL);
 
 	if (sig.interlaced) {
-		if (g_ipu_hw_rev >= 2) {
+		if (g_ipu_hw_rev >= IPU_V3DEX) {
 			if((pixel_fmt == IPU_PIX_FMT_BT656) || (pixel_fmt == IPU_PIX_FMT_BT1120)) {
 				/* COUNTER_1: basic clock */
 				_ipu_di_sync_config(ipu,
@@ -2027,14 +2049,14 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 				/* set y_sel = DI_BT656_SYNC_HSYNC - 1 */
 				di_gen |= ((DI_BT656_SYNC_HSYNC - 1) << 28);
 			} else {
-				/* Setup internal HSYNC waveform */
+				/* Internal VSYNC for each frame */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						1, 		/* counter */
-						h_total/2 - 1, 	/* run count */
-						DI_SYNC_CLK,	/* run_resolution */
-						0, 		/* offset */
-						DI_SYNC_NONE, 	/* offset resolution */
+						DI_SYNC_COUNT_1, 		/* counter */
+						v_total*2 - 1, 	/* run count */
+						(3 - 1),	/* run_resolution, counter 1 can reference to counter 6,7,8 with run_resolution=2,3,4 */
+						1, 		/* offset */
+						(3 - 1), 	/* offset resolution, 3=counter 7 */
 						0, 		/* repeat count */
 						DI_SYNC_NONE, 	/* CNT_CLR_SEL */
 						0, 		/* CNT_POLARITY_GEN_EN */
@@ -2044,50 +2066,51 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 						0		/* COUNT DOWN */
 						);
 
-				/* Field 1 VSYNC waveform */
+				/* HSYNC waveform on DI_PIN02 */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						2, 		/* counter */
-						h_total - 1, 	/* run count */
-						DI_SYNC_CLK,	/* run_resolution */
+						DI_SYNC_HSYNC, 		/* counter */
+						h_total - 1,	/* run count */
+						DI_SYNC_CLK,	/* run_resolution, counter 2 can reference to counter 5,7 with run_resolution=3,4 */
 						0, 		/* offset */
 						DI_SYNC_NONE, 	/* offset resolution */
 						0, 		/* repeat count */
 						DI_SYNC_NONE, 	/* CNT_CLR_SEL */
-						0, 		/* CNT_POLARITY_GEN_EN */
+						1, 		/* CNT_POLARITY_GEN_EN */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
+						DI_SYNC_CLK, 	/* CNT_POLARITY_TRIGGER_SEL */
 						0, 		/* COUNT UP */
-						2*div		/* COUNT DOWN */
+						2*h_sync_width		/* COUNT DOWN */
 						);
 
-				/* Setup internal HSYNC waveform */
+				/* VSYNC waveform on DI_PIN03 */
+				vsync_cnt = DI_SYNC_VSYNC;
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						3, 		/* counter */
-						v_total*2 - 1, 	/* run count */
-						DI_SYNC_INT_HSYNC,	/* run_resolution */
+						DI_SYNC_VSYNC, 		/* counter */
+						v_total - 1,	/* run count */
+						(4 - 1),	/* run_resolution, counter 3 can reference to counter 7 with run_resolution=4 */
 						1, 			/* offset */
-						DI_SYNC_INT_HSYNC, 	/* offset resolution */
-						0, 		/* repeat count */
-						DI_SYNC_NONE, 	/* CNT_CLR_SEL */
-						0, 		/* CNT_POLARITY_GEN_EN */
+						(4 - 1), 	/* offset resolution, 4=counter 7 */
+						2, 		/* repeat count */
+						DI_SYNC_COUNT_1, 	/* CNT_CLR_SEL */
+						1, 		/* CNT_POLARITY_GEN_EN */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
+						(4 - 1),	/* CNT_POLARITY_TRIGGER_SEL, 4=counter 7 */
 						0, 		/* COUNT UP */
-						2*div		/* COUNT DOWN */
+						2*v_sync_width		/* COUNT DOWN */
 						);
 
-				/* Active Field ? */
+				/* Active Field */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						4, 		/* counter */
-						v_total/2 - 1, 	/* run count */
+						DI_SYNC_AFIELD, 		/* counter */
+						(v_total/2 + 1) - 1, 	/* run count */
 						DI_SYNC_HSYNC,	/* run_resolution */
-						v_start_width, 	/*  offset */
-						DI_SYNC_HSYNC, 	/* offset resolution */
+						h_total/2, /*  offset */
+						DI_SYNC_CLK,	/* offset resolution */
 						2, 		/* repeat count */
-						DI_SYNC_VSYNC, 	/* CNT_CLR_SEL */
+						DI_SYNC_COUNT_1, 	/* CNT_CLR_SEL */
 						0, 		/* CNT_POLARITY_GEN_EN */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
@@ -2098,48 +2121,13 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 				/* Active Line */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						5, 		/* counter */
+						DI_SYNC_ALINE, 		/* counter */
 						0, 		/* run count */
 						DI_SYNC_HSYNC,	/* run_resolution */
-						0, 		/*  offset */
-						DI_SYNC_NONE, 	/* offset resolution */
-						height/2, 	/* repeat count */
-						4, 		/* CNT_CLR_SEL */
-						0, 		/* CNT_POLARITY_GEN_EN */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
-						0, 		/* COUNT UP */
-						0		/* COUNT DOWN */
-						);
-
-				/* Field 0 VSYNC waveform */
-				_ipu_di_sync_config(ipu,
-						disp, 		/* display */
-						6, 		/* counter */
-						v_total - 1, 	/* run count */
-						DI_SYNC_HSYNC,	/* run_resolution */
-						0, 		/* offset */
-						DI_SYNC_NONE, 	/* offset resolution */
-						0, 		/* repeat count */
-						DI_SYNC_NONE, 	/* CNT_CLR_SEL  */
-						0, 		/* CNT_POLARITY_GEN_EN */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
-						0, 		/* COUNT UP */
-						0		/* COUNT DOWN */
-						);
-
-				/* DC VSYNC waveform */
-				vsync_cnt = 7;
-				_ipu_di_sync_config(ipu,
-						disp, 		/* display */
-						7, 		/* counter */
-						v_total/2 - 1, 	/* run count */
-						DI_SYNC_HSYNC,	/* run_resolution  */
-						9, 		/* offset  */
+						(v_start_width + v_sync_width) / 2, 		/*  offset */
 						DI_SYNC_HSYNC, 	/* offset resolution */
-						2, 		/* repeat count */
-						DI_SYNC_VSYNC, 	/* CNT_CLR_SEL */
+						height/2, 	/* repeat count */
+						DI_SYNC_AFIELD, 		/* CNT_CLR_SEL */
 						0, 		/* CNT_POLARITY_GEN_EN */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
@@ -2147,16 +2135,16 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 						0		/* COUNT DOWN */
 						);
 
-				/* active pixel waveform */
+				/* Active Pixel */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						8, 		/* counter */
+						DI_SYNC_APIXEL, 		/* counter */
 						0, 		/* run count  */
 						DI_SYNC_CLK,	/* run_resolution */
-						h_start_width, 	/* offset  */
+						h_start_width + h_sync_width, 	/* offset  */
 						DI_SYNC_CLK, 	/* offset resolution */
 						width, 		/* repeat count  */
-						5, 		/* CNT_CLR_SEL  */
+						DI_SYNC_ALINE, 		/* CNT_CLR_SEL  */
 						0, 		/* CNT_POLARITY_GEN_EN  */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL  */
@@ -2164,39 +2152,31 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 						0		/* COUNT DOWN */
 						);
 
-				/* Second VSYNC */
+				/* Half line HSYNC */
 				_ipu_di_sync_config(ipu,
 						disp, 		/* display */
-						9, 		/* counter */
-						v_total - 1, 	/* run count */
-						DI_SYNC_INT_HSYNC,	/* run_resolution */
-						v_total/2, 		/* offset  */
-						DI_SYNC_INT_HSYNC, 	/* offset resolution  */
+						DI_SYNC_COUNT_7, 		/* counter */
+						h_total/2 - 1,	/* run count */
+						DI_SYNC_CLK,	/* run_resolution */
+						0, 		/* offset */
+						DI_SYNC_NONE, 	/* offset resolution */
 						0, 		/* repeat count */
-						DI_SYNC_HSYNC, 	/* CNT_CLR_SEL */
-						0, 		/* CNT_POLARITY_GEN_EN  */
-						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL  */
+						DI_SYNC_NONE, 	/* CNT_CLR_SEL */
+						0, 		/* CNT_POLARITY_GEN_EN */
+						DI_SYNC_NONE, 	/* CNT_POLARITY_CLR_SEL */
 						DI_SYNC_NONE, 	/* CNT_POLARITY_TRIGGER_SEL */
 						0, 		/* COUNT UP */
-						2*div		/* COUNT DOWN */
+						0		/* COUNT DOWN */
 						);
-
-				/* set gentime select and tag sel */
-				reg = ipu_di_read(ipu, disp, DI_SW_GEN1(9));
-				reg &= 0x1FFFFFFF;
-				reg |= (3-1)<<29 | 0x00008000;
-				ipu_di_write(ipu, disp, reg, DI_SW_GEN1(9));
 
 				ipu_di_write(ipu, disp, v_total / 2 - 1, DI_SCR_CONF);
 
 				/* set y_sel = 1 */
-				di_gen |= 0x10000000;
-				di_gen |= DI_GEN_POLARITY_5;
-				di_gen |= DI_GEN_POLARITY_8;
+				di_gen |= ((DI_SYNC_HSYNC-1)<<28);
 			}
 		} else {
-			/* Setup internal HSYNC waveform */
-			_ipu_di_sync_config(ipu, disp, 1, h_total - 1, DI_SYNC_CLK,
+			/* Internal HSYNC waveform */
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_INT_HSYNC, h_total - 1, DI_SYNC_CLK,
 					0, DI_SYNC_NONE, 0, DI_SYNC_NONE, 0, DI_SYNC_NONE,
 					DI_SYNC_NONE, 0, 0);
 
@@ -2208,52 +2188,52 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 			}
 			v_total += v_start_width + v_end_width;
 
-			/* Field 1 VSYNC waveform */
-			_ipu_di_sync_config(ipu, disp, 2, v_total - 1, 1,
-					field0_offset,
-					field0_offset ? 1 : DI_SYNC_NONE,
-					0, DI_SYNC_NONE, 0,
-					DI_SYNC_NONE, DI_SYNC_NONE, 0, 4);
-
-			/* Setup internal HSYNC waveform */
-			_ipu_di_sync_config(ipu, disp, 3, h_total - 1, DI_SYNC_CLK,
+			/* HSYNC waveform */
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_HSYNC, h_total - 1, DI_SYNC_CLK,
 					0, DI_SYNC_NONE, 0, DI_SYNC_NONE, 0,
 					DI_SYNC_NONE, DI_SYNC_NONE, 0, 4);
 
-			/* Active Field ? */
-			_ipu_di_sync_config(ipu, disp, 4,
+			/* Field 1 VSYNC waveform */
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_VSYNC, v_total - 1, DI_SYNC_INT_HSYNC,
+					field0_offset,
+					field0_offset ? DI_SYNC_INT_HSYNC : DI_SYNC_NONE,
+					0, DI_SYNC_NONE, 0,
+					DI_SYNC_NONE, DI_SYNC_NONE, 0, 4);
+
+			/* Active Field */
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_AFIELD,
 					field0_offset ?
 					field0_offset : field1_offset - 2,
-					1, v_start_width + v_sync_width, 1, 2, 2,
-					0, DI_SYNC_NONE, DI_SYNC_NONE, 0, 0);
+					DI_SYNC_INT_HSYNC, v_start_width + v_sync_width, DI_SYNC_INT_HSYNC, 
+					2, DI_SYNC_VSYNC, 0, DI_SYNC_NONE, DI_SYNC_NONE, 0, 0);
 
 			/* Active Line */
-			_ipu_di_sync_config(ipu, disp, 5, 0, 1,
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_ALINE, 0, DI_SYNC_INT_HSYNC,
 					0, DI_SYNC_NONE,
-					height / 2, 4, 0, DI_SYNC_NONE,
+					height / 2, DI_SYNC_AFIELD, 0, DI_SYNC_NONE,
 					DI_SYNC_NONE, 0, 0);
 
+			/* Active Pixel */
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_APIXEL, 0, DI_SYNC_CLK,
+					h_sync_width + h_start_width, DI_SYNC_CLK,
+					width, DI_SYNC_ALINE, 0, DI_SYNC_NONE, DI_SYNC_NONE,
+					0, 0);
+
+			/* DC VSYNC waveform */
+			vsync_cnt = DI_SYNC_COUNT_7;
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_COUNT_7, 0, DI_SYNC_INT_HSYNC,
+					field1_offset,
+					field1_offset ? DI_SYNC_INT_HSYNC : DI_SYNC_NONE,
+					1, DI_SYNC_VSYNC, 0, DI_SYNC_NONE, DI_SYNC_NONE, 0, 0);
+
 			/* Field 0 VSYNC waveform */
-			_ipu_di_sync_config(ipu, disp, 6, v_total - 1, 1,
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_COUNT_8, v_total - 1, DI_SYNC_INT_HSYNC,
 					0, DI_SYNC_NONE,
 					0, DI_SYNC_NONE, 0, DI_SYNC_NONE,
 					DI_SYNC_NONE, 0, 0);
 
-			/* DC VSYNC waveform */
-			vsync_cnt = 7;
-			_ipu_di_sync_config(ipu, disp, 7, 0, 1,
-					field1_offset,
-					field1_offset ? 1 : DI_SYNC_NONE,
-					1, 2, 0, DI_SYNC_NONE, DI_SYNC_NONE, 0, 0);
-
-			/* active pixel waveform */
-			_ipu_di_sync_config(ipu, disp, 8, 0, DI_SYNC_CLK,
-					h_sync_width + h_start_width, DI_SYNC_CLK,
-					width, 5, 0, DI_SYNC_NONE, DI_SYNC_NONE,
-					0, 0);
-
 			/* ??? */
-			_ipu_di_sync_config(ipu, disp, 9, v_total - 1, 2,
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_COUNT_9, v_total - 1, (DI_SYNC_HSYNC - 1),
 					0, DI_SYNC_NONE,
 					0, DI_SYNC_NONE, 6, DI_SYNC_NONE,
 					DI_SYNC_NONE, 0, 0);
@@ -2268,6 +2248,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 
 		if((pixel_fmt == IPU_PIX_FMT_BT656) || (pixel_fmt == IPU_PIX_FMT_BT1120)) {
 			/* Init template microcode */
+#ifdef BT656_IF_DI_MSB
 			if(pixel_fmt == IPU_PIX_FMT_BT656) {
 				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 0, BT656_IF_DI_MSB, 
 						bt656_h_start_width,
@@ -2279,16 +2260,50 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 						bt656_v_start_width_field0, bt656_v_end_width_field0, 
 						bt656_v_start_width_field1, bt656_v_end_width_field1);
 			}
-
+#else
+			if(pixel_fmt == IPU_PIX_FMT_BT656) {
+				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 0, 23, 
+						bt656_h_start_width,
+						bt656_v_start_width_field0, bt656_v_end_width_field0, 
+						bt656_v_start_width_field1, bt656_v_end_width_field1);
+			} else {
+				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 1, 23, 
+						bt656_h_start_width,
+						bt656_v_start_width_field0, bt656_v_end_width_field0, 
+						bt656_v_start_width_field1, bt656_v_end_width_field1);
+			}
+#endif
 			ipu_dc_write(ipu, (width - 1), DC_UGDE_3(disp));
 
 			if (sig.Hsync_pol)
 				di_gen |= DI_GEN_POLARITY_2;
 			if (sig.Vsync_pol)
-				di_gen |= DI_GEN_POLARITY_4;
+				di_gen |= DI_GEN_POLARITY_3;
 		} else {
 			/* Init template microcode */
-			_ipu_dc_write_tmpl(ipu, 0, WROD, 0, map, SYNC_WAVE, 0, 8, 1, 0, 0);
+			if (disp) {
+				_ipu_dc_write_tmpl(ipu, 1, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+				if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
+					(pixel_fmt == IPU_PIX_FMT_UYVY) ||
+					(pixel_fmt == IPU_PIX_FMT_YVYU) ||
+					(pixel_fmt == IPU_PIX_FMT_VYUY)) {
+					_ipu_dc_write_tmpl(ipu, 8, WROD, 0, (map - 1), SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+					_ipu_dc_write_tmpl(ipu, 9, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+					/* configure user events according to DISP NUM */
+					ipu_dc_write(ipu, (width - 1), DC_UGDE_3(disp));
+				}
+			} else {
+				_ipu_dc_write_tmpl(ipu, 0, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+				if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
+					(pixel_fmt == IPU_PIX_FMT_UYVY) ||
+					(pixel_fmt == IPU_PIX_FMT_YVYU) ||
+					(pixel_fmt == IPU_PIX_FMT_VYUY)) {
+					_ipu_dc_write_tmpl(ipu, 10, WROD, 0, (map - 1), SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+					_ipu_dc_write_tmpl(ipu, 11, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+					/* configure user events according to DISP NUM */
+					ipu_dc_write(ipu, width - 1, DC_UGDE_3(disp));
+				}
+			}
 
 			if (sig.Hsync_pol)
 				di_gen |= DI_GEN_POLARITY_2;
@@ -2297,7 +2312,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		}
 	} else {
 		/* Setup internal HSYNC waveform */
-		_ipu_di_sync_config(ipu, disp, 1, h_total - 1, DI_SYNC_CLK,
+		_ipu_di_sync_config(ipu, disp, DI_SYNC_INT_HSYNC, h_total - 1, DI_SYNC_CLK,
 					0, DI_SYNC_NONE, 0, DI_SYNC_NONE, 0, DI_SYNC_NONE,
 					DI_SYNC_NONE, 0, 0);
 
@@ -2315,19 +2330,19 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		ipu_di_write(ipu, disp, v_total - 1, DI_SCR_CONF);
 
 		/* Setup active data waveform to sync with DC */
-		_ipu_di_sync_config(ipu, disp, 4, 0, DI_SYNC_HSYNC,
+		_ipu_di_sync_config(ipu, disp, DI_SYNC_ALINE, 0, DI_SYNC_HSYNC,
 				    v_sync_width + v_start_width, DI_SYNC_HSYNC, height,
 				    DI_SYNC_VSYNC, 0, DI_SYNC_NONE,
 				    DI_SYNC_NONE, 0, 0);
-		_ipu_di_sync_config(ipu, disp, 5, 0, DI_SYNC_CLK,
+		_ipu_di_sync_config(ipu, disp, DI_SYNC_APIXEL, 0, DI_SYNC_CLK,
 				    h_sync_width + h_start_width, DI_SYNC_CLK,
-				    width, 4, 0, DI_SYNC_NONE, DI_SYNC_NONE, 0,
+				    width, DI_SYNC_ALINE, 0, DI_SYNC_NONE, DI_SYNC_NONE, 0,
 				    0);
 
 		/* set VGA delayed hsync/vsync no matter VGA enabled */
 		if (disp) {
 			/* couter 7 for VGA delay HSYNC */
-			_ipu_di_sync_config(ipu, disp, 7,
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_COUNT_7,
 					h_total - 1, DI_SYNC_CLK,
 					18, DI_SYNC_CLK,
 					0, DI_SYNC_NONE,
@@ -2335,7 +2350,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 					0, h_sync_width * 2);
 
 			/* couter 8 for VGA delay VSYNC */
-			_ipu_di_sync_config(ipu, disp, 8,
+			_ipu_di_sync_config(ipu, disp, DI_SYNC_COUNT_8,
 					v_total - 1, DI_SYNC_INT_HSYNC,
 					1, DI_SYNC_INT_HSYNC,
 					0, DI_SYNC_NONE,
@@ -2344,8 +2359,6 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		}
 
 		/* reset all unused counters */
-		ipu_di_write(ipu, disp, 0, DI_SW_GEN0(6));
-		ipu_di_write(ipu, disp, 0, DI_SW_GEN1(6));
 		if (!disp) {
 			ipu_di_write(ipu, disp, 0, DI_SW_GEN0(7));
 			ipu_di_write(ipu, disp, 0, DI_SW_GEN1(7));
@@ -2358,40 +2371,36 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		ipu_di_write(ipu, disp, 0, DI_SW_GEN1(9));
 		ipu_di_write(ipu, disp, 0, DI_STP_REP(9));
 
-		reg = ipu_di_read(ipu, disp, DI_STP_REP(6));
-		reg &= 0x0000FFFF;
-		ipu_di_write(ipu, disp, reg, DI_STP_REP(6));
-
 		/* Init template microcode */
 		if (disp) {
 			if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
 				(pixel_fmt == IPU_PIX_FMT_UYVY) ||
 				(pixel_fmt == IPU_PIX_FMT_YVYU) ||
 				(pixel_fmt == IPU_PIX_FMT_VYUY)) {
-				_ipu_dc_write_tmpl(ipu, 8, WROD, 0, (map - 1), SYNC_WAVE, 0, 5, 1, 0, 0);
-				_ipu_dc_write_tmpl(ipu, 9, WROD, 0, map, SYNC_WAVE, 0, 5, 1, 0, 0);
+				_ipu_dc_write_tmpl(ipu, 8, WROD, 0, (map - 1), SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+				_ipu_dc_write_tmpl(ipu, 9, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
 				/* configure user events according to DISP NUM */
 				ipu_dc_write(ipu, (width - 1), DC_UGDE_3(disp));
 			}
-			_ipu_dc_write_tmpl(ipu, 2, WROD, 0, map, SYNC_WAVE, 8, 5, 1, 0, 0);
-			_ipu_dc_write_tmpl(ipu, 3, WROD, 0, map, SYNC_WAVE, 4, 5, 0, 0, 0);
-			_ipu_dc_write_tmpl(ipu, 4, WRG, 0, map, NULL_WAVE, 0, 0, 1, 0, 0);
-			_ipu_dc_write_tmpl(ipu, 1, WROD, 0, map, SYNC_WAVE, 0, 5, 1, 0, 0);
+			_ipu_dc_write_tmpl(ipu, 2, WROD, 0, map, SYNC_WAVE, 8, DI_SYNC_APIXEL, 1, 0, 0);
+			_ipu_dc_write_tmpl(ipu, 3, WROD, 0, map, SYNC_WAVE, 4, DI_SYNC_APIXEL, 0, 0, 0);
+			_ipu_dc_write_tmpl(ipu, 4, WRG, 0, map, NULL_WAVE, 0, DI_SYNC_CLK, 1, 0, 0);
+			_ipu_dc_write_tmpl(ipu, 1, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
 
 		} else {
 			if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
 				(pixel_fmt == IPU_PIX_FMT_UYVY) ||
 				(pixel_fmt == IPU_PIX_FMT_YVYU) ||
 				(pixel_fmt == IPU_PIX_FMT_VYUY)) {
-				_ipu_dc_write_tmpl(ipu, 10, WROD, 0, (map - 1), SYNC_WAVE, 0, 5, 1, 0, 0);
-				_ipu_dc_write_tmpl(ipu, 11, WROD, 0, map, SYNC_WAVE, 0, 5, 1, 0, 0);
+				_ipu_dc_write_tmpl(ipu, 10, WROD, 0, (map - 1), SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
+				_ipu_dc_write_tmpl(ipu, 11, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
 				/* configure user events according to DISP NUM */
 				ipu_dc_write(ipu, width - 1, DC_UGDE_3(disp));
 			}
-		   _ipu_dc_write_tmpl(ipu, 5, WROD, 0, map, SYNC_WAVE, 8, 5, 1, 0, 0);
-		   _ipu_dc_write_tmpl(ipu, 6, WROD, 0, map, SYNC_WAVE, 4, 5, 0, 0, 0);
-		   _ipu_dc_write_tmpl(ipu, 7, WRG, 0, map, NULL_WAVE, 0, 0, 1, 0, 0);
-		   _ipu_dc_write_tmpl(ipu, 12, WROD, 0, map, SYNC_WAVE, 0, 5, 1, 0, 0);
+		   _ipu_dc_write_tmpl(ipu, 5, WROD, 0, map, SYNC_WAVE, 8, DI_SYNC_APIXEL, 1, 0, 0);
+		   _ipu_dc_write_tmpl(ipu, 6, WROD, 0, map, SYNC_WAVE, 4, DI_SYNC_APIXEL, 0, 0, 0);
+		   _ipu_dc_write_tmpl(ipu, 7, WRG, 0, map, NULL_WAVE, 0, DI_SYNC_CLK, 1, 0, 0);
+		   _ipu_dc_write_tmpl(ipu, 12, WROD, 0, map, SYNC_WAVE, 0, DI_SYNC_APIXEL, 1, 0, 0);
 		}
 
 		if (sig.Hsync_pol) {
@@ -2406,12 +2415,13 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		}
 	}
 	/* changinc DISP_CLK polarity: it can be wrong for some applications */
+/*
 	if ((pixel_fmt == IPU_PIX_FMT_YUYV) ||
 		(pixel_fmt == IPU_PIX_FMT_UYVY) ||
 		(pixel_fmt == IPU_PIX_FMT_YVYU) ||
 		(pixel_fmt == IPU_PIX_FMT_VYUY))
 			di_gen |= 0x00020000;
-
+*/
 	if (!sig.clk_pol)
 		di_gen |= DI_GEN_POLARITY_DISP_CLK;
 

@@ -731,9 +731,15 @@ enum di_sync_wave {
 	DI_SYNC_NONE = -1,
 	DI_SYNC_CLK = 0,
 	DI_SYNC_INT_HSYNC = 1,
+	DI_SYNC_COUNT_1 = 1,
 	DI_SYNC_HSYNC = 2,
 	DI_SYNC_VSYNC = 3,
-	DI_SYNC_DE = 5,
+	DI_SYNC_AFIELD = 4,
+	DI_SYNC_ALINE = 5,
+	DI_SYNC_APIXEL = 6,
+	DI_SYNC_COUNT_7 = 7,
+	DI_SYNC_COUNT_8 = 8,
+	DI_SYNC_COUNT_9 = 9,
 };
 
 enum di_bt656_sync_wave {
