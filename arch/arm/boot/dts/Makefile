@@ -206,7 +206,6 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6q-gw51xx.dtb \
 	imx6q-gw52xx.dtb \
 	imx6q-gw53xx.dtb \
-	imx6q-gw5400-a.dtb \
 	imx6q-gw54xx.dtb \
 	imx6q-gw552x.dtb \
 	imx6q-nitrogen6x.dtb \
