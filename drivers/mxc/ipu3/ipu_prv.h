@@ -124,6 +124,7 @@ struct ipu_soc {
 
 	int	vdoa_en;
 	struct task_struct *thread[2];
+
 };
 
 struct ipu_channel {

@@ -703,7 +703,6 @@ void __ipu_dp_csc_setup(struct ipu_soc *ipu,
 		reg = ipu_dp_read(ipu, DP_COM_CONF(dp));
 		reg &= ~DP_COM_CONF_CSC_DEF_MASK;
 		reg |= dp_csc_param.mode;
-//		reg |= (1 << 11);  /* Y range 16-235, U/V range 16-240. */
 		ipu_dp_write(ipu, reg, DP_COM_CONF(dp));
 	}
 
@@ -892,22 +891,19 @@ void _ipu_dc_init(struct ipu_soc *ipu, int dc_chan, int di, bool interlaced, uin
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_CHAN, 0, 0);
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR, 0, 0);
 
-			// config DC_UGDEx_0 for DC event 0: new line, disable autorepeat, enable odd mode, set event 0 priority to 1
-			reg = (0x1 << 25) | (0x1 << 3);
-			reg |= (DC_MCODE_BT656_DATA_W << 16);
-			if(pixel_fmt == IPU_PIX_FMT_BT656)
-				reg |= ((DC_MCODE_BT656_DATA_W + 3) << 8);
-			else if(pixel_fmt == IPU_PIX_FMT_BT1120)
-				reg |= ((DC_MCODE_BT656_DATA_W + 1) << 8);
-
-			if(dc_chan == 1)
-				reg |= (0x1 << 0);
-			else if(dc_chan == 5)
-				reg |= (0x3 << 0);
-
-			ipu_dc_write(ipu, reg, DC_UGDE_0(DC_DISP_ID_SYNC(di)));
-			ipu_dc_write(ipu, 0, DC_UGDE_1(DC_DISP_ID_SYNC(di)));
-			ipu_dc_write(ipu, 0, DC_UGDE_2(DC_DISP_ID_SYNC(di)));
+			if (di) {
+				_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, DC_MCODE_BT656_DATA_W, 1);
+				if(pixel_fmt == IPU_PIX_FMT_BT656)
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, DC_MCODE_BT656_DATA_W + 3, 1);
+				else
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, DC_MCODE_BT656_DATA_W + 1, 1);
+			} else {
+				_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, DC_MCODE_BT656_DATA_W, 1);
+				if(pixel_fmt == IPU_PIX_FMT_BT656)
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, DC_MCODE_BT656_DATA_W + 3, 1);
+				else
+					_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, DC_MCODE_BT656_DATA_W + 1, 1);
+			}
 		} else {
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NF, 0, 0);
 			_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NFIELD, 0, 0);
@@ -1995,7 +1991,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 		 * we will only use 1/2 fraction for ipu clk,
 		 * so if the clk rate is not fit, try ext clk.
 		 */
-		if ((!sig.int_clk &&
+		if (!(sig.int_clk &&
 			((rounded_pixel_clk >= pixel_clk + pixel_clk/200) ||
 			(rounded_pixel_clk <= pixel_clk - pixel_clk/200))) || 
 			(pixel_fmt == IPU_PIX_FMT_BT656) || (pixel_fmt == IPU_PIX_FMT_BT1120)) {
@@ -2022,6 +2018,10 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 	msleep(5);
 	/* Get integer portion of divider */
 	div = clk_get_rate(clk_get_parent(&ipu->pixel_clk[disp])) / rounded_pixel_clk;
+	if (!div) {
+		dev_err(ipu->dev, "invalid pixel clk div = 0\n");
+		return -EINVAL;
+	}
 
 	mutex_lock(&ipu->mutex_lock);
 
@@ -2410,6 +2410,7 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 
 		if((pixel_fmt == IPU_PIX_FMT_BT656) || (pixel_fmt == IPU_PIX_FMT_BT1120)) {
 			/* Init template microcode */
+#ifdef BT656_IF_DI_MSB
 			if(pixel_fmt == IPU_PIX_FMT_BT656) {
 				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 0, BT656_IF_DI_MSB, 
 						bt656_h_start_width, 
@@ -2421,7 +2422,19 @@ int32_t ipu_init_sync_panel(struct ipu_soc *ipu, int disp, uint32_t pixel_clk,
 						bt656_v_start_width_field0, bt656_v_end_width_field0, 
 						bt656_v_start_width_field1, bt656_v_end_width_field1);
 			}
-
+#else
+			if(pixel_fmt == IPU_PIX_FMT_BT656) {
+				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 0, 23, 
+						bt656_h_start_width, 
+						bt656_v_start_width_field0, bt656_v_end_width_field0, 
+						bt656_v_start_width_field1, bt656_v_end_width_field1);
+			} else {
+				_ipu_dc_setup_bt656_interlaced(ipu, u_map, y_map, v_map, 1, 23, 
+						bt656_h_start_width, 
+						bt656_v_start_width_field0, bt656_v_end_width_field0, 
+						bt656_v_start_width_field1, bt656_v_end_width_field1);
+			}
+#endif
 			ipu_dc_write(ipu, (width - 1), DC_UGDE_3(disp));
 
 			if (sig.Hsync_pol)
