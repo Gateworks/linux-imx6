@@ -5448,7 +5448,7 @@ int __init mx6_clocks_init(unsigned long ckil, unsigned long osc,
 
 	clk_set_parent(&ipu1_di_clk[0], &pll5_video_main_clk);
 	clk_set_parent(&ipu1_di_clk[1], &pll5_video_main_clk);
-	clk_set_parent(&ipu2_di_clk[0], &pll5_video_main_clk);
+	clk_set_parent(&ipu2_di_clk[0], &pll3_pfd_540M);  /* For CVBS 27MHz clock */
 	clk_set_parent(&ipu2_di_clk[1], &pll5_video_main_clk);
 
 	clk_set_parent(&emi_clk, &pll2_pfd_400M);
@@ -5476,11 +5476,11 @@ int __init mx6_clocks_init(unsigned long ckil, unsigned long osc,
 
 		clk_set_rate(&pll3_pfd_540M, 540000000);
 
-		clk_set_parent(&ipu1_clk, &pll3_pfd_540M);
+		clk_set_parent(&ipu1_clk, &mmdc_ch0_axi_clk[0]);
 		/* pxp & epdc */
 		clk_set_parent(&ipu2_clk, &pll2_pfd_400M);
 		clk_set_rate(&ipu2_clk, 200000000);
-		clk_set_parent(&axi_clk, &pll3_pfd_540M);
+		clk_set_parent(&axi_clk, &periph_clk);
 	} else if (cpu_is_mx6q()) {
 		clk_set_parent(&gpu3d_core_clk[0], &mmdc_ch0_axi_clk[0]);
 		clk_set_rate(&gpu3d_core_clk[0], 528000000);

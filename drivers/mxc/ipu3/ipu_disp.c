@@ -933,7 +933,7 @@ void _ipu_dc_init(struct ipu_soc *ipu, int dc_chan, int di, bool interlaced, uin
 	ipu_dc_write(ipu, 0x00000084, DC_GEN);
 }
 
-void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan)
+void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan, int di)
 {
 	if ((dc_chan == 1) || (dc_chan == 5)) {
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NL, 0, 0);
@@ -945,10 +945,13 @@ void _ipu_dc_uninit(struct ipu_soc *ipu, int dc_chan)
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_EOFIELD, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_CHAN, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, 0, 0);
-		_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, 0, 0);
+		if (di == 0) {
+			_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE0, 0, 0);
+			_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE0, 0, 0);
+		} else if (di == 1) {
+			_ipu_dc_link_event(ipu, dc_chan, DC_ODD_UGDE1, 0, 0);
+			_ipu_dc_link_event(ipu, dc_chan, DC_EVEN_UGDE1, 0, 0);
+		}
 	} else if ((dc_chan == 8) || (dc_chan == 9)) {
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR_W_0, 0, 0);
 		_ipu_dc_link_event(ipu, dc_chan, DC_EVT_NEW_ADDR_W_1, 0, 0);

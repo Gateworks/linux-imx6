@@ -798,8 +798,10 @@ EXPORT_SYMBOL(ipu_init_channel);
  *
  * @param	ipu	ipu handler
  * @param       channel Input parameter for the logical channel ID to uninit.
+ * @param    params  Input parameter containing union of channel
+ *				   initialization parameters.
  */
-void ipu_uninit_channel(struct ipu_soc *ipu, ipu_channel_t channel)
+void ipu_uninit_channel(struct ipu_soc *ipu, ipu_channel_t channel, ipu_channel_params_t *params)
 {
 	uint32_t reg;
 	uint32_t in_dma, out_dma = 0;
@@ -938,7 +940,7 @@ void ipu_uninit_channel(struct ipu_soc *ipu, ipu_channel_t channel)
 		break;
 	case MEM_DC_SYNC:
 		dc_chan = 1;
-		_ipu_dc_uninit(ipu, 1);
+		_ipu_dc_uninit(ipu, 1, params->mem_dc_sync.di);
 		ipu->di_use_count[ipu->dc_di_assignment[1]]--;
 		ipu->dc_use_count--;
 		ipu->dmfc_use_count--;
@@ -946,7 +948,7 @@ void ipu_uninit_channel(struct ipu_soc *ipu, ipu_channel_t channel)
 	case MEM_BG_SYNC:
 		dc_chan = 5;
 		_ipu_dp_uninit(ipu, channel);
-		_ipu_dc_uninit(ipu, 5);
+		_ipu_dc_uninit(ipu, 5, params->mem_dp_bg_sync.di);
 		ipu->di_use_count[ipu->dc_di_assignment[5]]--;
 		ipu->dc_use_count--;
 		ipu->dp_use_count--;
@@ -960,13 +962,13 @@ void ipu_uninit_channel(struct ipu_soc *ipu, ipu_channel_t channel)
 		break;
 	case DIRECT_ASYNC0:
 		dc_chan = 8;
-		_ipu_dc_uninit(ipu, 8);
+		_ipu_dc_uninit(ipu, 8, params->direct_async.di);
 		ipu->di_use_count[ipu->dc_di_assignment[8]]--;
 		ipu->dc_use_count--;
 		break;
 	case DIRECT_ASYNC1:
 		dc_chan = 9;
-		_ipu_dc_uninit(ipu, 9);
+		_ipu_dc_uninit(ipu, 9, params->direct_async.di);
 		ipu->di_use_count[ipu->dc_di_assignment[9]]--;
 		ipu->dc_use_count--;
 		break;
@@ -2033,6 +2035,44 @@ int32_t ipu_enable_channel(struct ipu_soc *ipu, ipu_channel_t channel)
 	return 0;
 }
 EXPORT_SYMBOL(ipu_enable_channel);
+
+ /*!
+ * This function check error for a display channel.
+ *
+ * @param    ipu		ipu handler
+ * @param    channel         Input parameter for the logical channel ID.
+ * @param    di         Input parameter for display di.
+ *
+ * @return      This function returns 0 for no error or 1 for error.
+ *
+ */
+int32_t ipu_check_disp_channel_error(struct ipu_soc *ipu, ipu_channel_t channel, int32_t di)
+{
+	uint32_t reg5 = 0, reg10 = 0;
+	bool need_check = false;
+
+	if ((channel == MEM_BG_SYNC) && (ipu->channel_enable_mask & (1L << IPU_CHAN_ID(MEM_DC_SYNC))))
+		need_check = true;
+	else if ((channel == MEM_DC_SYNC) && (ipu->channel_enable_mask & (1L << IPU_CHAN_ID(MEM_BG_SYNC))))
+		need_check = true;
+
+	if (need_check) {
+		msleep(800);
+
+		reg5= ipu_cm_read(ipu, IPU_INT_STAT(5));
+		reg10 = ipu_cm_read(ipu, IPU_INT_STAT(10));
+		if ((channel == MEM_BG_SYNC) && (reg5 & (1L << IPU_CHAN_ID(MEM_BG_SYNC))))
+			return 1;
+		else if ((channel == MEM_DC_SYNC) && (reg5 & (1L << IPU_CHAN_ID(MEM_DC_SYNC))))
+			return 1;
+		else if ((di == 0) && (reg10 & (1L << 19)))
+			return 1;
+		else if ((di == 1) && (reg10 & (1L << 20)))
+			return 1;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(ipu_check_disp_channel_error);
 
 /*!
  * This function check buffer ready for a logical channel.
