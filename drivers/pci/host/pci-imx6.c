@@ -237,11 +237,25 @@ static int imx6_pcie_assert_core_reset(struct pcie_port *pp)
 
 	if ((gpr1 & IMX6Q_GPR1_PCIE_REF_CLK_EN) &&
 	    (gpr12 & IMX6Q_GPR12_PCIE_CTL_2)) {
+
+		/* can not access dbi_base until clocks are enabled */
+		if (clk_prepare_enable(imx6_pcie->sata_ref_100m))
+			dev_err(pp->dev, "unable to enable sata_ref_100m\n");
+		if (clk_prepare_enable(imx6_pcie->pcie_ref_125m))
+			dev_err(pp->dev, "unable to enable pcie_ref_125m\n");
+		if (clk_prepare_enable(imx6_pcie->lvds_gate))
+			dev_err(pp->dev, "unable to enable lvds_gate\n");
+		if (clk_prepare_enable(imx6_pcie->pcie_axi))
+			dev_err(pp->dev, "unable to enable pcie_axi\n");
+		usleep_range(200, 500); /* allow the clocks to stabilize */
+
+		/* force link down */
 		val = readl(pp->dbi_base + PCIE_PL_PFLR);
 		val &= ~PCIE_PL_PFLR_LINK_STATE_MASK;
 		val |= PCIE_PL_PFLR_FORCE_LINK;
 		writel(val, pp->dbi_base + PCIE_PL_PFLR);
 
+		/* disable LTSSM */
 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
 				IMX6Q_GPR12_PCIE_CTL_2, 0 << 10);
 	}
