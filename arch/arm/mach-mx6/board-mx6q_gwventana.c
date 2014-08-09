@@ -2029,12 +2029,6 @@ static int __init ventana_model_setup(void)
 			platform_device_register(&mx6_ventana_pps_device);
 #endif
 
-			/* serial console rs232 driver enable */
-			SETUP_PAD(PAD_SD4_DAT3__GPIO_2_11);
-			gpio_request(IMX_GPIO_NR(2,11), "uart2_en");
-			gpio_export(IMX_GPIO_NR(2,11), 0);
-			gpio_direction_output(IMX_GPIO_NR(2,11), 0);
-
 			/* i2c switch enable */
 			SETUP_PAD(PAD_GPIO_19__GPIO_4_5);
 			gpio_request(IMX_GPIO_NR(4,5), "i2c_dis#");
@@ -2309,12 +2303,6 @@ static int __init ventana_model_setup(void)
 
 			/* PCI Reset */
 			mx6_ventana_pcie_data.pcie_rst = IMX_GPIO_NR(1, 29);
-
-			/* serial console rs232 driver enable */
-			SETUP_PAD(PAD_SD4_DAT3__GPIO_2_11);
-			gpio_request(IMX_GPIO_NR(2,11), "uart2_en");
-			gpio_export(IMX_GPIO_NR(2,11), 0);
-			gpio_direction_output(IMX_GPIO_NR(2,11), 0);
 
 			/* USB OTG Select (Front-Panel vs J8) */
 			SETUP_PAD_CFG(PAD_GPIO_2__GPIO_1_2,
