@@ -32,6 +32,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/i2c/at24.h>
+#include <linux/i2c/tsc2007.h>
 #include <linux/ata.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/map.h>
@@ -1060,6 +1061,16 @@ static struct i2c_board_info ventana_egalax_i2cinfo = {
 	I2C_BOARD_INFO("egalax_ts", 0x4),
 };
 
+/* Touchscreen controller */
+static struct tsc2007_platform_data tsc2007_pdata = {
+	.model		= 2007,
+	.x_plate_ohms	= 180,
+};
+static struct i2c_board_info ventana_tsc2007_i2cinfo = {
+	I2C_BOARD_INFO("tsc2007", 0x48),
+	.platform_data = (void *)&tsc2007_pdata,
+};
+
 static void imx6q_ventana_usbotg_vbus(bool on)
 {
 	printk(KERN_DEBUG "%s: %s\n", __func__, on?"on":"off");
@@ -1861,6 +1872,7 @@ static int __init ventana_model_setup(void)
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_GPIO_17__GPIO_7_12);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(7, 12));
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(7, 12));
 
 			/* Digital Video Decoder (HDMI IN) IRQ */
 			SETUP_PAD(PAD_GPIO_7__GPIO_1_7);
@@ -2105,6 +2117,7 @@ static int __init ventana_model_setup(void)
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
@@ -2265,6 +2278,7 @@ static int __init ventana_model_setup(void)
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
@@ -2421,6 +2435,7 @@ static int __init ventana_model_setup(void)
 		/* Sync Display device output */
 		if (info->config_lvds0 || info->config_lvds1) {
 			i2c_new_device(i2c_get_adapter(2), &ventana_egalax_i2cinfo);
+			i2c_new_device(i2c_get_adapter(2), &ventana_tsc2007_i2cinfo);
 			imx6q_add_ldb(&ldb_data);     // LVDS interface
 		}
 		if (info->config_lcd)
