@@ -249,9 +249,9 @@
 };
 
 &cpu0 {
-	arm-supply = <&sw1a_reg>;
-	soc-supply = <&sw1c_reg>;
-	pu-supply = <&reg_pu>; /* use pu_dummy if VDDSOC share with VDDPU */
+	arm-supply = <&reg_vdd_arm>;
+	soc-supply = <&reg_vdd_soc>;
+	pu-supply = <&pu_dummy>; /* ldo-bypass */
 };
 
 &flexcan1 {
@@ -274,9 +274,8 @@
 	fsl,cpu_pupscr_sw = <0xf>;
 	fsl,cpu_pdnscr_iso2sw = <0x1>;
 	fsl,cpu_pdnscr_iso = <0x1>;
-	fsl,ldo-bypass = <1>; /* use ldo-bypass, u-boot will check it and configure */
-	fsl,wdog-reset = <2>; /* watchdog select of reset source */
-	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	fsl,ldo-bypass = <1>;
+	pu-supply = <&pu_dummy>; /* ldo-bypass */
 };
 
 &gpmi {
@@ -286,7 +285,7 @@
 };
 
 &gpu {
-	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&pu_dummy>; /* ldo-bypass */
 };
 
 &hdmi_audio {
@@ -380,7 +379,8 @@
 		reg = <0x08>;
 
 		regulators {
-			sw1a_reg: sw1ab {
+			/* VDD_ARM */
+			reg_vdd_arm: sw1ab {
 				regulator-min-microvolt = <300000>;
 				regulator-max-microvolt = <1875000>;
 				regulator-boot-on;
@@ -388,7 +388,8 @@
 				regulator-ramp-delay = <6250>;
 			};
 
-			sw1c_reg: sw1c {
+			/* VDD_SOC */
+			reg_vdd_soc: sw1c {
 				regulator-min-microvolt = <300000>;
 				regulator-max-microvolt = <1875000>;
 				regulator-boot-on;
@@ -396,77 +397,91 @@
 				regulator-ramp-delay = <6250>;
 			};
 
-			sw2_reg: sw2 {
+			/* VDD_HIGH */
+			reg_3p0v: sw2 {
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <3950000>;
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
-			sw3a_reg: sw3a {
+			/* VDD_DDR */
+			reg_ddra: sw3a {
 				regulator-min-microvolt = <400000>;
 				regulator-max-microvolt = <1975000>;
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
-			sw3b_reg: sw3b {
+			/* VDD_DDR */
+			reg_ddrb: sw3b {
 				regulator-min-microvolt = <400000>;
 				regulator-max-microvolt = <1975000>;
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
-			sw4_reg: sw4 {
+			/* VDD_1P8 */
+			reg_1p8v: sw4 {
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <3300000>;
 			};
 
-			swbst_reg: swbst {
+			reg_swbst: swbst {
 				regulator-min-microvolt = <5000000>;
 				regulator-max-microvolt = <5150000>;
 			};
 
-			snvs_reg: vsnvs {
+			reg_snvs: vsnvs {
 				regulator-min-microvolt = <1000000>;
 				regulator-max-microvolt = <3000000>;
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
-			vref_reg: vrefddr {
+			reg_vref: vrefddr {
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
-			vgen1_reg: vgen1 {
+			/* VDD_PCI_1P5_1 */
+			reg_1p5va: vgen1 {
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1550000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 
-			vgen2_reg: vgen2 {
+			/* VDD_PCI_1P5_2 */
+			reg_1p5vb: vgen2 {
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1550000>;
+				regulator-boot-on;
+				regulator-always-on;
 			};
 
-			vgen3_reg: vgen3 {
+			/* unused */
+			reg_vgen3: vgen3 {
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 			};
 
-			vgen4_reg: vgen4 {
+			/* VDD_AUD_1P8 */
+			reg_aud_1p8v: vgen4 {
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 			};
 
-			vgen5_reg: vgen5 {
+			/* VDD_2P5 */
+			reg_2p5v: vgen5 {
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
 			};
 
-			vgen6_reg: vgen6 {
+			/* unused */
+			reg_vgen6: vgen6 {
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
@@ -496,7 +511,7 @@
 		compatible = "fsl,sgtl5000";
 		reg = <0x0a>;
 		clocks = <&clks 201>;
-		VDDA-supply = <&sw4_reg>;
+		VDDA-supply = <&reg_1p8v>;
 		VDDIO-supply = <&reg_3p3v>;
 	};
 
@@ -506,9 +521,9 @@
 		interrupt-parent = <&gpio1>;
 		interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
 		/* regulators */
-		DOVDD-supply = <&reg_3p3v>; /* 3.3v */
-		AVDD-supply = <&sw4_reg>;   /* 1.8v */
-		DVDD-supply = <&sw4_reg>;   /* 1.8v*/
+		DOVDD-supply = <&reg_3p3v>;
+		AVDD-supply = <&reg_1p8v>;
+		DVDD-supply = <&reg_1p8v>;
 		hdcp = <0>; /* HDCP disabled */
 		ddc_slave = <0x74>; /* DDC slave addres */
 		/* video output format */
@@ -550,10 +565,10 @@
 		reg = <0x20>;
 		clocks = <&clks 201>;
 		clock-names = "csi_mclk";
-		DOVDD-supply = <&reg_3p3v>; /* 3.3v */
-		AVDD-supply = <&sw4_reg>;   /* 1.8v */
-		DVDD-supply = <&sw4_reg>;   /* 1.8v*/
-		PVDD-supply = <&sw4_reg>;   /* 1.8v*/
+		DOVDD-supply = <&reg_3p3v>;
+		AVDD-supply = <&reg_1p8v>;
+		DVDD-supply = <&reg_1p8v>;
+		PVDD-supply = <&reg_1p8v>;
 		pwn-gpios = <&gpio3 31 GPIO_ACTIVE_LOW>; /* powerdown */
 		/* mclk required but not used */
 		mclk = <24000000>;
@@ -696,5 +711,5 @@
 };
 
 &vpu {
-	pu-supply = <&reg_pu>; /* ldo-bypass:use pu_dummy if VDDSOC share with VDDPU */
+	pu-supply = <&pu_dummy>; /* ldo-bypass */
 };
