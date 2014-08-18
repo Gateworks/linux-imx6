@@ -95,6 +95,7 @@ static struct regulator_init_data dispreg_initdata = {
 
 static int pu_dummy_enable;
 static int dispreg_enable;
+static int ldo_bypass;
 
 static void imx_disp_clk(bool enable)
 {
@@ -551,6 +552,7 @@ void __init imx_gpc_init(void)
 	of_property_read_u32(np, "fsl,cpu_pupscr_sw", &cpu_pupscr_sw);
 	of_property_read_u32(np, "fsl,cpu_pdnscr_iso2sw", &cpu_pdnscr_iso2sw);
 	of_property_read_u32(np, "fsl,cpu_pdnscr_iso", &cpu_pdnscr_iso);
+	of_property_read_u32(np, "fsl,ldo-bypass", &ldo_bypass);
 
 	/* Read supported wakeup source in M/F domain */
 	if (cpu_is_imx6sx()) {
@@ -741,6 +743,10 @@ static int imx_gpc_probe(struct platform_device *pdev)
 	int ret;
 
 	gpc_dev = &pdev->dev;
+
+	/* Enable LDO bypass if selected */
+	if (ldo_bypass)
+		imx_anatop_ldobypass_enable();
 
 	pu_reg = devm_regulator_get(gpc_dev, "pu");
 	if (IS_ERR(pu_reg)) {
