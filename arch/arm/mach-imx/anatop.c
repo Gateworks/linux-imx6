@@ -39,6 +39,7 @@
 #define BM_ANADIG_USB_CHRG_DETECT_EN_B		0x100000
 
 #define ANADIG_REG_TARG_MASK	0x1f
+#define ANADIG_REG0_TARG_SHIFT	0	/* VDDARM */
 #define ANADIG_REG1_TARG_SHIFT	9	/* VDDPU */
 #define ANADIG_REG2_TARG_SHIFT	18	/* VDDSOC */
 
@@ -130,6 +131,17 @@ void imx_anatop_pu_enable(bool enable)
 		}
 	}
 }
+
+/* enable ldo-bypass mode, bypassing internal anantop LDO's for SOC/ARM/xPU */
+void imx_anatop_ldobypass_enable(void)
+{
+	printk(KERN_INFO "anatop: enabling LDO bypass mode\n");
+	regmap_write(anatop, ANADIG_REG_CORE + REG_SET,
+		ANADIG_REG_TARG_MASK << ANADIG_REG0_TARG_SHIFT |
+		ANADIG_REG_TARG_MASK << ANADIG_REG1_TARG_SHIFT |
+		ANADIG_REG_TARG_MASK << ANADIG_REG2_TARG_SHIFT);
+}
+
 void __init imx_init_revision_from_anatop(void)
 {
 	struct device_node *np;
