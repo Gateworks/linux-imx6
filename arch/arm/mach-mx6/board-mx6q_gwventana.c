@@ -2244,13 +2244,6 @@ static int __init ventana_model_setup(void)
 			/* PCI Reset */
 			mx6_ventana_pcie_data.pcie_rst = IMX_GPIO_NR(1, 29);
 
-			/* USB OTG Select (Front-Panel vs J8) */
-			SETUP_PAD_CFG(PAD_GPIO_2__GPIO_1_2,
-				      VENTANA_DIO_PADCFG);
-			gpio_request(IMX_GPIO_NR(1,2), "usbotg_pcisel");
-			gpio_export(IMX_GPIO_NR(1,2), 0);
-			gpio_direction_output(IMX_GPIO_NR(1,2), 0);
-
 			/* Video out: Modify mxcfb array to better suit this board */
 			/* mxcfb0 = hdmi */
 			/* mxcfb1 = Freescale MXC-LVDS1 */
