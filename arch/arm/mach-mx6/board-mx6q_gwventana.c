@@ -29,6 +29,7 @@
 #include <linux/fsl_devices.h>
 #include <linux/spi/spi.h>
 #include <linux/spi/flash.h>
+#include <linux/hwmon-gsp.h>
 #include <linux/i2c.h>
 #include <linux/i2c/pca953x.h>
 #include <linux/i2c/at24.h>
@@ -871,10 +872,85 @@ static struct at24_platform_data ventana_eeprom_info = {
   .setup = ventana_eeprom_setup,
 };
 
+struct gsp_sensor_info gw51xx_sensors[] = {
+        {"TEMPERATURE",	0x00 },
+        {"Vin",		0x02 },
+        {"VDD_3P3",	0x05 },
+        {"GSC_BATTERY",	0x08 },
+        {"VDD_5P0",	0x0b },
+        {"VDD_ARM",	0x0e },
+        {"VDD_SOC",	0x11 },
+        {"VDD_HIGH",	0x14 },
+        {"VDD_DDR",	0x17 },
+        {"VDD_1P8",	0x1d },
+        {"VDD_2P5",	0x23 },
+        {"ANALOG1",	0x20},
+};
+struct gsp_platform_data gw51xx_hwmon_pdata = {
+        .sensors = gw51xx_sensors,
+        .nsensors = ARRAY_SIZE(gw51xx_sensors),
+};
+struct gsp_sensor_info gw52xx_sensors[] = {
+        {"TEMPERATURE",	0x00 },
+        {"Vin",		0x02 },
+        {"VDD_3P3",	0x05 },
+        {"GSC_BATTERY",	0x08 },
+        {"VDD_5P0",	0x0b },
+        {"VDD_ARM",	0x0e },
+        {"VDD_SOC",	0x11 },
+        {"VDD_HIGH",	0x14 },
+        {"VDD_DDR",	0x17 },
+        {"VDD_1P8",	0x1d },
+        {"VDD_2P5",	0x23 },
+};
+struct gsp_platform_data gw52xx_hwmon_pdata = {
+        .sensors = gw52xx_sensors,
+        .nsensors = ARRAY_SIZE(gw52xx_sensors),
+};
+struct gsp_sensor_info gw53xx_sensors[] = {
+        {"TEMPERATURE",	0x00 },
+        {"Vin",		0x02 },
+        {"VDD_3P3",	0x05 },
+        {"GSC_BATTERY",	0x08 },
+        {"VDD_5P0",	0x0b },
+        {"VDD_ARM",	0x0e },
+        {"VDD_SOC",	0x11 },
+        {"VDD_HIGH",	0x14 },
+        {"VDD_DDR",	0x17 },
+        {"VDD_1P8",	0x1d },
+        {"VDD_2P5",	0x23 },
+        {"VDD_1P0",	0x20},
+};
+struct gsp_platform_data gw53xx_hwmon_pdata = {
+        .sensors = gw52xx_sensors,
+        .nsensors = ARRAY_SIZE(gw53xx_sensors),
+};
+struct gsp_sensor_info gw54xx_sensors[] = {
+        {"TEMPERATURE",	0x00 },
+        {"Vin",		0x02 },
+        {"VDD_3P3",	0x05 },
+        {"GSC_BATTERY",	0x08 },
+        {"VDD_5P0",	0x0b },
+        {"VDD_ARM",	0x0e },
+        {"VDD_SOC",	0x11 },
+        {"VDD_HIGH",	0x14 },
+        {"VDD_DDR",	0x17 },
+        {"VDD_1P8",	0x1d },
+        {"VDD_2P5",	0x23 },
+        {"VDD_1P0",	0x20},
+};
+struct gsp_platform_data gw54xx_hwmon_pdata = {
+        .sensors = gw52xx_sensors,
+        .nsensors = ARRAY_SIZE(gw54xx_sensors),
+	.has_fan_controller = 1,
+};
+
+static struct i2c_board_info hwmon_i2cinfo = {
+	I2C_BOARD_INFO("gsp", 0x29),
+};
+
 static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 	{
-		I2C_BOARD_INFO("gsp", 0x29),
-	},{
 		I2C_BOARD_INFO ("24c08",0x50),
 		.platform_data = &ventana_eeprom_info,
 	},{
@@ -1090,8 +1166,30 @@ static struct i2c_board_info ventana_tca8418_i2cinfo = {
 	.platform_data = (void *)&tca8418_pdata,
 };
 
+struct gsp_sensor_info gw16107_sensors[] = {
+        {"VDD_12P0",	0x02 },
+        {"VDD_3P3",	0x05 },
+        {"VDD_5P0",	0x08 },
+        {"ANALOG_1",	0x0b },
+        {"ANALOG_2",	0x0e },
+        {"ANALOG_3",	0x11 },
+        {"ANALOG_4",	0x14 },
+        {"ANALOG_5",	0x17 },
+        {"ANALOG_6",	0x1a },
+        {"ANALOG_7",	0x1d },
+        {"ANALOG_8",	0x20 },
+        {"ANALOG_9",	0x23 },
+        {"ANALOG_C",	0x26 },
+        {"PADDLE",	0x29 },
+};
+struct gsp_platform_data gw16107_pdata = {
+        .sensors = gw16107_sensors,
+        .nsensors = ARRAY_SIZE(gw16107_sensors),
+};
+
 static struct i2c_board_info gw16107_hwmon_i2cinfo = {
 	I2C_BOARD_INFO("gsp", 0x29),
+	.platform_data = (void *)&gw16107_pdata,
 };
 
 static void imx6q_ventana_usbotg_vbus(bool on)
@@ -2092,6 +2190,10 @@ static int __init ventana_model_setup(void)
 			}
 			/* PCIe */
 			mx6_ventana_pcie_data.pcie_rst	= IMX_GPIO_NR(1, 29);
+
+			/* Hardware Monitor */
+			hwmon_i2cinfo.platform_data = &gw54xx_hwmon_pdata;
+			i2c_new_device(i2c_get_adapter(0), &hwmon_i2cinfo);
 		} /* end GW54xx */
 
 		else if (strncmp(info->model, "GW53", 4) == 0) {
@@ -2245,7 +2347,9 @@ static int __init ventana_model_setup(void)
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
-
+			/* Hardware Monitor */
+			hwmon_i2cinfo.platform_data = &gw53xx_hwmon_pdata;
+			i2c_new_device(i2c_get_adapter(0), &hwmon_i2cinfo);
 		} /* end GW53xx */
 
 		else if (strncmp(info->model, "GW52", 4) == 0) {
@@ -2410,6 +2514,10 @@ static int __init ventana_model_setup(void)
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
+			/* Hardware Monitor */
+			hwmon_i2cinfo.platform_data = &gw52xx_hwmon_pdata;
+			i2c_new_device(i2c_get_adapter(0), &hwmon_i2cinfo);
+
 			/* GW16107 Hardware Monitor */
 			i2c_new_device(i2c_get_adapter(2), &gw16107_hwmon_i2cinfo);
 		} /* end GW52xx */
@@ -2528,6 +2636,10 @@ static int __init ventana_model_setup(void)
 			sprintf(ventana_fb_data[1].disp_dev, "off");
 			sprintf(ventana_fb_data[2].disp_dev, "off");
 			sprintf(ventana_fb_data[3].disp_dev, "off");
+
+			/* Hardware Monitor */
+			hwmon_i2cinfo.platform_data = &gw51xx_hwmon_pdata;
+			i2c_new_device(i2c_get_adapter(0), &hwmon_i2cinfo);
 		} /* end GW51xx */
 
 		else {
