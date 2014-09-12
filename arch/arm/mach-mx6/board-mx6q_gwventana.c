@@ -1057,7 +1057,7 @@ static struct tsc2007_platform_data tsc2007_pdata = {
 	.x_plate_ohms	= 400,
 };
 static struct i2c_board_info ventana_tsc2007_i2cinfo = {
-	I2C_BOARD_INFO("tsc2007", 0x48),
+	I2C_BOARD_INFO("tsc2007", 0x49),
 	.platform_data = (void *)&tsc2007_pdata,
 };
 
