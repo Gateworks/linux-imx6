@@ -1101,6 +1101,9 @@ static struct i2c_board_info ventana_tca8418_i2cinfo = {
 	.platform_data = (void *)&tca8418_pdata,
 };
 
+static struct i2c_board_info gw16107_hwmon_i2cinfo = {
+	I2C_BOARD_INFO("gsp", 0x29),
+};
 
 static void imx6q_ventana_usbotg_vbus(bool on)
 {
@@ -2334,7 +2337,8 @@ static int __init ventana_model_setup(void)
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
-
+			/* GW16107 Hardware Monitor */
+			i2c_new_device(i2c_get_adapter(2), &gw16107_hwmon_i2cinfo);
 		} /* end GW52xx */
 
 		else if (strncmp(info->model, "GW51", 4) == 0) {
