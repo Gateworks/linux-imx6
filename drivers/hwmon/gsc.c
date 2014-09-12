@@ -15,6 +15,7 @@
 #include <linux/hwmon-sysfs.h>
 #include <linux/err.h>
 #include <linux/slab.h>
+#include <linux/hwmon-gsp.h>
 
 #define DRV_VERSION "0.2"
 
@@ -42,12 +43,7 @@ enum chips { gsp };
 #define GSP_FAN_4		0x34
 #define GSP_FAN_5		0x36
 
-struct gsp_sensor_info {
-	const char* name;
-	int reg;
-};
-
-static const struct gsp_sensor_info gsp_sensors[] = {
+static struct gsp_sensor_info gsp_sensors[] = {
 	{"temp", GSP_REG_TEMP_IN},
 	{"vin", GSP_REG_VIN},
 	{"3p3", GSP_REG_3P3},
@@ -73,6 +69,8 @@ static const struct gsp_sensor_info gsp_sensors[] = {
 struct gsp_data {
 	struct device		*hwmon_dev;
 	struct attribute_group	attrs;
+	struct gsp_sensor_info	*sensors;
+	unsigned int		nsensors;
 	enum chips		type;
 };
 
@@ -129,15 +127,19 @@ static ssize_t show_adc(struct device *dev, struct device_attribute *devattr,
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
-	return sprintf(buf, "%d\n", gsp_read(client, gsp_sensors[attr->index].reg));
+	struct gsp_data *data = i2c_get_clientdata(client);
+
+	return sprintf(buf, "%d\n", gsp_read(client, data->sensors[attr->index].reg));
 }
 
 static ssize_t show_label(struct device *dev,
 			struct device_attribute *devattr, char *buf)
 {
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct i2c_client *client = to_i2c_client(dev);
+	struct gsp_data *data = i2c_get_clientdata(client);
 
-	return sprintf(buf, "%s\n", gsp_sensors[attr->index].name);
+	return sprintf(buf, "%s\n", data->sensors[attr->index].name);
 }
 
 static ssize_t store_fan(struct device *dev,
@@ -146,8 +148,10 @@ static ssize_t store_fan(struct device *dev,
 	u16 val;
 	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
 	struct i2c_client *client = to_i2c_client(dev);
+	struct gsp_data *data = i2c_get_clientdata(client);
+
 	val = simple_strtoul(buf, NULL, 10);
-	gsp_write(client, gsp_sensors[attr->index].reg, val);
+	gsp_write(client, data->sensors[attr->index].reg, val);
 	return count;
 }
 
@@ -228,10 +232,108 @@ static struct attribute *gsp_attributes[] = {
 	NULL
 };
 
+#define GSP_ATTR(name) \
+	attrs.attrs[i++] = &sensor_dev_attr_ ##name.dev_attr.attr;
+static int parse_platform_sensors(struct gsp_platform_data *pdata,
+				  struct gsp_data *data)
+{
+	struct attribute_group	attrs = data->attrs;
+	int i, j;
+
+	printk("gsp: parsing platform sensors\n");
+	for (j = 0; j < data->nsensors; j++) {
+		data->sensors[j].name = NULL;
+		for (i = 0; i < pdata->nsensors; i++) {
+			if (pdata->sensors[i].reg == data->sensors[j].reg) {
+				data->sensors[j].name = pdata->sensors[i].name;
+				break;
+			}
+		}
+	}
+
+	/* prune attributes */
+	i = 0;
+	for (j = 0; j < ARRAY_SIZE(gsp_sensors); j++) {
+		if (!data->sensors[j].name)
+			continue;
+		switch(j) {
+		case 0:
+			GSP_ATTR(temp0_input);
+			GSP_ATTR(temp0_label);
+			break;
+		case 1:
+			GSP_ATTR(in0_input);
+			GSP_ATTR(in0_label);
+			break;
+		case 2:
+			GSP_ATTR(in1_input);
+			GSP_ATTR(in1_label);
+			break;
+		case 3:
+			GSP_ATTR(in2_input);
+			GSP_ATTR(in2_label);
+			break;
+		case 4:
+			GSP_ATTR(in3_input);
+			GSP_ATTR(in3_label);
+			break;
+		case 5:
+			GSP_ATTR(in4_input);
+			GSP_ATTR(in4_label);
+			break;
+		case 6:
+			GSP_ATTR(in5_input);
+			GSP_ATTR(in5_label);
+			break;
+		case 7:
+			GSP_ATTR(in6_input);
+			GSP_ATTR(in6_label);
+			break;
+		case 8:
+			GSP_ATTR(in7_input);
+			GSP_ATTR(in7_label);
+			break;
+		case 9:
+			GSP_ATTR(in8_input);
+			GSP_ATTR(in8_label);
+			break;
+		case 10:
+			GSP_ATTR(in9_input);
+			GSP_ATTR(in9_label);
+			break;
+		case 11:
+			GSP_ATTR(in10_input);
+			GSP_ATTR(in10_label);
+			break;
+		case 12:
+			GSP_ATTR(in11_input);
+			GSP_ATTR(in11_label);
+			break;
+		case 13:
+			GSP_ATTR(in12_input);
+			GSP_ATTR(in12_label);
+			break;
+		}
+	}
+
+	if (pdata->has_fan_controller) {
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point0.dev_attr.attr;
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point1.dev_attr.attr;
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point2.dev_attr.attr;
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point3.dev_attr.attr;
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point4.dev_attr.attr;
+		attrs.attrs[i++] = &sensor_dev_attr_fan0_point5.dev_attr.attr;
+	}
+
+	attrs.attrs[i++] = NULL;
+
+	return 0;
+}
 
 static int gsp_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
+	struct gsp_platform_data *pdata;
 	struct i2c_adapter *adapter = client->adapter;
 	struct gsp_data *data;
 	int err;
@@ -246,6 +348,14 @@ static int gsp_probe(struct i2c_client *client,
 		err = -ENOMEM;
 		goto exit;
 	}
+	data->sensors = kzalloc(sizeof(gsp_sensors), GFP_KERNEL);
+	if (!data->sensors) {
+		err = -ENOMEM;
+		kfree(data);
+		goto exit;
+	}
+	memcpy(data->sensors, gsp_sensors, sizeof(gsp_sensors));
+	data->nsensors = ARRAY_SIZE(gsp_sensors);
 
 	i2c_set_clientdata(client, data);
 
@@ -257,7 +367,11 @@ static int gsp_probe(struct i2c_client *client,
 		break;
 	}
 
-	dev_info(&client->dev, "%s chip found\n", client->name);
+	dev_info(&client->dev, "Gateworks System Controller found\n");
+
+	pdata = client->dev.platform_data;
+	if (pdata)
+		parse_platform_sensors(pdata, data);
 
 	/* Register sysfs hooks */
 	if ((err = sysfs_create_group(&client->dev.kobj, &data->attrs)))
@@ -284,6 +398,7 @@ static int gsp_remove(struct i2c_client *client)
 	struct gsp_data *data = i2c_get_clientdata(client);
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&client->dev.kobj, &data->attrs);
+	kfree(data->sensors);
 	kfree(data);
 	return 0;
 }
