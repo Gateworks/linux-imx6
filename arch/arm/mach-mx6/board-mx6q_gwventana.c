@@ -38,6 +38,7 @@
 #include <linux/mtd/map.h>
 #include <linux/mtd/partitions.h>
 #include <linux/regulator/consumer.h>
+#include <linux/input/tca8418_keypad.h>
 #include <linux/pmic_external.h>
 #include <linux/pmic_status.h>
 #include <linux/ipu.h>
@@ -1059,6 +1060,36 @@ static struct i2c_board_info ventana_tsc2007_i2cinfo = {
 	I2C_BOARD_INFO("tsc2007", 0x48),
 	.platform_data = (void *)&tsc2007_pdata,
 };
+
+/* Matrix Keyboard controller */
+static const unsigned int ventana_keymap[] = {
+	/* row, col, keycode */
+	KEY(0, 1, BTN_0), /* HOME */
+	KEY(0, 0, BTN_1), /* MENU */
+	KEY(1, 1, BTN_2), /* ESCAPE */
+	KEY(1, 0, BTN_3), /* BACK */
+	KEY(2, 0, BTN_4), /* SEARCH */
+	KEY(0, 3, BTN_5), /* UP */
+	KEY(0, 2, BTN_6), /* RIGHT */
+	KEY(1, 3, BTN_7), /* LEFT */
+	KEY(1, 2, BTN_8), /* DOWN */
+	KEY(2, 2, BTN_9), /* ENTER */
+};
+static const struct matrix_keymap_data tca8418_keymap = {
+	.keymap		= ventana_keymap,
+	.keymap_size	= ARRAY_SIZE(ventana_keymap),
+};
+static struct tca8418_keypad_platform_data tca8418_pdata = {
+	.keymap_data	= &tca8418_keymap,
+	.rows		= 3,
+	.cols		= 4,
+	.rep		= 1,
+};
+static struct i2c_board_info ventana_tca8418_i2cinfo = {
+	I2C_BOARD_INFO("tca8418_keypad", 0x34),
+	.platform_data = (void *)&tca8418_pdata,
+};
+
 
 static void imx6q_ventana_usbotg_vbus(bool on)
 {
@@ -2345,6 +2376,11 @@ static int __init ventana_model_setup(void)
 			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
 			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
 			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
+
+			/* Matric Keyboard IRQ */
+			SETUP_PAD(PAD_SD1_DAT0__GPIO_1_16);
+			ventana_tca8418_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 16));
+			i2c_new_device(i2c_get_adapter(2), &ventana_tca8418_i2cinfo);
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
