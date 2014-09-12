@@ -949,10 +949,17 @@ static struct i2c_board_info hwmon_i2cinfo = {
 	I2C_BOARD_INFO("gsp", 0x29),
 };
 
+static struct pca953x_platform_data gsc_gpio_expander_pdata = {
+	.gpio_base	= 224,
+};
+
 static struct i2c_board_info mxc_i2c0_board_info[] __initdata = {
 	{
 		I2C_BOARD_INFO ("24c08",0x50),
 		.platform_data = &ventana_eeprom_info,
+	},{
+		I2C_BOARD_INFO("pca9555", 0x23),
+		.platform_data = &gsc_gpio_expander_pdata,
 	},{
 		I2C_BOARD_INFO("ds1672", 0x68),
 	},
@@ -1135,6 +1142,15 @@ static struct tsc2007_platform_data tsc2007_pdata = {
 static struct i2c_board_info ventana_tsc2007_i2cinfo = {
 	I2C_BOARD_INFO("tsc2007", 0x49),
 	.platform_data = (void *)&tsc2007_pdata,
+};
+
+/* GPIO Port Expanders */
+static struct pca953x_platform_data gw16107_gpio_expander_pdata = {
+	.gpio_base	= 240,
+};
+static struct i2c_board_info gw16107_gpio_i2cinfo = {
+	I2C_BOARD_INFO("pca9555", 0x21),
+	.platform_data = &gw16107_gpio_expander_pdata,
 };
 
 /* Matrix Keyboard controller */
@@ -2514,6 +2530,9 @@ static int __init ventana_model_setup(void)
 #ifdef CONFIG_SND_SOC_SGTL5000
 			platform_device_register(&sgtl5000_ventana_vdda_reg_devices);
 #endif
+			/* GW16107 GPIO Expander */
+			i2c_new_device(i2c_get_adapter(2), &gw16107_gpio_i2cinfo);
+
 			/* Hardware Monitor */
 			hwmon_i2cinfo.platform_data = &gw52xx_hwmon_pdata;
 			i2c_new_device(i2c_get_adapter(0), &hwmon_i2cinfo);
