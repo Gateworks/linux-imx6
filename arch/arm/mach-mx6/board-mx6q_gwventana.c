@@ -32,6 +32,7 @@
 #include <linux/hwmon-gsp.h>
 #include <linux/i2c.h>
 #include <linux/i2c/pca953x.h>
+#include <linux/i2c/pca9685.h>
 #include <linux/i2c/at24.h>
 #include <linux/i2c/tsc2007.h>
 #include <linux/ata.h>
@@ -1206,6 +1207,32 @@ struct gsp_platform_data gw16107_pdata = {
 static struct i2c_board_info gw16107_hwmon_i2cinfo = {
 	I2C_BOARD_INFO("gsp", 0x29),
 	.platform_data = (void *)&gw16107_pdata,
+};
+
+/* PWM LEDs */
+static struct led_info pca9685_leds[] = {
+	{
+		.name = "pca9685-led0",
+		.default_trigger = "none",
+	},
+	{
+		.name = "pca9685-led1",
+		.default_trigger = "none",
+		.flags = 1 | (PCA9685_FLAGS_ACTIVE_LOW << PCA9685_FLAGS_SHIFT),
+	},
+	{
+		.name = "pca9685-led2",
+		.default_trigger = "none",
+		.flags = 2 | (PCA9685_FLAGS_ACTIVE_LOW << PCA9685_FLAGS_SHIFT),
+	},
+};
+static struct pca9685_platform_data pca9685_pdata = {
+	.leds = pca9685_leds,
+	.num_leds = ARRAY_SIZE(pca9685_leds),
+};
+static struct i2c_board_info gw16107_pwm_i2cinfo = {
+	I2C_BOARD_INFO("pca9685", 0x40),
+	.platform_data = (void *)&pca9685_pdata,
 };
 
 static void imx6q_ventana_usbotg_vbus(bool on)
@@ -2532,6 +2559,9 @@ static int __init ventana_model_setup(void)
 #endif
 			/* GW16107 GPIO Expander */
 			i2c_new_device(i2c_get_adapter(2), &gw16107_gpio_i2cinfo);
+
+			/* GW16107 PWM LED driver */
+			i2c_new_device(i2c_get_adapter(2), &gw16107_pwm_i2cinfo);
 
 			/* Hardware Monitor */
 			hwmon_i2cinfo.platform_data = &gw52xx_hwmon_pdata;
