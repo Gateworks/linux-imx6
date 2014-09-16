@@ -171,6 +171,14 @@ config LEDS_PCA9532_GPIO
 	  To use a pin as gpio pca9532_type in pca9532_platform data needs to
 	  set to PCA9532_TYPE_GPIO.
 
+config LEDS_PCA9685
+        tristate "LED driver for NXP PCA9685 16-channel PWM LED controller"
+	depends on LEDS_CLASS
+        depends on I2C
+        help
+          If you have a backlight driven by a NXP PCA9685, say Y here: the
+          module will be called pca9685.
+
 config LEDS_GPIO
 	tristate "LED Support for GPIO connected LEDs"
 	depends on LEDS_CLASS
