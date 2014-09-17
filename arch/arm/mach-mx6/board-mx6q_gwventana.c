@@ -1139,6 +1139,7 @@ static struct i2c_board_info ventana_egalax_i2cinfo = {
 static struct tsc2007_platform_data tsc2007_pdata = {
 	.model		= 2007,
 	.x_plate_ohms	= 400,
+	.invert_rt	= true,
 };
 static struct i2c_board_info ventana_tsc2007_i2cinfo = {
 	I2C_BOARD_INFO("tsc2007", 0x49),
