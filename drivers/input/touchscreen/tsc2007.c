@@ -75,6 +75,7 @@ struct tsc2007 {
 	u16			max_rt;
 	unsigned long		poll_delay;
 	unsigned long		poll_period;
+	bool			invert_rt;
 
 	bool			pendown;
 	int			irq;
@@ -138,6 +139,12 @@ static u32 tsc2007_calculate_pressure(struct tsc2007 *tsc, struct ts_event *tc)
 		rt = (rt + 2047) >> 12;
 	}
 
+	if (tsc->invert_rt) {
+		if (rt > tsc->max_rt)
+			rt = 0;
+		else
+			rt = tsc->max_rt - rt;
+	}
 	return rt;
 }
 
@@ -299,6 +306,7 @@ static int __devinit tsc2007_probe(struct i2c_client *client,
 	ts->poll_period       = pdata->poll_period ? : 1;
 	ts->get_pendown_state = pdata->get_pendown_state;
 	ts->clear_penirq      = pdata->clear_penirq;
+	ts->invert_rt         = pdata->invert_rt;
 
 	if (tsc2007_xfer(ts, PWRDOWN) < 0) {
 		err = -ENODEV;
