@@ -1044,7 +1044,7 @@ static void adv7180_pdwn(int powerdown) {
 	gpio_set_value(IMX_GPIO_NR(5,20), powerdown ? 0 : 1);
 }
 
-/* Analog Video In - IPU2_CSI1 */
+/* Analog Video In */
 static struct fsl_mxc_tvin_platform_data adv7180_pdata = {
 	.dvddio_reg = "VDD_DLY_3P3",
 	.dvdd_reg = "DVDD", // VDD_1P8
@@ -2023,6 +2023,15 @@ static int __init ventana_model_setup(void)
 				gpio_export(IMX_GPIO_NR(2,18), 0);
 				gpio_direction_input(IMX_GPIO_NR(2,18));
 
+				/* Video In (adv7180) */
+				if (info->config_vid_in) {
+					adv7180_pdata.csi = 1;
+					adv7180_pdata.io_init = mx6_csi1_io_init;
+					capture_data[1].csi = 1;
+					/* IPU1_CSI1 on MX6DL, IPU2_CSI1 on MX6Q */
+					capture_data[1].ipu = (cpu_is_mx6q()) ? 1 : 0;
+				}
+
 				/* NAND */
 				if (info->config_nand)
 					imx6q_add_gpmi(&mx6q_gpmi_nand_platform_data);
@@ -2191,13 +2200,13 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(2,18), 0);
 			gpio_direction_input(IMX_GPIO_NR(2,18));
 
-			/* Video In */
+			/* Video In (adv7180) */
 			if (info->config_vid_in) {
-				/* use IPU1_CSI1 for adv7180 */
 				adv7180_pdata.csi = 1;
 				adv7180_pdata.io_init = mx6_csi1_io_init;
 				capture_data[0].csi = 1;
-				capture_data[0].ipu = 0;
+				/* IPU1_CSI1 on MX6DL, IPU2_CSI1 on MX6Q */
+				capture_data[0].ipu = (cpu_is_mx6q()) ? 1 : 0;
 			}
 
 			/* NAND */
@@ -2347,13 +2356,13 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(2,18), 0);
 			gpio_direction_input(IMX_GPIO_NR(2,18));
 
-			/* Video In */
+			/* Video In (adv7180) */
 			if (info->config_vid_in) {
-				/* use IPU1_CSI1 for adv7180 */
 				adv7180_pdata.csi = 1;
 				adv7180_pdata.io_init = mx6_csi1_io_init;
 				capture_data[0].csi = 1;
-				capture_data[0].ipu = 0;
+				/* IPU1_CSI1 on MX6DL, IPU2_CSI1 on MX6Q */
+				capture_data[0].ipu = (cpu_is_mx6q()) ? 1 : 0;
 			}
 
 			/* NAND */
@@ -2525,7 +2534,7 @@ static int __init ventana_model_setup(void)
 			gpio_export(IMX_GPIO_NR(2,18), 0);
 			gpio_direction_input(IMX_GPIO_NR(2,18));
 
-			/* Video Decoder Powerdown */
+			/* Video In (adv7180) */
 			if (info->config_vid_in) {
 				/* use IPU1_CSI0 for adv7180 */
 				adv7180_pdata.csi = 0;
@@ -2650,9 +2659,8 @@ static int __init ventana_model_setup(void)
 		}
 
 		/* IPU (imx6q has 2, imx6dl has 1) */
-		if (info->config_ipu0)
-			imx6q_add_ipuv3(0, &ipu_data[0]);
-		if (info->config_ipu1 && cpu_is_mx6q())
+		imx6q_add_ipuv3(0, &ipu_data[0]);
+		if (cpu_is_mx6q())
 			imx6q_add_ipuv3(1, &ipu_data[1]);
 		if (info->config_ipu0 || info->config_ipu1)
 			imx6q_add_vdoa();            // Video Data Order Adapter
