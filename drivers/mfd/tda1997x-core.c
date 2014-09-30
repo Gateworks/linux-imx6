@@ -1378,7 +1378,7 @@ static int io_write(u16 reg, u8 val)
 	/* page 80 denotes CEC reg which needs to go out cec_client */
 	BUG_ON(reg>>8 == 0x80);
 
-	mutex_unlock(&tda1997x->page_lock);
+	mutex_lock(&tda1997x->page_lock);
 	if (tda1997x_setpage(reg>>8)) {
 		ret = -1;
 		goto out;
@@ -1393,9 +1393,9 @@ static int io_write(u16 reg, u8 val)
 		ret = -1;
 		goto out;
 	}
-	mutex_unlock(&tda1997x->page_lock);
 
 out:
+	mutex_unlock(&tda1997x->page_lock);
 	return ret;
 }
 /* 16bit write */
