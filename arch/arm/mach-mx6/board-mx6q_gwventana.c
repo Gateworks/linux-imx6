@@ -1185,6 +1185,7 @@ static struct i2c_board_info ventana_tca8418_i2cinfo = {
 };
 
 struct gsp_sensor_info gw16107_sensors[] = {
+        {"PADDLE",	0x00 },
         {"VDD_12P0",	0x02 },
         {"VDD_3P3",	0x05 },
         {"VDD_5P0",	0x08 },
@@ -1198,7 +1199,6 @@ struct gsp_sensor_info gw16107_sensors[] = {
         {"ANALOG_8",	0x20 },
         {"ANALOG_9",	0x23 },
         {"ANALOG_C",	0x26 },
-        {"PADDLE",	0x29 },
 };
 struct gsp_platform_data gw16107_pdata = {
         .sensors = gw16107_sensors,
