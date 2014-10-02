@@ -24,6 +24,24 @@ config FB_MXC_LDB
 	depends on MXC_IPU_V3 || FB_MXS
 	select VIDEOMODE_HELPERS
 
+config FB_MXC_BT656
+	tristate "MXC BT656 and BT1120 output"
+	depends on FB_MXC_SYNC_PANEL
+	depends on MXC_IPU_V3
+
+config FB_MXC_BT656_IF_DI_MSB
+	int "DISP port data MSB used for BT656 interface"
+	depends on FB_MXC_BT656
+	default 23
+	help
+	  This spcifies the upper bit of the parallel output data port used
+	  for BT656 devices. For example;
+	    23 for 8bit DISP_DAT23-DISP_DAT16
+	    15 for 8bit DISP_DAT15-DISP_DAT8
+	     7 for 8bit DISP_DAT7 -DISP_DAT0
+	    23 for 16bit DISP_DAT23-DISP_DAT8
+	    15 for 16bit DISP_DAT15-DISP_DAT0
+
 config FB_MXC_MIPI_DSI
 	tristate "MXC MIPI_DSI"
 	depends on FB_MXC_SYNC_PANEL
