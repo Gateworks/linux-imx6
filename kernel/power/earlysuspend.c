@@ -23,6 +23,7 @@
 
 #include "power.h"
 
+#ifdef CONFIG_ANDROID
 enum {
 	DEBUG_USER_STATE = 1U << 0,
 	DEBUG_SUSPEND = 1U << 2,
@@ -185,3 +186,15 @@ suspend_state_t get_suspend_state(void)
 {
 	return requested_suspend_state;
 }
+
+#else
+void request_suspend_state(suspend_state_t new_state)
+{
+}
+void register_early_suspend(struct early_suspend *handler)
+{
+}
+void unregister_early_suspend(struct early_suspend *handler)
+{
+}
+#endif
