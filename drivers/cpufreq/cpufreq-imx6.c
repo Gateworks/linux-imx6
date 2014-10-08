@@ -111,9 +111,10 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 			return -EINVAL;
 	}
 
-	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld mV\n",
+	dev_dbg(cpu_dev, "%u MHz, %ld mV --> %u MHz, %ld/%ld mV\n",
 		freqs.old / 1000, volt_old / 1000,
-		freqs.new / 1000, volt / 1000);
+		freqs.new / 1000, volt / 1000,
+		imx6_soc_opp[soc_opp_index].soc_volt / 1000);
 
 	/*
 	  * CPU freq is increasing, so need to ensure
