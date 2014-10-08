@@ -62,6 +62,7 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 	unsigned long freq_hz, volt, volt_old;
 	unsigned int index, soc_opp_index = 0;
 	int ret;
+	int tol = 25000; /* 25mv tollerance */
 
 	mutex_lock(&set_cpufreq_lock);
 
@@ -128,7 +129,7 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 		if (!IS_ERR(pu_reg) && regulator_is_enabled(pu_reg)) {
 			ret = regulator_set_voltage_tol(pu_reg,
 					imx6_soc_opp[soc_opp_index].soc_volt,
-					0);
+					tol);
 			if (ret) {
 				dev_err(cpu_dev,
 					"failed to scale vddpu up: %d\n", ret);
@@ -136,13 +137,13 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 			}
 		}
 		ret = regulator_set_voltage_tol(soc_reg,
-				imx6_soc_opp[soc_opp_index].soc_volt, 0);
+				imx6_soc_opp[soc_opp_index].soc_volt, tol);
 		if (ret) {
 			dev_err(cpu_dev,
 				"failed to scale vddsoc up: %d\n", ret);
 			goto err1;
 		}
-		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+		ret = regulator_set_voltage_tol(arm_reg, volt, tol);
 		if (ret) {
 			dev_err(cpu_dev,
 				"failed to scale vddarm up: %d\n", ret);
@@ -175,7 +176,7 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 
 	/* scaling down?  scale voltage after frequency */
 	if (freqs.new < freqs.old) {
-		ret = regulator_set_voltage_tol(arm_reg, volt, 0);
+		ret = regulator_set_voltage_tol(arm_reg, volt, tol);
 		if (ret) {
 			dev_warn(cpu_dev,
 				 "failed to scale vddarm down: %d\n", ret);
@@ -183,7 +184,7 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 		}
 
 		ret = regulator_set_voltage_tol(soc_reg,
-				imx6_soc_opp[soc_opp_index].soc_volt, 0);
+				imx6_soc_opp[soc_opp_index].soc_volt, tol);
 		if (ret) {
 			dev_err(cpu_dev,
 				"failed to scale vddsoc down: %d\n", ret);
@@ -193,7 +194,7 @@ static int imx6_set_target(struct cpufreq_policy *policy,
 		if (!IS_ERR(pu_reg) && regulator_is_enabled(pu_reg)) {
 			ret = regulator_set_voltage_tol(pu_reg,
 					imx6_soc_opp[soc_opp_index].soc_volt,
-					0);
+					tol);
 			if (ret) {
 				dev_err(cpu_dev,
 				"failed to scale vddpu down: %d\n", ret);
