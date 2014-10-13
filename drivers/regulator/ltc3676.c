@@ -75,6 +75,7 @@ enum ltc3676_reg {
 
 struct ltc3676_regulator {
 	struct regulator_desc desc;
+	struct device_node *np;
 
 	/* External feedback voltage divider */
 	unsigned int r1;
@@ -138,16 +139,8 @@ static struct regulator_ops ltc3676_linear_regulator_ops =
 	.set_suspend_mode = ltc3676_set_suspend_mode,
 };
 
-/* LDO1 always on fixed 0.8V-3.3V via scalar via R1/R2 feeback res */
+/* always on fixed regulators */
 static struct regulator_ops ltc3676_fixed_standby_regulator_ops = {
-};
-
-/* LDO2, LDO3 fixed (LDO2 has external scalar via R1/R2 feedback res) */
-static struct regulator_ops ltc3676_fixed_regulator_ops = 
-{
-	.enable = regulator_enable_regmap,
-	.disable = regulator_disable_regmap,
-	.is_enabled = regulator_is_enabled_regmap,
 };
 
 #define LTC3676_REG(_name, _ops, en_reg, en_bit, dvba_reg, dvb_mask)   \
@@ -175,18 +168,18 @@ static struct regulator_ops ltc3676_fixed_regulator_ops =
 		    LTC3676_ ## _en, 7,                                \
 		    LTC3676_ ## _dvba, 0x1f)
 
-#define LTC3676_FIXED_REG(_name, _en_reg, _en_bit) \
-	LTC3676_REG(_name, fixed, LTC3676_ ## _en_reg, _en_bit, 0, 0)
+#define LTC3676_FIXED_REG(_name) \
+	LTC3676_REG(_name, fixed_standby, 0, 0, 0, 0)
 
 static struct ltc3676_regulator ltc3676_regulators[LTC3676_NUM_REGULATORS] = {
 	LTC3676_LINEAR_REG(SW1, BUCK1, DVB1A),
 	LTC3676_LINEAR_REG(SW2, BUCK2, DVB2A),
 	LTC3676_LINEAR_REG(SW3, BUCK3, DVB3A),
 	LTC3676_LINEAR_REG(SW4, BUCK4, DVB4A),
-	LTC3676_REG(LDO1, fixed_standby, 0, 0, 0, 0),
-	LTC3676_FIXED_REG(LDO2, LDOA, 2),
-	LTC3676_FIXED_REG(LDO3, LDOA, 5),
-	LTC3676_FIXED_REG(LDO4, LDOB, 2),
+	LTC3676_FIXED_REG(LDO1),
+	LTC3676_FIXED_REG(LDO2),
+	LTC3676_FIXED_REG(LDO3),
+	LTC3676_FIXED_REG(LDO4),
 };
 
 #ifdef CONFIG_OF
@@ -220,19 +213,15 @@ static int ltc3676_parse_regulators_dt(struct ltc3676 *ltc3676)
 		dev_err(dev, "Error parsing regulator init data: %d\n", ret);
 		return -EINVAL;
 	}
-	if (ret != LTC3676_NUM_REGULATORS) {
-		dev_err(dev, "Only %d regulators described in device tree\n",
-			ret);
-		return -EINVAL;
-	}
 
 	/* parse feedback voltage deviders: LDO3 doesn't have them */
 	for (i = 0; i < LTC3676_NUM_REGULATORS; i++) {
-		struct ltc3676_regulator *desc = &ltc3676->regulator_descs[i];
+		struct ltc3676_regulator *rdesc = &ltc3676->regulator_descs[i];
 		struct device_node *np = ltc3676_matches[i].of_node;
 		u32 vdiv[2];
 
-		if (i == LTC3676_LDO3)
+		rdesc->np = ltc3676_matches[i].of_node;
+		if (i == LTC3676_LDO3 || !rdesc->np)
 			continue;
 		ret = of_property_read_u32_array(np, "lltc,fb-voltage-divider",
 						 vdiv, 2);
@@ -242,8 +231,8 @@ static int ltc3676_parse_regulators_dt(struct ltc3676 *ltc3676)
 			return ret;
 		}
 
-		desc->r1 = vdiv[0];
-		desc->r2 = vdiv[1];
+		rdesc->r1 = vdiv[0];
+		rdesc->r2 = vdiv[1];
 	}
 
 	return 0;
@@ -449,6 +438,9 @@ static int ltc3676_regulator_probe(struct i2c_client *client,
 		struct regulator_config config = { };
 
 		init_data = match_init_data(i);
+
+		if (!rdesc->np)
+			continue;
 
 		if (i != LTC3676_LDO3) {
 			/* skip unused (defined by r1=r2=0) */
