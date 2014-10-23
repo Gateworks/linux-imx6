@@ -742,8 +742,20 @@ static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
 static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
 {
 	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+	int irq;
 
-	return pp->irq;
+	switch (pin) {
+	case 1: irq = pp->irq; break;
+	case 2: irq = pp->irq - 1; break;
+	case 3: irq = pp->irq - 2; break;
+	case 4: irq = pp->irq - 3; break;
+	default: irq = -1; break;
+	}
+
+	dev_info(&dev->dev, "map_irq: %04x:%04x slot%d pin%d irq%d\n",
+		 dev->vendor, dev->device, slot, pin, irq);
+
+	return irq;
 }
 
 static void dw_pcie_add_bus(struct pci_bus *bus)
