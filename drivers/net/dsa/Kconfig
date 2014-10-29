@@ -44,4 +44,12 @@ config NET_DSA_MV88E6171
 	---help---
 	  This enables support for the Marvell 88E6171 ethernet switch
 	  chip.
+
+config NET_DSA_MV88E6352
+	tristate "Marvell 88E6352 ethernet switch chip support"
+	select NET_DSA
+	select NET_DSA_MV88E6XXX
+	select NET_DSA_TAG_EDSA
+	---help---
+	  This enables support for the Marvell 88E6352 ethernet switch chip.
 endmenu
