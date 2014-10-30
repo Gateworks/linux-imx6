@@ -40,6 +40,36 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 
+/* Set codec bit size, rate from params */
+static int tda1997x_pcm_hw_params(struct snd_pcm_substream *substream,
+	struct snd_pcm_hw_params *params,
+	struct snd_soc_dai *dai)
+{
+	tda1997x_audout_fmt_t fmt;
+	int ret;
+
+	ret = tda1997x_get_audout_fmt(&fmt);
+	if (ret) {
+		dev_err(dai->dev, "invalid info fromt da1997x: %d\n", ret);
+		return -EIO;
+	}
+	if (params_rate(params) != fmt.samplerate) {
+		dev_err(dai->dev, "invalid samplerate - %d required\n",
+			fmt.samplerate);
+		return -EINVAL;
+	}
+
+	/*
+	 * TODO: validate the sample-rate and format, but that information
+	 * is currently inaccruate from the tda1997x driver
+	 */
+
+	return 0;
+}
+
+static const struct snd_soc_dai_ops tda1997x_ops = {
+	.hw_params = tda1997x_pcm_hw_params,
+};
 
 static struct snd_soc_dai_driver tda1997x_codec_dai = {
 	.name = "tda1997x",
@@ -48,9 +78,13 @@ static struct snd_soc_dai_driver tda1997x_codec_dai = {
 		.channels_min = 2,
 		.channels_max = 2,
 		/* rate and foramat are dependent on the HDMI source */
-		.rates = SNDRV_PCM_RATE_44100,
+		.rates = SNDRV_PCM_RATE_32000 |
+			SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
+			SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000 |
+			SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_192000,
 		.formats = SNDRV_PCM_FMTBIT_S16_LE,
 	},
+	.ops = &tda1997x_ops,
 };
 
 static int tda1997x_probe(struct snd_soc_codec *codec)
