@@ -1094,14 +1094,19 @@ struct tda1997x_data {
 	u16 key_decryption_seed;
 
 	/* video source */
-	tda1997x_vidout_fmt_t video_mode;
 	tda1997x_colorspace_t colorspace;
 	tda1997x_colorimetry_t colorimetry;
 	tda1997x_restype_t resolutiontype;
 
+	/* video source and output format */
+	tda1997x_vidout_fmt_t video_mode;
+
 	/* audio source */
-	tda1997x_audout_fmt_t audio_mode;
 	u8  channel_assignment;
+	int source_channels;
+
+	/* audio output format */
+	tda1997x_audout_fmt_t audio_mode;
 };
 
 #ifdef DEBUG
@@ -2243,7 +2248,7 @@ tda1997x_configure_audio_formatter(struct tda1997x_platform_data *pdata,
 		channel_assignment, pdata->audio_auto_mute);
 
 	/* AUDIO_PATH bits:
-	 *  7:0 - channel assignment
+	 *  7:0 - channel assignment (CEA-861-D Table 20)
 	 */
 	io_write(REG_AUDIO_PATH, channel_assignment);
 
@@ -2919,23 +2924,8 @@ tda1997x_get_audio_frequency(struct tda1997x_data *tda1997x)
 		case 0x07: freq=192000; break;
 	}
 
-	if (freq != tda1997x->audio_mode.samplerate) {
-		DPRINTK(0, "Audio: %ldHz %s\n", freq, (reg & 0x80)?"double":"single");
-		tda1997x->audio_mode.samplerate = freq;
-		tda1997x->audio_mode.samplesize = (io_read(REG_AUDIO_SEL)&(1<<4))?2:1;
-		/* not sure how to tell how many channels there are */
-		switch(tda1997x->pdata->audout_layout) {
-			case AUDIO_LAYOUT_FORCED_0:
-				tda1997x->audio_mode.channels = (reg & 0x80)?2:1; /* stereo */
-				break;
-			case AUDIO_LAYOUT_FORCED_1:
-				tda1997x->audio_mode.channels = (reg & 0x80)?8:4; /* ?? */
-				break;
-			default:
-				tda1997x->audio_mode.channels = 2; /* ?? */
-				break;
-		}
-	}
+	DPRINTK(0, "REG_AUDIO_FREQ=0x%02x: %ldHz\n", reg, freq);
+	tda1997x->audio_mode.samplerate = freq;
 
 	return 0;
 }
@@ -3167,6 +3157,12 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 				(d[8] & 0x80) >> 7,  /* DM_INH */
 				(d[8] & 0x78) >> 3); /* LSV3, LSV2, LSV1, LSV0 */
 
+			/* Channel Count */
+			tda1997x->source_channels = (d[4] & 0x07) + 1;
+			DPRINTK(0, "Audio Channels: %d\n",
+				tda1997x->source_channels);
+
+			/* Channel Assignment */
 			if ( (d[7] <= 0x1f)    /* MAX_CHANNEL_ALLOC */
 				&& (d[7] != tda1997x->channel_assignment)
 			  && !tda1997x->pdata->audio_force_channel_assignment)
@@ -3756,8 +3752,9 @@ static void tda1997x_work(struct work_struct *work)
 			if (source & MASK_AUDIO_FREQ_FLG) {
 				DPRINTK(0, "\tAudio freq change\n");
 				tda1997x_get_audio_frequency(tda1997x);
-				printk(KERN_INFO "%s: Audio Frequency Change: %dHz\n", KBUILD_MODNAME,
-					tda1997x->audio_mode.samplerate);
+				printk(KERN_INFO "%s: Audio Frequency Change: %dHz\n",
+				     KBUILD_MODNAME,
+				     tda1997x->audio_mode.samplerate);
 			}
 			if (source & MASK_AUDIO_FLG) {
 				reg = io_read(REG_AUDIO_FLAGS);
@@ -4159,6 +4156,27 @@ static int tda1997x_probe(struct i2c_client *client,
 	INIT_WORK(&tda1997x->work, tda1997x_work);
 	mutex_init(&tda1997x->page_lock);
 	mutex_init(&tda1997x->cec_lock);
+	switch(pdata->audout_layout) {
+	case AUDIO_LAYOUT_FORCED_0:
+		tda1997x->audio_mode.channels = 2;
+		break;
+	case AUDIO_LAYOUT_FORCED_1:
+		tda1997x->audio_mode.channels = 8;
+		break;
+	default:
+		tda1997x->audio_mode.channels = 8;
+		break;
+	}
+	switch(pdata->audout_format) {
+	case AUDIO_FMT_I2S16:
+		tda1997x->audio_mode.samplesize = 2;
+		break;
+	case AUDIO_FMT_I2S32:
+		tda1997x->audio_mode.samplesize = 2;
+		break;
+	default:
+		tda1997x->audio_mode.samplesize = 0;
+	}
 
 	/* sysfs hooks */
 	ret = sysfs_create_group(&client->dev.kobj, &attr_group);
