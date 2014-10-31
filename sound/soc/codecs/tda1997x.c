@@ -40,35 +40,37 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 
-/* Set codec bit size, rate from params */
-static int tda1997x_pcm_hw_params(struct snd_pcm_substream *substream,
-	struct snd_pcm_hw_params *params,
+/* refine sample-rate based on HDMI source */
+static int tda1997x_pcm_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_dai *dai)
 {
-	tda1997x_audout_fmt_t fmt;
-	int ret;
+	struct snd_soc_codec *codec = dai->codec;
+	struct snd_pcm_runtime *rtd = substream->runtime;
+        tda1997x_audout_fmt_t fmt;
+	int rate, ret;
 
-	ret = tda1997x_get_audout_fmt(&fmt);
+        ret = tda1997x_get_audout_fmt(&fmt);
 	if (ret) {
-		dev_err(dai->dev, "invalid info fromt da1997x: %d\n", ret);
+		dev_err(codec->dev, "failed to obtain tda1997x info: %d\n",
+			ret);
 		return -EIO;
 	}
-	if (params_rate(params) != fmt.samplerate) {
-		dev_err(dai->dev, "invalid samplerate - %d required\n",
-			fmt.samplerate);
-		return -EINVAL;
-	}
+	rate = fmt.samplerate;
 
-	/*
-	 * TODO: validate the sample-rate and format, but that information
-	 * is currently inaccruate from the tda1997x driver
-	 */
+	ret = snd_pcm_hw_constraint_minmax(rtd, SNDRV_PCM_HW_PARAM_RATE,
+					   rate, rate);
+	if (ret > 0)
+		dev_info(codec->dev, "set samplerate constraint to %dHz\n",
+			 rate);
+	else
+		dev_err(codec->dev, "failed to set samplerate constraint "
+			"to %dHz: %d\n", rate, ret);
 
 	return 0;
 }
 
 static const struct snd_soc_dai_ops tda1997x_ops = {
-	.hw_params = tda1997x_pcm_hw_params,
+	.startup = tda1997x_pcm_startup,
 };
 
 static struct snd_soc_dai_driver tda1997x_codec_dai = {
