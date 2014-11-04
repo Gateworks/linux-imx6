@@ -46,6 +46,9 @@
 #include <linux/mfd/tda1997x-core.h>
 #include <linux/time.h>
 
+#include <drm/drm_edid.h>
+#include <drm/drm_crtc.h>
+
 /* Voltage regulators */
 #define TDA1997X_VOLTAGE_DIGITAL_IO	3300000
 #define TDA1997X_VOLTAGE_DIGITAL_CORE	1800000
@@ -256,9 +259,7 @@ static struct regulator *avdd_regulator;
 #define REG_TEST_MODE           0x1437
 
 /* Page 0x20 */
-#define REG_EDID_IN_BYTE0       0x2000
-// ...
-#define REG_EDID_IN_BYTE127     0x207F
+#define REG_EDID_IN_BYTE0       0x2000 /* EDID base */
 #define REG_EDID_IN_VERSION     0x2080
 #define REG_EDID_ENABLE         0x2081
 #define REG_HPD_POWER           0x2084
@@ -267,9 +268,7 @@ static struct regulator *avdd_regulator;
 #define REG_RX_HPD_HEAC         0x2087
 
 /* Page 0x21 */
-#define REG_EDID_IN_BYTE128     0x2100
-// ...
-#define REG_EDID_IN_BYTE255     0x217F
+#define REG_EDID_IN_BYTE128     0x2100 /* CEA Extension block */
 #define REG_EDID_IN_SPA_SUB     0x2180
 #define REG_EDID_IN_SPA_AB_A    0x2181
 #define REG_EDID_IN_SPA_CD_A    0x2182
@@ -1458,7 +1457,7 @@ u8 edid_block[256] = {
  0x02, 0x03, 0x21, 0xf0, 0x4c, 0x22, 0x20, 0x21,
  0x04, 0x13, 0x03, 0x12, 0x05, 0x14, 0x07, 0x16,
  0x01, 0x23, 0x09, 0x07, 0x07, 0x83, 0x01, 0x00,
- 0x00, 0x67, 0x03, 0x0c, 0x00, 0x00, 0x00, 0xb8,
+ 0x00, 0x67, 0x03, 0x0c, 0x10, 0x00, 0x00, 0xb8,
  0x2d, 0x01, 0x1d, 0x80, 0x18, 0x71, 0x38, 0x2d,
  0x40, 0x58, 0x2c, 0x45, 0x00, 0x80, 0x38, 0x74,
  0x00, 0x00, 0x3f, 0x01, 0x1d, 0x00, 0x72, 0x51,
@@ -1470,13 +1469,14 @@ u8 edid_block[256] = {
  0x60, 0x22, 0x01, 0x80, 0xe0, 0x21, 0x00, 0x00,
  0x39, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
- 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xa7,
+ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x97,
 };
 
 /* DDC config 0 (page 0x20) */
 u8 ddc_config0[8] = {
 	/* 0x80: EDID_VERSION */
 	0x19, /* main=0x19 */
+
 	/* 0x81: EDID_ENABLE bits:
 	 *   7 - unused
 	 *   6 - edid_only
@@ -1485,6 +1485,7 @@ u8 ddc_config0[8] = {
 	 *   0 - edid_a_en
 	 */
 	0x41, /* enable EDID for A only */
+
 	/* 0x82: EDID_BLOCK_SELECT bits:
 	 * 7:6 - ddc_b_blk1_sel
 	 * 5:4 - ddc_b_blk0_sel
@@ -1492,8 +1493,10 @@ u8 ddc_config0[8] = {
 	 * 1:0 - ddc_a_blk0_sel
 	 */
 	0x44, /* ddc_b_blk1_sel=1 ddc_a_blk1_sel=1 */
+
 	/* 0x83: empty */
 	0x00,
+
 	/* 0x84: HPD_POWER bits:
 	 * 7:5 - unused
 	 * 4:3 - hpd_bp
@@ -1501,6 +1504,7 @@ u8 ddc_config0[8] = {
 	 * 1:0 - unused
 	 */
 	0x06, /* hpd_bp=1 hpd_edid_only=1 */
+
 	/* 0x85: HPD_AUTO_CTRL bits
 	 *   7 - read_edid
 	 *   6 - unused
@@ -1512,48 +1516,16 @@ u8 ddc_config0[8] = {
 	 *   0 - hpd_new_ch
 	 */
 	0x18, /* hpd_other=1, hdp_unsel=1 */
+
 	/* 0x86: HPD_DURATION */
 	0x00, /* hpd_duration=0 */
+
 	/* 0x87: RX_HPD_HEAC bits
 	 * 7:2 - unused
 	 *   1 - heac_b_en
 	 *   0 - heac_a_en
 	 */
 	0x00,
-};
-
-/* DDC config 1 (page 0x21) */
-u8 ddc_config1[7] = {
-	/* 0x80: EDID_IN_SPA_SUB */
-	0x08, /* edid_in_spa_sub=0x08 */
-	/* 0x81: EDID_IN_SPA_AB_A bits
-	 * 7:4 - edid_in_spa_a_a
-	 * 3:0 - edid_in_spa_b_a
-	 */
-	0x10, /* edid_in_spa_a_a=1 */
-	/* 0x82: EDID_IN_SPA_CD_A bits
-	 * 7:4 - edid_in_spa_c_a
-	 * 3:0 - edid_in_spa_d_a
-	 */
-	0x00,
-	/* 0x83: EDID_IN_CHECKSUM_A */
-	0xa2,
-	/* 0x84: EDID_IN_SPA_AB_B bits
-	 * 7:4 - edid_in_spa_a_b
-	 * 3:0 - edid_in_spa_b_b
-	 */
-	0x00,
-	/* 0x85: EDID_IN_SPA_CD_B bits
-	 * 7:4 - edid_in_spa_c_b
-	 * 3:0 - edid_in_spa_d_b
-	 */
-	0x00,
-	/* 0x86: EDID_IN_CHECKSUM_B */
-	0xb2,
-};
-u16 spa_edid[2] = {
-	(0x10 << 8) + 0x00,
-	(0x00 << 8) + 0x00,
 };
 
 /* RT config (page 0x30) */
@@ -1569,11 +1541,13 @@ u8 rt_config[6] = {
 	 *   0 - rt_new_ch
 	 */
 	0x78,
+
 	/* 0x01: EQ_MAN_CTRL0 bits:
 	 * 7-3 - unused
 	 * 2-0 - ch0_man_gain
 	 */
 	0x03, /* ch0_man_gain=3 */
+
 	/* 0x02: EQ_MAN_CTRL1 bits:
 	 *   7 - unused
 	 * 6-4 - ch1_man_gain
@@ -1581,6 +1555,7 @@ u8 rt_config[6] = {
 	 * 2-0 - ch2_man_gain
 	 */
 	0x33, /* ch1_man_gain=3 ch2_man_gain=3 */
+
 	/* 0x03: OUTPUT_CFG bits
 	 *   7 - eq_cal_act
 	 *   6 - eq_cal_ch
@@ -1592,6 +1567,7 @@ u8 rt_config[6] = {
 	 *   0 - vp_idle
 	 */
 	0xf0, /* eq_cal_act=1 eq_cal_ch=1 eq_cal_5v=1 eq_cal_cond=1 */
+
 	/* 0x04: MUTE_CTRL bits
 	 * 7:3 - unused
 	 *   2 - mute_man
@@ -1599,6 +1575,7 @@ u8 rt_config[6] = {
 	 *   0 - mute_ena
 	 */
 	0x00,
+
 	/* 0x05: SLAVE_ADDR bits
 	 * 7:6 - unused
 	 *   5 - i2c_cec_a1
@@ -1613,13 +1590,105 @@ u8 rt_config[6] = {
 
 static u32 reg = 0;
 
+/** Loads EDID data into embedded EDID memory of receiver device
+ * @edid - pointer to two block EDID (array of 256 bytes) common to both inputs
+ *
+ * A common EDID block is used for both inputs with the exception of the
+ * SPA (Source Physical Address) used for CEC. Therefore, we locate the SPA
+ * within the EDID passed and treating it as the SPA for InputA while adding
+ * 1 to it for the SPA for InputB. The EDID is written into nvram as well
+ * as the SPA offset, SPA's and adjusted checksums for both inputs.
+ */
+static int tda1997x_load_edid_data(u8 *edid)
+{
+	u8 chksum, chksum_spa;
+	int i, n, spa_offset = 0;
+	u16 spa;
+
+	DPRINTK(0,"%s\n", __func__);
+
+	/* sanity check EDID data: base block, extensions, checksums */
+	if (!drm_edid_is_valid((struct edid *) edid)) {
+		printk(KERN_ERR "edid data is invalid\n");
+		return -EINVAL;
+	}
+	if (edid[0x7e] != 1) {
+		printk(KERN_ERR "edid requires a single CEA extension block\n");
+		return -EINVAL;
+	}
+
+	/* Find SPA offset within CEA extentsion */
+	for (i = 1; i <= edid[0x7e]; i++) {
+		u8 *ext = edid + (i * EDID_LENGTH);
+
+		/* look for CEA v3 extension */
+		if (ext[0] != 0x02 || ext[1] != 0x03)
+			continue;
+
+		/* make sure we have a DBC */
+		if (ext[2] < 5)
+			continue;
+
+		/* iterate through DBC's until we find the Vendor block */
+		for (n = 4; n < ext[2]; n++) {
+			char type = (ext[n] & 0xe0) >> 5;
+			char len = (ext[n] & 0x1f);
+			if (type == 3) {
+				if (ext[n+1] == 0x03 && ext[n+2] == 0x0c) {
+					spa_offset = n+4;
+					spa = ext[spa_offset] << 8 |
+					      ext[spa_offset+1];
+				}
+			}
+			n += len;
+		}
+	}
+	if (!spa_offset) {
+		printk(KERN_ERR
+		       "EDID requires an HDMI Vendor Specific Data Block\n");
+		return -EINVAL;
+	}
+
+	/* calculate ext block checksum w/o SPA */
+	chksum = 0;
+	for (i = 0; i < 127; i++)
+		if (i != spa_offset && i != (spa_offset + 1))
+			chksum += edid[i+128];
+
+	/* write base EDID */
+	for (i = 0; i < 128; i++)
+		io_write(REG_EDID_IN_BYTE0 + i, edid[i]);
+
+	/* write CEA Extension */
+	for (i = 0; i < 128; i++)
+		io_write(REG_EDID_IN_BYTE128 + i, edid[i+128]);
+
+	/* SPA for InputA */
+	io_write16(REG_EDID_IN_SPA_AB_A, spa);
+	chksum_spa = (u8)((spa & 0xff00)>>8) + (u8)(spa & 0x00ff) + chksum;
+	chksum_spa = (u8)((0xff - chksum_spa) + 0x01); /* 2's complement */
+	io_write(REG_EDID_IN_CKSUM_A, chksum_spa);
+
+	/* SPA for InputB */
+	spa += 1;
+	io_write16(REG_EDID_IN_SPA_AB_B, spa);
+	chksum_spa = (u8)((spa & 0xff00)>>8) + (u8)(spa & 0x00ff) + chksum;
+	chksum_spa = (u8)((0xff - chksum_spa) + 0x01); /* 2's comp */
+	io_write(REG_EDID_IN_CKSUM_B, chksum_spa);
+
+	/* write source physical address subaddress offset */
+	io_write(REG_EDID_IN_SPA_SUB, spa_offset);
+
+	return 0;
+}
+
 /*
  * sysfs hooks
  */
 static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 	char *buf)
 {
-	int rz = 0, i;
+	int rz = 0;
 	const char *name = attr->attr.name;
 	struct tda1997x_data *tda1997x = &tda1997x_data;
 	unsigned long flags;
@@ -1686,8 +1755,6 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 	return rz;
 }
 
-static int tda1997x_load_edid_data(const u8 *edid, const u16 *spa, u8 spa_offset);
-
 static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 	const char *buf, size_t count)
 {
@@ -1700,7 +1767,7 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 		for (i = 0; i < count; i++)
 			edid_block[i] = buf[i];
 		printk(KERN_INFO "TDA1997x-core: New EDID being loaded\n");
-		tda1997x_load_edid_data(edid_block, spa_edid, ddc_config1[0]);
+		tda1997x_load_edid_data(edid_block);
 	} else if (strcasecmp(name, "reg") == 0) {
 			i = sscanf(buf, "%x %x", &reg, &val);
 			if (i == 2) {
@@ -1758,62 +1825,6 @@ static struct attribute *tda1997x_attrs[] = {
 static struct attribute_group attr_group = {
 	.attrs = tda1997x_attrs,
 };
-
-/** Loads EDID data into embedded EDID memory of receiver device
- * @edid - pointer to two block EDID (array of 256 bytes)
- *		 common to all HDMI inputs
- * @spa  - pointer to array of 4 source physical addresses
- *		 (total of 8 bytes written in big endian order).
- * @spa_offset - offset of the first SPA byte inside EDID block 1
- *			   (same for all HDMI inputs: A, B, C and D)
- */
-static int tda1997x_load_edid_data(const u8 *edid, const u16 *spa,
-				   u8 spa_offset)
-{
-	u8 chksum[5];
-	u8 intermediate_chksum = 0;
-	int i;
-
-	DPRINTK(0,"%s\n", __func__);
-	for (i = 0; i < 5; i++)
-		chksum[i] = 0;
-	for (i = 0; i < 127; i++)
-		chksum[0] = chksum[0] + edid[i];
-	chksum[0] = (u8)((0xff - chksum[0]) + 0x01); /* 2's complelement */
-	for (i = 128; i < 255; i++) {
-		if ((i != (128 + spa_offset)) && (i != (128 + spa_offset + 1)))
-			intermediate_chksum = intermediate_chksum + edid[i];
-	}
-	for (i = 0; i < 2; i++) {
-		chksum[i+1] = intermediate_chksum + (u8)((spa[i] & 0xff00)>>8) +
-										  (u8)(spa[i] & 0x00ff);
-		chksum[i+1] = (u8)((0xff - chksum[i+1]) + 0x01);
-	}
-
-	/* write EDID data 0 to 126 */
-	for (i = 0; i < 127; i++)
-		io_write(REG_EDID_IN_BYTE0 + i, edid[i]);	
-	/* write EDID data 127 (checksum) */
-	io_write(REG_EDID_IN_BYTE0 + 127, chksum[0]);
-	/* write EDID data 128 to 255 */
-	for (i = 0; i < 128; i++)
-		io_write(REG_EDID_IN_BYTE128 + i, edid[i+128]);	
-
-	/* write source physical address subaddress register
-	 * (position of the sPA in block 1
-	 */
-	io_write(REG_EDID_IN_SPA_SUB, spa_offset);
-	/* write source physical address registers for input A */
-	io_write16(REG_EDID_IN_SPA_AB_A, spa[0]);
-	/* write checksum for input A */
-	io_write(REG_EDID_IN_CKSUM_A, chksum[1]);
-	/* write source physical address registers for input B */
-	io_write16(REG_EDID_IN_SPA_AB_B, spa[1]);
-	/* write checksum for input B */
-	io_write(REG_EDID_IN_CKSUM_B, chksum[2]);
-
-	return 0;
-}
 
 /** Loads DDC and RT configuration data into embedded memory of receiver device
  * @ddc_config - pointer to the DDC block configuration (8 bytes)
@@ -4452,7 +4463,7 @@ static int tda1997x_probe(struct i2c_client *client,
 	/* Internal EDIDs are enabled - we can now load EDID */
 	if (tda1997x->internal_edid) {
 		/* Load EDID into embedded memory */
-		tda1997x_load_edid_data(edid_block, spa_edid, ddc_config1[0]);
+		tda1997x_load_edid_data(edid_block);
 
 		/* Load DDC and RT data into embedded memory */
 		tda1997x_load_config_data(tda1997x, ddc_config0, rt_config);
