@@ -1142,9 +1142,6 @@ static int uart_get_icount(struct tty_struct *tty,
 static int uart_get_rs485_config(struct uart_port *port,
 			 struct serial_rs485 __user *rs485)
 {
-	if (!port->rs485_config)
-		return -ENOIOCTLCMD;
-
 	if (copy_to_user(rs485, &port->rs485, sizeof(port->rs485)))
 		return -EFAULT;
 	return 0;
@@ -1238,7 +1235,12 @@ uart_ioctl(struct tty_struct *tty, unsigned int cmd,
 	 * All these rely on hardware being present and need to be
 	 * protected against the tty being hung up.
 	 */
+
 	switch (cmd) {
+	case TIOCSERGETLSR: /* Get line status register */
+		ret = uart_get_lsr_info(tty, state, uarg);
+		break;
+
 	case TIOCGRS485:
 		ret = uart_get_rs485_config(state->uart_port, uarg);
 		break;
@@ -1246,15 +1248,6 @@ uart_ioctl(struct tty_struct *tty, unsigned int cmd,
 	case TIOCSRS485:
 		ret = uart_set_rs485_config(state->uart_port, uarg);
 		break;
-	}
-	if (ret != -ENOIOCTLCMD)
-		goto out;
-
-	switch (cmd) {
-	case TIOCSERGETLSR: /* Get line status register */
-		ret = uart_get_lsr_info(tty, state, uarg);
-		break;
-
 	default: {
 		struct uart_port *uport = state->uart_port;
 		if (uport->ops->ioctl)
