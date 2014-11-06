@@ -1734,16 +1734,6 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 	} else if (strcasecmp(name, "edid") == 0) {
 		for (rz = 0; rz < sizeof(edid_block); rz++)
 			buf[rz] = edid_block[rz];
-	} else if (strcasecmp(name, "edid-ascii") == 0) {
-		rz = 0;
-		buf[0] = 0;
-		rz += sprintf(buf + strlen(buf), "{\n");
-		for (i = 0; i < sizeof(edid_block); i++) {
-			rz += sprintf(buf + strlen(buf), " 0x%02x,", edid_block[i]);
-			if (!((i+1)%8))
-				rz += sprintf(buf + strlen(buf), "\n");
-		}
-		rz += sprintf(buf + strlen(buf), "\n}\n");
 	} else if (strcasecmp(name, "reg") == 0) {
 		rz = sprintf(buf, "%02x\n", io_read(reg) );
 		printk(KERN_INFO "TDA1997x-core: Register %02x = %s\n", reg, buf);
@@ -1801,8 +1791,6 @@ static struct device_attribute attr_info =
 	__ATTR(info, 0660, b_show, NULL);
 static struct device_attribute attr_edid =
 	__ATTR(edid, 0770, b_show, b_store);
-static struct device_attribute attr_edid_ascii =
-	__ATTR(edid-ascii, 0660, b_show, NULL);
 static struct device_attribute attr_colorspace =
 	__ATTR(colorspace, 0660, b_show, NULL);
 static struct device_attribute attr_reg =
@@ -1816,7 +1804,6 @@ static struct attribute *tda1997x_attrs[] = {
 	&attr_product.attr,
 	&attr_info.attr,
 	&attr_edid.attr,
-	&attr_edid_ascii.attr,
 	&attr_colorspace.attr,
 	&attr_reg.attr,
 	NULL
