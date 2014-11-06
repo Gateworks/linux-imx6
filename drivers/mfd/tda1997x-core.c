@@ -1800,7 +1800,7 @@ static struct device_attribute attr_product =
 static struct device_attribute attr_info =
 	__ATTR(info, 0660, b_show, NULL);
 static struct device_attribute attr_edid =
-	__ATTR(edid, 0660, b_show, b_store);
+	__ATTR(edid, 0770, b_show, b_store);
 static struct device_attribute attr_edid_ascii =
 	__ATTR(edid-ascii, 0660, b_show, NULL);
 static struct device_attribute attr_colorspace =
