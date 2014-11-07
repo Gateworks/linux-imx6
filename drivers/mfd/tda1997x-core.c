@@ -3010,9 +3010,11 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 			tda1997x->resolutiontype = RESTYPE_SDTV;
 			if (res->width > 720)
 				tda1997x->resolutiontype = RESTYPE_HDTV;
-			printk(KERN_INFO "%s: matched resolution: %dx%d@%d%c %s\n",
-				KBUILD_MODNAME, res->width, res->height, res->horizfreq,
-				res->interlaced?'i':'p', restype_names[tda1997x->resolutiontype]);
+			printk(KERN_INFO "%s: matched resolution: %dx%d%c@%d %s\n",
+				KBUILD_MODNAME, res->width, res->height,
+				res->interlaced?'i':'p',
+				res->horizfreq,
+				restype_names[tda1997x->resolutiontype]);
 			return res;
 		}
 	}
