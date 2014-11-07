@@ -1166,6 +1166,8 @@ const char *audfmt_names[] = {
 
 static struct tda1997x_data tda1997x_data;
 
+static int tda1997x_manual_hpd(struct tda1997x_data *tda1997x, hpdmode_t mode);
+
 /** API for CEC
  */
 int tda1997x_cec_read(u8 reg)
@@ -1755,6 +1757,7 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 {
 	u32 val = 0;
 	const char *name = attr->attr.name;
+	struct tda1997x_data *tda1997x = &tda1997x_data;
 	int i;
 
 
@@ -1762,7 +1765,11 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 		for (i = 0; i < count; i++)
 			edid_block[i] = buf[i];
 		printk(KERN_INFO "TDA1997x-core: New EDID being loaded\n");
+		/* Set HPD low */
+		tda1997x_manual_hpd(tda1997x, HPD_LOW);
 		tda1997x_load_edid_data(edid_block);
+		/* Set HPD high (now that EDID is ready) */
+		tda1997x_manual_hpd(tda1997x, HPD_HIGH);
 	} else if (strcasecmp(name, "reg") == 0) {
 			i = sscanf(buf, "%x %x", &reg, &val);
 			if (i == 2) {
