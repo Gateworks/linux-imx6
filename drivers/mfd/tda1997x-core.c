@@ -2201,12 +2201,12 @@ tda1997x_configure_input_resolution(resolutionid_t resolution)
 	 * bit7   - interlaced_det - interlace detect method: 1=alternate,0=framefield
 	 * bit6:5 - vsync_type: 0=Auto,1=FDW,2=Even,3=Odd
 	 * bit4:3 - std_det: 0=PAL,1=NTSC,2=AUTO,3=OFF
-	 * bit2   - href_src - VREF source: 1=from standard, 0=manual
+	 * bit2   - vref_src - VREF source: 1=from standard, 0=manual
 	 * bit1   - href_src - HREF source: 1=from standard, 0=manual
 	 * bit0   - hsync_sel - HSYNC signal: 1=HS,0=VS
 	 */
-	reg = io_read(REG_VHREF_CTRL);
-	io_write(REG_VHREF_CTRL, 0x3<<3 /* std_det=off */);
+	reg = (0x3 << 3); /* Standard Detect off, V/H Refs manual */
+	io_write(REG_VHREF_CTRL, reg);
 
 	/* Set VHRef:
 	 * configure the VHRef timing values.  In case the VHREF generator has
