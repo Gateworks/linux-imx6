@@ -1743,7 +1743,7 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 			buf[rz] = edid_block[rz];
 	} else if (strcasecmp(name, "reg") == 0) {
 		rz = sprintf(buf, "%02x\n", io_read(reg) );
-		printk(KERN_INFO "TDA1997x-core: Register %02x = %s\n", reg, buf);
+		printk(KERN_INFO "TDA1997x-core: Register 0x%04x=%s\n", reg, buf);
 	} else {
 		rz = sprintf(buf, "invalid attr\n");
 	}
@@ -1774,9 +1774,9 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
 			i = sscanf(buf, "%x %x", &reg, &val);
 			if (i == 2) {
 				io_write( (u16)reg, (u8)val);
-				printk(KERN_INFO "TDA1997x-core: Register %02x, %02x\n", reg, val);
+				printk(KERN_INFO "TDA1997x-core: Register 0x%04x=0x%02x\n", reg, val);
 			} else {
-				printk(KERN_INFO "TDA1997x-core: Register %02x\n", reg);
+				printk(KERN_INFO "TDA1997x-core: Register 0x%04x\n", reg);
 			}
 	} else {
 		printk(KERN_ERR "invalid name '%s'\n", attr->attr.name);
