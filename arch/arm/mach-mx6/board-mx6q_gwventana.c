@@ -1136,10 +1136,13 @@ static struct i2c_board_info ventana_egalax_i2cinfo = {
 };
 
 /* Touchscreen controller */
+static int touch_irq = -1;
+static int tsc2007_get_pendown_state(void) {
+	return !gpio_get_value(touch_irq);
+}
 static struct tsc2007_platform_data tsc2007_pdata = {
 	.model		= 2007,
-	.x_plate_ohms	= 400,
-	.invert_rt	= true,
+	.get_pendown_state = tsc2007_get_pendown_state,
 };
 static struct i2c_board_info ventana_tsc2007_i2cinfo = {
 	I2C_BOARD_INFO("tsc2007", 0x49),
@@ -2120,8 +2123,9 @@ static int __init ventana_model_setup(void)
 
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_GPIO_17__GPIO_7_12);
-			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(7, 12));
-			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(7, 12));
+			touch_irq = IMX_GPIO_NR(7, 12);
+			ventana_egalax_i2cinfo.irq = gpio_to_irq(touch_irq);
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(touch_irq);
 
 			/* Digital Video Decoder (HDMI IN) IRQ */
 			SETUP_PAD(PAD_GPIO_7__GPIO_1_7);
@@ -2369,8 +2373,9 @@ static int __init ventana_model_setup(void)
 
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
-			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
-			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
+			touch_irq = IMX_GPIO_NR(1, 11);
+			ventana_egalax_i2cinfo.irq = gpio_to_irq(touch_irq);
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(touch_irq);
 
 			/* backlight pwm */
 			if (info->config_lvds0) {
@@ -2525,8 +2530,9 @@ static int __init ventana_model_setup(void)
 
 			/* Touchscreen IRQ */
 			SETUP_PAD(PAD_SD2_CMD__GPIO_1_11);
-			ventana_egalax_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
-			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(IMX_GPIO_NR(1, 11));
+			touch_irq = IMX_GPIO_NR(1, 11);
+			ventana_egalax_i2cinfo.irq = gpio_to_irq(touch_irq);
+			ventana_tsc2007_i2cinfo.irq = gpio_to_irq(touch_irq);
 
 			/* Matric Keyboard IRQ */
 			SETUP_PAD(PAD_SD1_DAT0__GPIO_1_16);
