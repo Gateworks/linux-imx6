@@ -562,7 +562,7 @@ static int mma8451_probe(struct i2c_client *client,
 	mma8451_idev->poll_interval_max = POLL_INTERVAL_MAX;
 	idev = mma8451_idev->input;
 	if (client_id == FXOS8700_ID)
-		idev->name = "mma845x_a";
+		idev->name = "FreescaleAccelerometer";
 	else
 		idev->name = "mma845x";
 	idev->id.bustype = BUS_I2C;
@@ -597,7 +597,7 @@ static int mma8451_probe(struct i2c_client *client,
 		fxos8700_m_idev->poll_interval_min = POLL_INTERVAL_MIN;
 		fxos8700_m_idev->poll_interval_max = POLL_INTERVAL_MAX;
 		idev = fxos8700_m_idev->input;
-		idev->name = "fxos8700_m";
+		idev->name = "FreescaleMagnetometer";
 		idev->id.bustype = BUS_I2C;
 		idev->evbit[0] = BIT_MASK(EV_ABS);
 
