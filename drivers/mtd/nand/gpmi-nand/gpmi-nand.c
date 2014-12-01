@@ -995,6 +995,69 @@ static void block_mark_swapping(struct gpmi_nand_data *this,
 	p[1] = (p[1] & mask) | (from_oob >> (8 - bit));
 }
 
+/*
+ * Check a page to see if it is erased (w/ bitflips) after an uncorrectable ECC
+ * error
+ *
+ * On a real error, return a negative error code (-EBADMSG for ECC error).
+ * Otherwise, fill chunk with 0xff and return the number of corrected
+ * bitflips.
+ *
+ */
+static int gpmi_verify_erased_page(struct gpmi_nand_data *this,
+				   unsigned int chunk)
+{
+	struct bch_geometry *nfc_geo = &this->bch_geometry;
+	int eccsize = nfc_geo->ecc_chunk_size;
+	int eccbits = nfc_geo->ecc_strength * nfc_geo->gf_len;
+	unsigned int bitflips = 0;
+	unsigned char *data = this->raw_buffer;
+	unsigned int threshold = nfc_geo->ecc_strength;
+	int data_nbits, bit_off;
+	int i;
+
+	data_nbits = (eccsize * 8) + eccbits;
+	bit_off = chunk * data_nbits;
+
+	/* First chunk also embeds metadata */
+	if (!chunk)
+		data_nbits += (nfc_geo->metadata_size * 8);
+	else
+		bit_off += (nfc_geo->metadata_size * 8);
+
+	data = this->raw_buffer + (bit_off % 8);
+	if (bit_off % 8) {
+		bitflips += hweight8(~(*data | GENMASK(bit_off - 1, 0)));
+		if (bitflips > threshold)
+			return -EBADMSG;
+
+		data_nbits -= bit_off;
+	}
+
+	for (i = 0; i < data_nbits / 8; i++) {
+		bitflips += hweight8(~data[i]);
+		if (bitflips > threshold)
+			return -EBADMSG;
+	}
+
+	data_nbits %= 8;
+	data += data_nbits / 8;
+	if (data_nbits) {
+		bitflips += hweight8(~(*data | GENMASK(7, data_nbits)));
+		if (bitflips > threshold)
+			return -EBADMSG;
+	}
+
+	memset(this->payload_virt + (chunk * eccsize), 0xff, eccsize);
+
+	if (!chunk)
+		memset(this->auxiliary_virt, 0xff, nfc_geo->metadata_size);
+
+	pr_debug("correcting %u bitflips in erased page\n", bitflips);
+
+	return bitflips;
+}
+
 static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 				uint8_t *buf, int oob_required, int page)
 {
@@ -1040,13 +1103,54 @@ static int gpmi_ecc_read_page(struct mtd_info *mtd, struct nand_chip *chip,
 	status = auxiliary_virt + nfc_geo->auxiliary_status_offset;
 
 	for (i = 0; i < nfc_geo->ecc_chunk_count; i++, status++) {
+		bool raw_read_done = false;
+
 		if ((*status == STATUS_GOOD) || (*status == STATUS_ERASED))
 			continue;
 
 		if (*status == STATUS_UNCORRECTABLE) {
-			mtd->ecc_stats.failed++;
-			continue;
+			if (!raw_read_done) {
+				bool direct_dma_map_ok;
+
+				/*
+				 * Reading a page will override the current
+				 * direct_dma_map_ok field.
+				 * Save direct_dma_map_ok and restore it after
+				 * raw page read has completed.
+				 */
+				direct_dma_map_ok = this->direct_dma_map_ok;
+				chip->cmdfunc(mtd, NAND_CMD_READ0, 0, page);
+				chip->read_buf(mtd, this->raw_buffer,
+					       mtd->writesize + mtd->oobsize);
+				this->direct_dma_map_ok = direct_dma_map_ok;
+
+				/*
+				 * Swap bad block marker if needed.
+				 */
+				if (this->swap_block_mark) {
+					u8 *raw_buf = this->raw_buffer;
+					u8 swap = raw_buf[0];
+
+					raw_buf[0] = raw_buf[mtd->writesize];
+					raw_buf[mtd->writesize] = swap;
+				}
+
+				raw_read_done = true;
+			}
+
+			/*
+			 * Analyse the current chunk to handle the "bitflips in
+			 * erased page" case.
+			 */
+			ret = gpmi_verify_erased_page(this, i);
+			if (ret < 0) {
+				mtd->ecc_stats.failed++;
+				continue;
+			}
+
+			*status = ret;
 		}
+
 		mtd->ecc_stats.corrected += *status;
 		max_bitflips = max_t(unsigned int, max_bitflips, *status);
 	}
