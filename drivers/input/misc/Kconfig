@@ -93,6 +93,17 @@ config INPUT_BMA150
 	  To compile this driver as a module, choose M here: the
 	  module will be called bma150.
 
+config INPUT_GSC
+	tristate "Gateworks System Controller Input support"
+	depends on GSC_CORE
+	help
+	Support for Gateworks System Controller input device.
+	  Say Y here if you want to enable Linux input device support for
+	  GSC user-pushbutton, and tamper events.
+
+	  To compile this driver as a module, choose M here. The module will
+	  be called gsc_input.
+
 config INPUT_PCSPKR
 	tristate "PC Speaker support"
 	depends on PCSPKR_PLATFORM
