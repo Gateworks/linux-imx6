@@ -321,6 +321,14 @@ config COH901327_WATCHDOG
 	  This watchdog is used to reset the system and thus cannot be
 	  compiled as a module.
 
+config GSC_WATCHDOG
+	tristate "Gateworks System Controller Watchdog"
+	depends on GSC_CORE
+	select WATCHDOG_CORE
+	help
+	  Support for Gateworks System Controller watchdog.
+	  Say 'Y' here to enable the watchdog timer support for GSC chips.
+
 config TWL4030_WATCHDOG
 	tristate "TWL4030 Watchdog"
 	depends on TWL4030_CORE
