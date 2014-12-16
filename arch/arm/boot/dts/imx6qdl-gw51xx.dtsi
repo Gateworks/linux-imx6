@@ -48,7 +48,7 @@
 
 	pps {
 		compatible = "pps-gpio";
-		gpios = <&gpio1 7 GPIO_ACTIVE_HIGH>;
+		gpios = <&gpio1 26 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
 
