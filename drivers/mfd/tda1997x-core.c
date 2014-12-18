@@ -4020,38 +4020,38 @@ static int tda1997x_get_of_property(struct device *dev,
 	/* enable HDCP */
 	err = of_property_read_u32(np, "hdcp", &hdcp);
 	if (err) {
-		dev_dbg(dev, "get of property hdcp fail\n");
+		dev_err(dev, "get of property hdcp fail\n");
 		return err;
 	}
 	/* DDC Slave address */
 	err = of_property_read_u32(np, "ddc_slave", &ddc_slave);
 	if (err) {
-		dev_dbg(dev, "get of property ddc_slave fail\n");
+		dev_err(dev, "get of property ddc_slave fail\n");
 		return err;
 	}
 
 	/* Video output mode */
 	err = of_property_read_string(np, "vidout_fmt", &vidout_fmt);
 	if (err) {
-		dev_dbg(dev, "get of property vidout_fmt fail\n");
+		dev_err(dev, "get of property vidout_fmt fail\n");
 		return err;
 	}
 	/* insert timing codes (SAV/EAV) in stream */
 	err = of_property_read_u32(np, "vidout_trc", &trc);
 	if (err) {
-		dev_dbg(dev, "get of property vidout_trc fail\n");
+		dev_err(dev, "get of property vidout_trc fail\n");
 		return err;
 	}
   	/* insert blanking codes in stream */
 	err = of_property_read_u32(np, "vidout_blc", &blc);
 	if (err) {
-		dev_dbg(dev, "get of property vidout_blc fail\n");
+		dev_err(dev, "get of property vidout_blc fail\n");
 		return err;
 	}
 	/* video output clock mode */
 	err = of_property_read_string(np, "vidout_clkmode", &vidout_clk);
 	if (err) {
-		dev_dbg(dev, "get of property vidout_clkmode fail\n");
+		dev_err(dev, "get of property vidout_clkmode fail\n");
 		return err;
 	}
 	/* video output port config */
@@ -4060,7 +4060,7 @@ static int tda1997x_get_of_property(struct device *dev,
 					pdata->vidout_port_config,
 					port_configs);
 	if (err) {
-		dev_dbg(dev, "get of property vidout_portcfg fail\n");
+		dev_err(dev, "get of property vidout_portcfg fail\n");
 		return err;
 	}
 	pdata->vidout_port_config_no = port_configs;
@@ -4068,19 +4068,19 @@ static int tda1997x_get_of_property(struct device *dev,
 	/* audio output format */
 	err = of_property_read_string(np, "audout_fmt", &audout_fmt);
 	if (err) {
-		dev_dbg(dev, "get of property audout_fmt fail\n");
+		dev_err(dev, "get of property audout_fmt fail\n");
 		return err;
 	}
 	/* audio output sysclk */
 	err = of_property_read_u32(np, "audout_sysclk", &audout_clk);
 	if (err) {
-		dev_dbg(dev, "get of property audout_clkmode fail\n");
+		dev_err(dev, "get of property audout_clkmode fail\n");
 		return err;
 	}
 	/* audio layout */
 	err = of_property_read_u32(np, "audout_layout", &audout_layout);
 	if (err) {
-		dev_dbg(dev, "get of property audout_layout fail\n");
+		dev_err(dev, "get of property audout_layout fail\n");
 		return err;
 	}
 
