@@ -1,0 +1,171 @@
+/*
+ * Copyright 2013-2014 Gateworks Corporation
+ *
+ * The code contained herein is licensed under the GNU General Public
+ * License. You may obtain a copy of the GNU General Public License
+ * Version 2 or later at the following locations:
+ *
+ * http://www.opensource.org/licenses/gpl-license.html
+ * http://www.gnu.org/copyleft/gpl.html
+ */
+
+/dts-v1/;
+
+#include "imx6dl.dtsi"
+#include "imx6qdl-gw52xx.dtsi"
+
+/ {
+	model = "Gateworks Ventana i.MX6 Solo/DualLite GWM7";
+	compatible = "gw,imx6dl-gw52xx", "gw,ventana", "fsl,imx6dl";
+
+	leds {
+		compatible = "gpio-leds";
+
+		led4: status1 {
+			label = "status1";
+			gpios = <&gpio16107 6 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+
+		led5: status2 {
+			label = "status2";
+			gpios = <&gpio16107 7 GPIO_ACTIVE_LOW>;
+			default-state = "off";
+		};
+	};
+
+	pwmleds {
+		compatible = "pwm-leds";
+
+		kpad {
+			label = "keypad";
+			pwms = <&pwm16109 0 7812500>;
+			max-brightness = <255>;
+		};
+
+		power_led1 {
+			label = "power_led1";
+			pwms = <&pwm16109 1 7812500>;
+			max-brightness = <255>;
+			active-low;
+		};
+
+		power_led2 {
+			label = "power_led2";
+			pwms = <&pwm16109 2 7812500>;
+			max-brightness = <255>;
+			active-low;
+		};
+	};
+};
+
+/* /dev/video0: IPU1_CSI1 - Analog in via ADV7180 */
+&cap0 {
+	ipu_id = <0>;
+	csi_id = <1>;
+};
+
+&i2c3 {
+	gpio16107: pca9555@21 {
+		compatible = "nxp,pca9555";
+		reg = <0x21>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+
+	hwmon16107: gsc@29 {
+		compatible = "gw,gsp";
+		reg = <0x29>;
+	};
+
+	keypad16109: tca8418@34 {
+		compatible = "ti,tca8418";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_tca8418>;
+		reg = <0x34>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <16 IRQ_TYPE_EDGE_FALLING>;
+		linux,keymap = <0x00010100	/* BTN_0 HOME */
+			        0x00000101	/* BTN_1 MENU */
+			        0x01010102	/* BTN_2 ESCAPE */
+			        0x01000103	/* BTN_3 BACK */
+			        0x02000104	/* BTN_4 SEARCH */
+			        0x00030105	/* BTN_5 UP */
+			        0x00020106	/* BTN_6 RIGHT */
+			        0x01030107	/* BTN_7 LEFT */
+			        0x01020108	/* BTN_8 DOWN */
+			        0x02020109>;	/* BTN_9 ENTER */
+		keypad,num-rows = <3>;
+		keypad,num-columns = <4>;
+	};
+
+	pwm16109: pca9685@40 {
+		compatible = "nxp,pca9685-pwm";
+		#pwm-cells = <2>;
+		reg = <0x40>;
+	};
+
+	touchscreen16109: tsc2007@49 {
+		compatible = "ti,tsc2007";
+		reg = <0x49>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_tsc2007>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
+		gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		ti,x-plate-ohms = <400>;
+		linux,wakeup;
+	};
+};
+
+&iomuxc {
+	hog {
+		pinctrl_tsc2007: tsc2007 {
+			fsl,pins = <
+				MX6QDL_PAD_SD2_CMD__GPIO1_IO11    0x0001b0b0
+			>;
+		};
+
+		pinctrl_tca8418: tca8418 {
+			fsl,pins = <
+				MX6QDL_PAD_SD1_DAT0__GPIO1_IO16   0x0001b0b0
+			>;
+		};
+	};
+};
+
+&ldb {
+	status = "okay";
+
+	lvds-channel@0 {
+		fsl,data-mapping = "spwg";
+		fsl,data-width = <18>;
+		crtc = "ipu1-di0";
+		status = "okay";
+		primary;
+
+		display-timings {
+			native-mode = <&timing0>;
+			timing0: hsd100pxn1 {
+				clock-frequency = <65000000>;
+				hactive = <800>;
+				vactive = <480>;
+				hback-porch = <40>;
+				hfront-porch = <40>;
+				vback-porch = <10>;
+				vfront-porch = <3>;
+				hsync-len = <80>;
+				vsync-len = <10>;
+			};
+		};
+	};
+};
+
+/* Analog VideoIn IPU1_CSI1 */
+&videoin {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ipu1_5>; /* IPU1_CSI1 8bit */
+	/* ipu_id/csi_id used to match up with v4l2_cap_<n> */
+	ipu_id = <0>;
+	csi_id = <1>;
+};
