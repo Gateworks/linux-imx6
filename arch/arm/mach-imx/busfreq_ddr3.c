@@ -58,7 +58,9 @@ struct imx6_busfreq_info {
 	void *iomux_offsets;
 } __aligned(8);
 
+#ifdef CONFIG_SOC_IMX6SX
 static struct imx6_busfreq_info *imx6sx_busfreq_info;
+#endif
 
 /* DDR settings */
 static unsigned long (*iram_ddr_settings)[2];
@@ -76,8 +78,10 @@ static volatile unsigned int cpus_in_wfe;
 static volatile bool wait_for_ddr_freq_update;
 static int curr_ddr_rate;
 
+#ifdef CONFIG_SOC_IMX6SX
 void (*imx6sx_change_ddr_freq)(struct imx6_busfreq_info *busfreq_info);
 extern void imx6sx_ddr3_freq_change(struct imx6_busfreq_info *busfreq_info);
+#endif
 
 void (*mx6_change_ddr_freq)(u32 freq, void *ddr_settings,
 	bool dll_mode, void *iomux_offsets) = NULL;
@@ -94,8 +98,10 @@ extern unsigned long ddr_freq_change_iram_base;
 extern unsigned long ddr_freq_change_total_size;
 extern unsigned long mx6_ddr3_freq_change_start asm("mx6_ddr3_freq_change_start");
 extern unsigned long mx6_ddr3_freq_change_end asm("mx6_ddr3_freq_change_end");
+#ifdef CONFIG_SOC_IMX6SX
 extern unsigned long imx6sx_ddr3_freq_change_start asm("imx6sx_ddr3_freq_change_start");
 extern unsigned long imx6sx_ddr3_freq_change_end asm("imx6sx_ddr3_freq_change_end");
+#endif
 
 #define MIN_DLL_ON_FREQ		333000000
 #define MAX_DLL_OFF_FREQ		125000000
@@ -213,6 +219,7 @@ irqreturn_t wait_in_wfe_irq(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_SOC_IMX6SX
 int update_ddr_freq_imx6sx(int ddr_rate)
 {
 	int i;
@@ -253,6 +260,7 @@ int update_ddr_freq_imx6sx(int ddr_rate)
 
 	return 0;
 }
+#endif
 
 /* change the DDR frequency. */
 int update_ddr_freq_imx6q(int ddr_rate)
@@ -342,6 +350,7 @@ int update_ddr_freq_imx6q(int ddr_rate)
 	return 0;
 }
 
+#ifdef CONFIG_SOC_IMX6SX
 int init_mmdc_ddr3_settings_imx6sx(struct platform_device *busfreq_pdev)
 {
 	int i;
@@ -423,6 +432,7 @@ int init_mmdc_ddr3_settings_imx6sx(struct platform_device *busfreq_pdev)
 
 	return 0;
 }
+#endif
 
 int init_mmdc_ddr3_settings_imx6q(struct platform_device *busfreq_pdev)
 {
