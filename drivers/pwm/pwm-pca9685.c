@@ -95,6 +95,14 @@ static int pca9685_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
 		return 0;
 	}
 
+	/* clear full-on bit */
+	if (pwm->hwpwm >= PCA9685_MAXCHAN)
+		reg = PCA9685_ALL_LED_ON_H;
+	else
+		reg = LED_N_ON_H(pwm->hwpwm);
+	regmap_update_bits(pca->regmap, reg, LED_FULL, 0x0);
+
+	/* Set LED_OFF_H/LED_OFF_L count */
 	duty = 4096 * (unsigned long long)duty_ns;
 	duty = DIV_ROUND_UP_ULL(duty, period_ns);
 
@@ -121,24 +129,6 @@ static int pca9685_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
 	unsigned int reg;
 
 	/*
-	 * The PWM subsystem does not support a pre-delay.
-	 * So, set the ON-timeout to 0
-	 */
-	if (pwm->hwpwm >= PCA9685_MAXCHAN)
-		reg = PCA9685_ALL_LED_ON_L;
-	else
-		reg = LED_N_ON_L(pwm->hwpwm);
-
-	regmap_write(pca->regmap, reg, 0);
-
-	if (pwm->hwpwm >= PCA9685_MAXCHAN)
-		reg = PCA9685_ALL_LED_ON_H;
-	else
-		reg = LED_N_ON_H(pwm->hwpwm);
-
-	regmap_write(pca->regmap, reg, 0);
-
-	/*
 	 * Clear the full-off bit.
 	 * It has precedence over the others and must be off.
 	 */
@@ -157,20 +147,13 @@ static void pca9685_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
 	struct pca9685 *pca = to_pca(chip);
 	unsigned int reg;
 
+	/* Set the full-off bit */
 	if (pwm->hwpwm >= PCA9685_MAXCHAN)
 		reg = PCA9685_ALL_LED_OFF_H;
 	else
 		reg = LED_N_OFF_H(pwm->hwpwm);
 
-	regmap_write(pca->regmap, reg, LED_FULL);
-
-	/* Clear the LED_OFF counter. */
-	if (pwm->hwpwm >= PCA9685_MAXCHAN)
-		reg = PCA9685_ALL_LED_OFF_L;
-	else
-		reg = LED_N_OFF_L(pwm->hwpwm);
-
-	regmap_write(pca->regmap, reg, 0x0);
+	regmap_update_bits(pca->regmap, reg, LED_FULL, LED_FULL);
 }
 
 static int pca9685_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
