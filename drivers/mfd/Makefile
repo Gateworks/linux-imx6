@@ -15,6 +15,8 @@ obj-$(CONFIG_MFD_CROS_EC_SPI)	+= cros_ec_spi.o
 rtsx_pci-objs			:= rtsx_pcr.o rts5209.o rts5229.o rtl8411.o rts5227.o rts5249.o
 obj-$(CONFIG_MFD_RTSX_PCI)	+= rtsx_pci.o
 
+gsc-objs			:= gsc-core.o gsc-irq.o
+obj-$(CONFIG_GSC_CORE)		+= gsc.o
 obj-$(CONFIG_HTC_EGPIO)		+= htc-egpio.o
 obj-$(CONFIG_HTC_PASIC3)	+= htc-pasic3.o
 obj-$(CONFIG_HTC_I2CPLD)	+= htc-i2cpld.o
