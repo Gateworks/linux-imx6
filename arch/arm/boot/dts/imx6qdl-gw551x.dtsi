@@ -87,7 +87,7 @@
 		compatible = "fsl,imx6q-ventana-tda1997x",
 			     "fsl,imx-audio-tda1997x";
 		model = "tda1997x-audio";
-		ssi-controller = <&ssi1>;
+		cpu-dai = <&ssi1>;
 		audio-codec = <&tda1997x_codec>;
 		mux-int-port = <2>;
 		mux-ext-port = <5>;
