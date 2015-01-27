@@ -89,7 +89,7 @@
 		model = "tda1997x-audio";
 		ssi-controller = <&ssi1>;
 		audio-codec = <&tda1997x_codec>;
-		mux-int-port = <2>;
+		mux-int-port = <1>;
 		mux-ext-port = <5>;
 	};
 
