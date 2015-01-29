@@ -32,7 +32,7 @@
 
 		led0: user1 {
 			label = "user1";
-			gpios = <&gpio4 7 GPIO_ACTIVE_HIGH>;
+			gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
 			default-state = "on";
 			linux,default-trigger = "heartbeat";
 		};
