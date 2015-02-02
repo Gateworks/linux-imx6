@@ -352,6 +352,7 @@ static const struct regmap_config ltc3676_regmap_config = {
 	.volatile_reg = ltc3676_volatile_reg,
 	.max_register = LTC3676_CLIRQ,
 	.reg_defaults = ltc3676_reg_defaults,
+	.num_reg_defaults = ARRAY_SIZE(ltc3676_reg_defaults),
 	.use_single_rw = true,
 	.cache_type = REGCACHE_RBTREE,
 };
