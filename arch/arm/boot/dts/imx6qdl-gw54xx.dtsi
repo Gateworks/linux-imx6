@@ -566,6 +566,9 @@
 		interrupt-parent = <&gpio7>;
 		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
 		reset-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+		invert;
+		screen-x = <1024>;
+		screen-y = <600>;
 	};
 
 	/* on IMX6Q this can be IPU1_DISP0 or IPU2_DISP0 so we define in q/dl */
