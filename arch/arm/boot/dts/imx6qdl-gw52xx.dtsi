@@ -426,6 +426,9 @@
 		interrupt-parent = <&gpio1>;
 		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
 		reset-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+		invert;
+		screen-x = <1024>;
+		screen-y = <600>;
 	};
 
 	/* Analog VideoIn */
