@@ -23,16 +23,18 @@
 			reg = <0>;
 			next-level-cache = <&L2>;
 			operating-points = <
+				/* vmin@freq + 35mV */
 				/* kHz    uV */
-				996000  1275000
-				792000  1175000
-				396000  1150000
+				996000  1285000
+				792000  1185000
+				396000  1160000
 			>;
 			fsl,soc-operating-points = <
-				/* ARM kHz  SOC-PU uV */
-				996000	1175000
-				792000	1175000
-				396000	1175000
+				/* vmin@freq + 35mV */
+				/* ARM kHz      SOC-PU uV */
+				996000            1185000
+				792000            1185000
+				396000            1185000
 			>;
 			clock-latency = <61036>; /* two CLK32 periods */
 			clocks = <&clks IMX6QDL_CLK_ARM>,
