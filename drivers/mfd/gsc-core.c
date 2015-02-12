@@ -56,7 +56,7 @@ struct gsc {
 static struct gsc *gsc_priv;
 
 /**
- * gsc_i2c_write - Writes a register to GSC
+ * gsc_i2c_write - Writes a register to GSC with retries
  * @reg: register address
  * @val: value to write
  *
@@ -64,10 +64,17 @@ static struct gsc *gsc_priv;
  */
 int __gsc_i2c_write(u8 reg, u8 val)
 {
-	int retry, ret = -EAGAIN;
+	int retry, ret;
 
-	for (retry = 0; ret == -EAGAIN && retry < I2C_RETRIES; retry++)
+	for (retry = 0; retry < I2C_RETRIES; retry++) {
 		ret = i2c_smbus_write_byte_data(gsc_priv->client, reg, val);
+		/*
+		 * -EAGAIN returned when the i2c host controller is busy
+		 * -EIO returned when i2c device is busy
+		 */
+		if (ret != -EAGAIN && ret != -EIO)
+			break;
+	}
 	if (ret < 0) {
 		dev_err(&gsc_priv->client->dev, ">> 0x%02x %d\n", reg, ret);
 		return ret;
@@ -79,7 +86,7 @@ int __gsc_i2c_write(u8 reg, u8 val)
 }
 
 /**
- * gsc_i2c_read - Reads register from GSC
+ * gsc_i2c_read - Reads register from GSC with retries
  * @reg: register address
  * @val: value to write
  *
@@ -87,10 +94,17 @@ int __gsc_i2c_write(u8 reg, u8 val)
  */
 static int __gsc_i2c_read(u8 reg, u8 *val)
 {
-	int retry, ret = -EAGAIN;
+	int retry, ret;
 
-	for (retry = 0; ret == -EAGAIN && retry < I2C_RETRIES; retry++)
+	for (retry = 0; retry < I2C_RETRIES; retry++) {
 		ret = i2c_smbus_read_byte_data(gsc_priv->client, reg);
+		/*
+		 * -EAGAIN returned when the i2c host controller is busy
+		 * -EIO returned when i2c device is busy
+		 */
+		if (ret != -EAGAIN && ret != -EIO)
+			continue;
+	}
 	if (ret < 0) {
 		dev_err(&gsc_priv->client->dev, "<< 0x%02x %d\n", reg, ret);
 		return ret;
