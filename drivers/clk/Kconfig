@@ -107,6 +107,13 @@ config COMMON_CLK_KEYSTONE
           Supports clock drivers for Keystone based SOCs. These SOCs have local
 	  a power sleep control module that gate the clock to the IPs and PLLs.
 
+config COMMON_CLK_PWM
+	tristate "Clock driver for PWMs used as clock outputs"
+	depends on PWM
+	---help---
+	  Adapter driver so that any PWM output can be (mis)used as clock signal
+	  at 50% duty cycle.
+
 source "drivers/clk/qcom/Kconfig"
 
 endmenu
