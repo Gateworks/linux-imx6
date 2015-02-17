@@ -1659,6 +1659,7 @@ void pcie_bus_configure_settings(struct pci_bus *bus)
 }
 EXPORT_SYMBOL_GPL(pcie_bus_configure_settings);
 
+unsigned int pci_skip_bus_number = 0x00;
 unsigned int pci_scan_child_bus(struct pci_bus *bus)
 {
 	unsigned int devfn, pass, max = bus->busn_res.start;
@@ -1668,7 +1669,8 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 
 	/* Go find them, Rover! */
 	for (devfn = 0; devfn < 0x100; devfn += 8)
-		pci_scan_slot(bus, devfn);
+		if (!((pci_skip_bus_number >> bus->number) & 0x01))
+			pci_scan_slot(bus, devfn);
 
 	/* Reserve buses for SR-IOV capability. */
 	max += pci_iov_bus_range(bus);
@@ -1700,6 +1702,13 @@ unsigned int pci_scan_child_bus(struct pci_bus *bus)
 	dev_dbg(&bus->dev, "bus scan returning with max=%02x\n", max);
 	return max;
 }
+
+static int __init setup_pci_skip_bus_number(char *str)
+{
+	get_option(&str, &pci_skip_bus_number);
+	return 0;
+}
+early_param("pci_skip_bus_number", setup_pci_skip_bus_number);
 
 /**
  * pcibios_root_bridge_prepare - Platform-specific host bridge setup.
