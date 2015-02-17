@@ -371,12 +371,23 @@ static const struct i2c_device_id goodix_ts_id[] = {
 	{ "GDIX1001:00", 0 },
 	{ }
 };
+MODULE_DEVICE_TABLE(i2c, goodix_ts_id);
 
+#ifdef CONFIG_ACPI
 static const struct acpi_device_id goodix_acpi_match[] = {
 	{ "GDIX1001", 0 },
 	{ }
 };
 MODULE_DEVICE_TABLE(acpi, goodix_acpi_match);
+#endif
+
+#ifdef CONFIG_OF
+static const struct of_device_id goodix_of_match[] = {
+	{ .compatible = "gdx,gt9xx", },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(of, goodix_of_match);
+#endif
 
 static struct i2c_driver goodix_ts_driver = {
 	.probe = goodix_ts_probe,
@@ -384,7 +395,12 @@ static struct i2c_driver goodix_ts_driver = {
 	.driver = {
 		.name = "Goodix-TS",
 		.owner = THIS_MODULE,
+#ifdef CONFIG_ACPI
 		.acpi_match_table = goodix_acpi_match,
+#endif
+#ifdef CONFIG_OF
+		.of_match_table = of_match_ptr(goodix_of_match),
+#endif
 	},
 };
 module_i2c_driver(goodix_ts_driver);
