@@ -597,6 +597,17 @@
 		screen-y = <600>;
 	};
 
+	/* touchscreen */
+	gt9xx@14 {
+		compatible = "gdx,gt9xx";
+		reg = <0x14>;
+		interrupt-parent = <&gpio7>;
+		interrupts = <12 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpio = <&gpio1 10 GPIO_ACTIVE_LOW>;
+		int-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+		rotate;
+	};
+
 	/* on IMX6Q this can be IPU1_DISP0 or IPU2_DISP0 so we define in q/dl */
 	videoout: adv7393@2a {
 		compatible = "adi,adv7393";

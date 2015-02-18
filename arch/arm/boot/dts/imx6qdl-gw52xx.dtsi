@@ -457,6 +457,18 @@
 		screen-y = <600>;
 	};
 
+
+	/* touchscreen */
+	gt9xx@14 {
+		compatible = "gdx,gt9xx";
+		reg = <0x14>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
+		reset-gpio = <&gpio1 10 GPIO_ACTIVE_LOW>;
+		int-gpio = <&gpio1 11 GPIO_ACTIVE_HIGH>;
+		rotate;
+	};
+
 	/* Analog VideoIn */
 	/* EIM pads differ between IMX6Q and IMX6DL so we define pinmux/csi/ipu in IMX6Q/IMX6DL */
 	videoin: adv7180@20 {
