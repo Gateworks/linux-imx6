@@ -530,6 +530,13 @@ typedef enum {
 	RESTYPE_PC,
 } tda1997x_restype_t;
 
+/* Video output port format */
+const char *vidfmt_names[] = {
+	"RGB444/YCrCb444",      /* RGB/YUV444 16bit data bus, 8bpp */
+	"YCrCb422 semi-planar", /* YUV422 16bit data base, 8bpp */
+	"YCrCb422 CCIR656",     /* BT656 (YUV 8bpp 2 clock per pixel) */
+};
+
 static char *colorspace_names[] = {
 	"RGB", "YCbCr422", "YCbCr444", "Future"	
 };
@@ -1132,13 +1139,6 @@ const char *conversion_names[] = {
 	"CUSTOM",
 	"Predefined1 (RGBlimited_YCbCr601)",
 	"Predefined2 (YCbCr601_RGBLimited)",
-};
-
-/* Video output port format */
-const char *vidfmt_names[] = {
-	"RGB/YCbCr 4:4:4",
-	"YCbCr 4:2:2 semi-planar",
-	"YCbCr 4:2:2 CCIR656",
 };
 
 /* Audio output port layout (hardware pins) */
@@ -4253,6 +4253,7 @@ static int tda1997x_probe(struct i2c_client *client,
 		tda1997x->chip_revision + 1,
 		(tda1997x->port_30bit)?30:24,
 		(tda1997x->cec_enabled)?", CEC ":"");
+	pr_info("video out format: %s\n", vidfmt_names[pdata->vidout_format]);
 	if (tda1997x->cec_enabled)
 		pr_info("CEC slave address 0x%02x\n", tda1997x->cec_slave);
 
