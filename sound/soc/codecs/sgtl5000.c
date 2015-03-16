@@ -1296,7 +1296,8 @@ err_regulator_free:
 
 static int sgtl5000_probe(struct snd_soc_codec *codec)
 {
-	int ret;
+	int ret, i;
+	u16 val;
 	struct sgtl5000_priv *sgtl5000 = snd_soc_codec_get_drvdata(codec);
 
 	/* setup i2c data ops */
@@ -1305,6 +1306,32 @@ static int sgtl5000_probe(struct snd_soc_codec *codec)
 		dev_err(codec->dev, "Failed to set cache I/O: %d\n", ret);
 		return ret;
 	}
+
+	/*
+	 * Write default values to make sure we always start with sane
+	 * registers. Since sgtl5000 does not have a reset line, nor a reset
+	 * command in software, we follow this approach to guarantee we always
+	 * start from the default values and avoid problems like not being
+	 * able to probe after an audio playback followed by a system reset or
+	 * a 'reboot' command in Linux.
+	 */
+	for (i = 0; i < ARRAY_SIZE(sgtl5000_regs); i++) {
+		val = sgtl5000_regs[i];
+		if (val)
+			ret = snd_soc_write(codec, i, val);
+	}
+	snd_soc_write(codec, SGTL5000_CHIP_DIG_POWER, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_ANA_ADC_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_LINREG_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_REF_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_MIC_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_LINE_OUT_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_CLK_TOP_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_CHIP_ANA_STATUS, 0);
+	snd_soc_write(codec, SGTL5000_DAP_CTRL, 0);
+	snd_soc_write(codec, SGTL5000_DAP_PEQ, 0);
+	snd_soc_write(codec, SGTL5000_DAP_AUDIO_EQ, 0);
+	snd_soc_write(codec, SGTL5000_DAP_MIX_CHAN, 0);
 
 	ret = sgtl5000_enable_regulators(codec);
 	if (ret)
