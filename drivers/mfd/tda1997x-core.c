@@ -578,19 +578,20 @@ typedef enum {
  * HDMI input to the desired output format RGB|YUV
  */
 typedef enum {
-	COLORCONVERSION_BYPASS,
-	COLORCONVERSION_CUSTOM,
-	COLORCONVERSION_PREDEFINED_1, /* RGBLimited_YCbCr601 */
-	COLORCONVERSION_PREDEFINED_2, /* YCbCr601_RGBLimited */
+	YCbCr709_RGBLimited,
+	RGBLimited_YCbCr601,
+	YCbCr601_RGBLimited,
 } colorconversion_t;
 
 /* Colorspace conversion matrix coefficients and offsets
  */
 typedef struct
 {
+	/* Input offsets */
 	s16 offInt1;
 	s16 offInt2;
 	s16 offInt3;
+	/* Coeficients */
 	s16 P11Coef;
 	s16 P12Coef;
 	s16 P13Coef;
@@ -600,20 +601,23 @@ typedef struct
 	s16 P31Coef;
 	s16 P32Coef;
 	s16 P33Coef;
+	/* Output offsets */
 	s16 offOut1;
 	s16 offOut2;
 	s16 offOut3;
 } colormatrixcoefs_t;
 
 /* Conversion matrixes */
-colormatrixcoefs_t CONVERSIONMATRIX__YCbCr709_RGBLimited = {
-	-256, -2048, -2048,
-	4096, -1875,  -750,
-	4096,  6307,     0,
-	4096,     0,  7431,
-	 256,   256,   256
-};
-colormatrixcoefs_t CONVERSIONMATRIX__predefined[2] = {
+colormatrixcoefs_t conversion_matrix[] = {
+	/* YCbCr709 -> RGBLimited */
+	{
+		-256, -2048,  -2048,  /*Input Offset*/
+		4096, -1875,   -750,
+		4096,  6307,      0,
+		4096,     0,   7431,
+		 256,   256,    256   /*Output Offset*/
+	},
+	/* RGBLimited -> YCbCr601 */
 	{
 		-256,  -256,   -256,  /*Input Offset*/
 		2404,  1225,    467,
@@ -621,6 +625,7 @@ colormatrixcoefs_t CONVERSIONMATRIX__predefined[2] = {
 		-1388, -707,   2095,  /*RGB limited range => ITU-601 YCbCr limited range */
 		256,   2048,   2048   /*Output Offset*/
 	},
+	/* YCbCr601 -> RGBLimited */
 	{
 		-256, -2048,  -2048,  /*Input Offset*/
 		4096, -2860,  -1378,
@@ -1131,14 +1136,6 @@ const char *hpd_names[] = {
 	"HPD_HIGH",
 	"HPD_HIGH_OTHER",
 	"HPD_PULSE",
-};
-
-/* colorspace conversion modes */
-const char *conversion_names[] = {
-	"BYPASS",
-	"CUSTOM",
-	"Predefined1 (RGBlimited_YCbCr601)",
-	"Predefined2 (YCbCr601_RGBLimited)",
 };
 
 /* Audio output port layout (hardware pins) */
@@ -1927,39 +1924,49 @@ static int tda1997x_manual_hpd(struct tda1997x_data *tda1997x, hpdmode_t mode)
 	return 0;
 }
 
-/** configure colorspace conversion
- * @param mode
- * @param coefficient table
- * @param blanking codes
+/** configure the receiver with the new colorspace
  * @returns 0 on success
+ * colorspace conversion depends on input format and output format
+ * blanking codes depend on the output colorspace
  */
-static int tda1997x_set_colorconversion_matrix(struct tda1997x_data *tda1997x,
-	colorconversion_t mode, colormatrixcoefs_t *pCoefficients,
-	blankingcodes_t *pBlankingCodes)
+static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x,
+	tda1997x_colorspace_t colorspace, tda1997x_colorimetry_t colorimetry,
+	tda1997x_videofmt_t vidout_format)
 {
-	s16 *pTabCoeff = &(pCoefficients->offInt1);
+	colormatrixcoefs_t *pCoefficients = NULL;
+	blankingcodes_t *pBlankingCodes = NULL;
 	u8 data[31];
-	u8 i, j;
 
-	DPRINTK(0,"%s: %s\n", __func__, conversion_names[mode]);
-	switch (mode) {
-		case COLORCONVERSION_BYPASS:
-			pCoefficients = NULL;
-			break;
-		case COLORCONVERSION_CUSTOM:
-			if (!pCoefficients)
-				return -EINVAL;
-			break;
-		case COLORCONVERSION_PREDEFINED_1: /* RGBLimited_YCbCr601 */
-			pCoefficients = &CONVERSIONMATRIX__predefined[0];
-			break;
-		case COLORCONVERSION_PREDEFINED_2: /* YCbCr601_RGBLimited */
-			pCoefficients = &CONVERSIONMATRIX__predefined[1];
-			break;
+	printk(KERN_INFO "%s: %s %s => %s\n", KBUILD_MODNAME,
+	       colorspace_names[colorspace],
+	       (colorspace == COLORSPACE_RGB) ? "" :
+	       colorimetry_names[colorimetry],
+	       vidfmt_names[vidout_format]);
+
+	switch (vidout_format) {
+	/* RGB 4:4:4 output */
+	case VIDEOFMT_444:
+		pBlankingCodes = &RGBBlankingCode;
+		if (colorspace != COLORSPACE_RGB) {
+			if (colorimetry == COLORIMETRY_ITU709)
+				pCoefficients = &conversion_matrix[YCbCr709_RGBLimited];
+			else
+				pCoefficients = &conversion_matrix[YCbCr601_RGBLimited];
+		}
+		break;
+
+	/* YCbCr 4:2:2 output */
+	case VIDEOFMT_422_SMP: /* YCbCr 4:2:2 semi-planar */
+	case VIDEOFMT_422_CCIR:/* YCbCr 4:2:2 CCIR656 */
+		pBlankingCodes = &YCbCrBlankingCode;
+		if (colorspace == COLORSPACE_RGB)
+			pCoefficients = &conversion_matrix[RGBLimited_YCbCr601];
+		break;
 	}
 
 	if (pCoefficients) {
-		pTabCoeff = &(pCoefficients->offInt1);
+		s16 *pTabCoeff = &(pCoefficients->offInt1);
+		u8 i, j;
 
 		/* test the range of the coefs */
 		for (i = 0; i < OFFSET_LOOP_NB; i++) {
@@ -2039,109 +2046,6 @@ static int tda1997x_set_colorconversion_matrix(struct tda1997x_data *tda1997x,
 		io_write16(REG_BLK_BU, pBlankingCodes->blankingCodeBu);
 		io_write16(REG_BLK_RV, pBlankingCodes->blankingCodeRv);
 	}
-
-	return 0;
-}
-
-/** configure the receiver with the new colorspace
- * @returns 0 on success
- */
-static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x)
-{
-	const char *colorname = "";
-
-	DPRINTK(0,"%s\n", __func__);
-	if (tda1997x->colorspace > COLORSPACE_FUTURE ||
-	    tda1997x->colorimetry > COLORIMETRY_XVYCC) {
-		printk(KERN_ERR "%s: invalid colorspace/colorimetry %d/%d\n",
-		       KBUILD_MODNAME,
-		       tda1997x->colorspace, tda1997x->colorimetry);
-	} else {
-		printk(KERN_INFO "%s: %s Colorspace %s\n", KBUILD_MODNAME,
-		       colorspace_names[tda1997x->colorspace],
-		       colorimetry_names[tda1997x->colorimetry]);
-	}
-
-	switch (tda1997x->colorspace) {
-		case COLORSPACE_RGB:
-			DPRINTK(0,"input colorspace is RGB, ");
-			/* configure the receiver with the new color space */
-			if (tda1997x->pdata->vidout_format == VIDEOFMT_444) {
-				DPRINTK(0,"output colorspace is RGB/YCbCr 4:4:4: - no conversion needed\n");
-				tda1997x_set_colorconversion_matrix(tda1997x,
-					COLORCONVERSION_BYPASS, NULL, &RGBBlankingCode);
-			} else {
-				DPRINTK(0,"output colorspace is YCbCr 4:2:2 - conversion needed\n");
-				tda1997x_set_colorconversion_matrix(tda1997x,
-					COLORCONVERSION_PREDEFINED_1, NULL, &RGBBlankingCode);
-			}
-			break;
-		case COLORSPACE_YCBCR_422:
-		case COLORSPACE_YCBCR_444:
-			DPRINTK(0,"input colorspace is YCbCr, ");
-			/* configure the receiver with the new color space */
-			switch(tda1997x->colorimetry) {
-				case COLORIMETRY_NONE:
-				case COLORIMETRY_XVYCC:
-					DPRINTK(0,"input colorimetry not defined - ");
-					/* colorimetry not specified - conversion depends on resolution:
-					 * YCbCr ITU709 for HD and YCbCr ITU601 for SD
-					 * (PC format should always be RGB)
-					 */
-					if (tda1997x->resolutiontype == RESTYPE_HDTV) {
-						/* YCbCr ITU709 is used */
-						DPRINTK(0,"assuming ITU709 (HDTV)\n");
-						tda1997x_set_colorconversion_matrix(tda1997x,
-							COLORCONVERSION_CUSTOM,
-							&CONVERSIONMATRIX__YCbCr709_RGBLimited,
-							&RGBBlankingCode);
-					} else {
-						/* YCbCr ITU601 is used */
-						DPRINTK(0,"assuming ITU601 (non-HDTV)\n");
-						tda1997x_set_colorconversion_matrix(tda1997x,
-							COLORCONVERSION_BYPASS,
-							NULL, &RGBBlankingCode);
-					}
-					break;
-				case COLORIMETRY_SMPTE170_ITU601:
-					/* YCbCr ITU601 is used */
-					DPRINTK(0,"ITU601\n");
-					tda1997x_set_colorconversion_matrix(tda1997x,
-						COLORCONVERSION_BYPASS,
-						NULL, &RGBBlankingCode);
-					break;
-				case COLORIMETRY_ITU709:
-					/* YCbCr ITU709 is used */
-					DPRINTK(0,"ITU709\n");
-					tda1997x_set_colorconversion_matrix(tda1997x,
-						COLORCONVERSION_CUSTOM,
-						&CONVERSIONMATRIX__YCbCr709_RGBLimited,
-						&RGBBlankingCode);
-					break;
-			}
-			break;
-		case COLORSPACE_FUTURE:
-			tda1997x->colorspace = COLORSPACE_YCBCR_444;
-			break;
-		default:
-			printk(KERN_ERR "%s: Invalid colorspace: %d\n", KBUILD_MODNAME,
-				tda1997x->colorspace);
-			break;
-	}
-
-	switch (tda1997x->colorimetry) {
-		case COLORIMETRY_NONE:
-		case COLORIMETRY_SMPTE170_ITU601:
-		case COLORIMETRY_ITU709:
-		case COLORIMETRY_XVYCC:
-			colorname = colorimetry_names[tda1997x->colorimetry];
-			break;
-		default:
-			printk(KERN_ERR "%s: Colorimetry: invalid %d\n", KBUILD_MODNAME,
-				tda1997x->colorimetry);
-			break;
-	}
-	//printk(KERN_INFO "%s: %s %s\n", KBUILD_MODNAME, colorspace_names[tda1997x->colorspace], colorname);
 
 	return 0;
 }
@@ -3016,9 +2920,21 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 			res->horizfreq, res->interlaced?'i':'p',
 			vPerCmp, hPerCmp, hsWidthCmp);
 		if (vPerCmp && hPerCmp && hsWidthCmp) {
-			tda1997x->resolutiontype = RESTYPE_SDTV;
-			if (res->width > 720)
-				tda1997x->resolutiontype = RESTYPE_HDTV;
+			/* resolutiontype used to determine Default Colorimetry */
+			switch (res->height) {
+				case 480:
+				case 576:
+				case 240:
+				case 288:
+					tda1997x->resolutiontype = RESTYPE_SDTV;
+					break;
+				case 720:
+				case 1080:
+					tda1997x->resolutiontype = RESTYPE_HDTV;
+					break;
+				default:
+					tda1997x->resolutiontype = RESTYPE_PC;
+			}
 			printk(KERN_INFO "%s: matched resolution: %dx%d%c@%d %s\n",
 				KBUILD_MODNAME, res->width, res->height,
 				res->interlaced?'i':'p',
@@ -3133,9 +3049,9 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 				d[4], d[5], d[6], d[7], d[8] & 0x10, d[8] & 0x03);
 			break;
 
+		/* Audio InfoFrame: see HDMI spec 8.2.2 */
 		case AUD_IF_TYPE:
-			/* from HDMI 1.3 spec:
-			 *
+			/*
 			 * CC0..CC2 - Channel Count. See CEA-861-D table 17
 			 * CT0..CT3 - Coding Type. The CT bits shall always be 0 (use Stream Header)
 			 * SS0..SS1 - Sample Size. The SS bits shall always be 0 (use Stream Header)
@@ -3192,6 +3108,7 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 			}
 			break;
 
+		/* Source Product Descriptor information (SPD) */
 		case SPD_IF_TYPE:
 			for (i = 0; i < 8; i++)
 				tda1997x->vendor[i] = d[4 + i];
@@ -3201,12 +3118,14 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 				tda1997x->vendor, tda1997x->product);
 			break;
 
+
+		/* Auxiliary Video information (AVI) InfoFrame: see HDMI spec 8.2.1 */
 		case AVI_IF_TYPE: {
 			u8 pixel_repetitionfactor;
 			u8 reg;
 	
 			if (d[0] != 0x82) {
-				printk(KERN_ERR "INFOFRAME AVI: wrong packet type!!!\n");
+				printk(KERN_ERR "INFOFRAME AVI: wrong packet type! (0x%02x)\n", d[0]);
 			}
 			DPRINTK(0,"\t\tcolorIndicator=%d activeInfoPresent=%d "
 				"barInfomationDataValid=%d scanInformation=%d colorimetry=%d "
@@ -3227,6 +3146,29 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 			tda1997x->colorspace = (d[4] & 0x60) >> 5;  /* Y1, Y0 */
 			tda1997x->colorimetry = (d[5] & 0xc0) >> 6; /* C1, C0 */
 			pixel_repetitionfactor = d[8] & 0x0f;       /* PR3, PR2, PR1, PR0 */
+			/* If colorimetry not specified, conversion depends on resolutiontype:
+			 *  - SDTV: ITU601 for SD (480/576/240/288 line resolution)
+			 *  - HDTV: ITU709 for HD (720/1080 line resolution)
+			 *  -   PC: sRGB
+			 * see HDMI specification section 6.7
+			 */
+			if ( (tda1997x->colorspace == COLORSPACE_YCBCR_422 ||
+			      tda1997x->colorspace == COLORSPACE_YCBCR_444) &&
+			     (tda1997x->colorimetry == COLORIMETRY_XVYCC ||
+			      tda1997x->colorimetry == COLORIMETRY_NONE) )
+			{
+
+				if (tda1997x->resolutiontype == RESTYPE_HDTV)
+					tda1997x->colorimetry = COLORIMETRY_ITU709;
+				else if (tda1997x->resolutiontype == RESTYPE_SDTV)
+					tda1997x->colorimetry = COLORIMETRY_SMPTE170_ITU601;
+				else
+					tda1997x->colorimetry = COLORIMETRY_NONE;
+				dev_info(&tda1997x->client->dev,
+					"invalid/undefined colorimetry defaulted to %s (%s)\n",
+					colorimetry_names[tda1997x->colorimetry],
+					restype_names[tda1997x->resolutiontype]);
+			}
 
 			/* configure upsampler per sample format */
 			/* ConfigureUpDownSampler: 0=bypass 1=repeatchroma 2=interpolate */
@@ -3242,7 +3184,10 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 			io_write(REG_PIX_REPEAT, reg);
 
 			/* configure the receiver with the new colorspace */
-			tda1997x_configure_conversion(tda1997x);
+			tda1997x_configure_conversion(tda1997x,
+				tda1997x->colorspace,
+				tda1997x->colorimetry,
+				tda1997x->pdata->vidout_format);
 
 		}	break;
 
@@ -3357,9 +3302,12 @@ static void tda1997x_work(struct work_struct *work)
 				 */
 				tda1997x->colorspace = COLORSPACE_RGB;
 				tda1997x->colorimetry = COLORIMETRY_NONE;
-
-				/* configure the receiver with the new colorspace */
-				tda1997x_configure_conversion(tda1997x);
+				/* bypass colorspace conversion */
+				io_write(REG_VDP_CTRL, io_read(REG_VDP_CTRL) | (1<<0));
+				/* SetBlankingCodes */
+				io_write16(REG_BLK_GY, RGBBlankingCode.blankingCodeGy);
+				io_write16(REG_BLK_BU, RGBBlankingCode.blankingCodeBu);
+				io_write16(REG_BLK_RV, RGBBlankingCode.blankingCodeRv);
 
 				/* set the state machine */
 				tda1997x->state = STATE_LOCKED;
@@ -4501,9 +4449,8 @@ static int tda1997x_probe(struct i2c_client *client,
 	/* Select input */
 	tda1997x_select_input(tda1997x->input);
 
-	/* set bypass of colorspace matrix (no conversion) */
-	tda1997x_set_colorconversion_matrix(tda1997x,
-		COLORCONVERSION_BYPASS, NULL, NULL);
+	/* enable matrix conversion bypass (no conversion) */
+	io_write(REG_VDP_CTRL, io_read(REG_VDP_CTRL) | (1<<0));
 
 	/* set video output mode */
 	tda1997x_set_video_outputformat(tda1997x->pdata);
