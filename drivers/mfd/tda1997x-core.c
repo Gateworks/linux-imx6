@@ -3472,8 +3472,7 @@ static void tda1997x_work(struct work_struct *work)
 					}
 
 					/* hold onto current state */
-					tda1997x->activity_status_reg = (tda1997x->activity_status_reg & mask)
-						| (irq_status & mask);
+					tda1997x->activity_status_reg = (irq_status & mask);
 				}
 			}
 		}
