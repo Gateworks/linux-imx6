@@ -91,9 +91,9 @@ typedef enum {
 
 /* Video output data formats */
 typedef enum {
-	VIDEOFMT_444         = 0x00,  /* RGB/YCbCr 4:4:4 */
-	VIDEOFMT_422_SMP     = 0x01,  /* YCbCr 4:2:2 semi-planar */
-	VIDEOFMT_422_CCIR    = 0x02   /* YCbCr 4:2:2 CCIR656 */
+	VIDEOFMT_444         = 0x00,  /* RGB444/YUV444 */
+	VIDEOFMT_422_SMP     = 0x01,  /* YUV422 semi-planar */
+	VIDEOFMT_422_CCIR    = 0x02   /* YUV422 CCIR656 */
 } tda1997x_videofmt_t;
 
 /* HS/HREF signal source */
