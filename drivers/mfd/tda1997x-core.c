@@ -3530,6 +3530,7 @@ static void tda1997x_work(struct work_struct *work)
 					(d[2] & 0x0f)       /* current SeqNum */
 				);
 			}
+#if 0
 			if (source & MASK_ISRC2) {
 				DPRINTK(0,"\tISRC2 packet\n");
 
@@ -3586,6 +3587,7 @@ static void tda1997x_work(struct work_struct *work)
 					}
 				}
 			}
+#endif
 			if (source & MASK_DC_NO_GCP) {
 				DPRINTK(0,"\tGCP not received in 5 frames\n");
 			}
