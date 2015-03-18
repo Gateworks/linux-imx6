@@ -509,7 +509,7 @@ typedef enum {
 /* Video Colorimetry formats */
 typedef enum {
 	COLORIMETRY_NONE,
-	COLORIMETRY_SMPTE170_ITU601,
+	COLORIMETRY_ITU601,
 	COLORIMETRY_ITU709,
 	COLORIMETRY_XVYCC,
 } tda1997x_colorimetry_t;
@@ -542,7 +542,7 @@ static char *colorspace_names[] = {
 };
 
 static char *colorimetry_names[] = {
-	"", "SMPTE170_ITU601", "ITU709", "XVYCC"
+	"", "ITU601", "ITU709", "XVYCC"
 };
 
 /* HDCP */
@@ -3161,7 +3161,7 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 				if (tda1997x->resolutiontype == RESTYPE_HDTV)
 					tda1997x->colorimetry = COLORIMETRY_ITU709;
 				else if (tda1997x->resolutiontype == RESTYPE_SDTV)
-					tda1997x->colorimetry = COLORIMETRY_SMPTE170_ITU601;
+					tda1997x->colorimetry = COLORIMETRY_ITU601;
 				else
 					tda1997x->colorimetry = COLORIMETRY_NONE;
 				dev_info(&tda1997x->client->dev,
