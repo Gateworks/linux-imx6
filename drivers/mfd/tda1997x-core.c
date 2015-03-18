@@ -487,7 +487,7 @@ static struct regulator *avdd_regulator;
 #define MAX_VAL_COEFF           16383
 #define MASK_MAT_COEFF_LSB      0x00FF
 
-/* Blanking code values depend on output colorspace (RGB or YCbCr) */
+/* Blanking code values depend on output colorspace (RGB or YUV) */
 typedef struct
 {
 	s16 blankingCodeGy;
@@ -496,7 +496,7 @@ typedef struct
 } blankingcodes_t;	
 
 blankingcodes_t RGBBlankingCode = {64, 64, 64};
-blankingcodes_t YCbCrBlankingCode = {64, 512, 512};
+blankingcodes_t YUVBlankingCode = {64, 512, 512};
 
 /* Video Colorspace formats */
 typedef enum {
@@ -532,13 +532,13 @@ typedef enum {
 
 /* Video output port format */
 const char *vidfmt_names[] = {
-	"RGB444/YCrCb444",      /* RGB/YUV444 16bit data bus, 8bpp */
-	"YCrCb422 semi-planar", /* YUV422 16bit data base, 8bpp */
-	"YCrCb422 CCIR656",     /* BT656 (YUV 8bpp 2 clock per pixel) */
+	"RGB444/YUV444",        /* RGB/YUV444 16bit data bus, 8bpp */
+	"YUV422 semi-planar", /* YUV422 16bit data base, 8bpp */
+	"YUV422 CCIR656",     /* BT656 (YUV 8bpp 2 clock per pixel) */
 };
 
 static char *colorspace_names[] = {
-	"RGB", "YCbCr422", "YCbCr444", "Future"	
+	"RGB", "YUV422", "YUV444", "Future"
 };
 
 static char *colorimetry_names[] = {
@@ -578,9 +578,9 @@ typedef enum {
  * HDMI input to the desired output format RGB|YUV
  */
 typedef enum {
-	YCbCr709_RGBLimited,
-	RGBLimited_YCbCr601,
-	YCbCr601_RGBLimited,
+	ITU709_RGBLimited,
+	RGBLimited_ITU601,
+	ITU601_RGBLimited,
 } colorconversion_t;
 
 /* Colorspace conversion matrix coefficients and offsets
@@ -609,7 +609,7 @@ typedef struct
 
 /* Conversion matrixes */
 colormatrixcoefs_t conversion_matrix[] = {
-	/* YCbCr709 -> RGBLimited */
+	/* ITU709 -> RGBLimited */
 	{
 		-256, -2048,  -2048,  /*Input Offset*/
 		4096, -1875,   -750,
@@ -617,20 +617,20 @@ colormatrixcoefs_t conversion_matrix[] = {
 		4096,     0,   7431,
 		 256,   256,    256   /*Output Offset*/
 	},
-	/* RGBLimited -> YCbCr601 */
+	/* RGBLimited -> ITU601 */
 	{
 		-256,  -256,   -256,  /*Input Offset*/
 		2404,  1225,    467,
 		-1754, 2095,   -341,
-		-1388, -707,   2095,  /*RGB limited range => ITU-601 YCbCr limited range */
+		-1388, -707,   2095,  /*RGB limited range => ITU-601 YUV limited range */
 		256,   2048,   2048   /*Output Offset*/
 	},
-	/* YCbCr601 -> RGBLimited */
+	/* YUV601 -> RGBLimited */
 	{
 		-256, -2048,  -2048,  /*Input Offset*/
 		4096, -2860,  -1378,
 		4096,  5615,      0,
-		4096,     0,   7097,  /*ITU-601 YCbCr limited range => RGB limited range */
+		4096,     0,   7097,  /*ITU-601 YUV limited range => RGB limited range */
 		256,    256,    256   /*Output Offset*/
 	}
 };
@@ -1949,18 +1949,18 @@ static int tda1997x_configure_conversion(struct tda1997x_data *tda1997x,
 		pBlankingCodes = &RGBBlankingCode;
 		if (colorspace != COLORSPACE_RGB) {
 			if (colorimetry == COLORIMETRY_ITU709)
-				pCoefficients = &conversion_matrix[YCbCr709_RGBLimited];
+				pCoefficients = &conversion_matrix[ITU709_RGBLimited];
 			else
-				pCoefficients = &conversion_matrix[YCbCr601_RGBLimited];
+				pCoefficients = &conversion_matrix[ITU601_RGBLimited];
 		}
 		break;
 
-	/* YCbCr 4:2:2 output */
-	case VIDEOFMT_422_SMP: /* YCbCr 4:2:2 semi-planar */
-	case VIDEOFMT_422_CCIR:/* YCbCr 4:2:2 CCIR656 */
-		pBlankingCodes = &YCbCrBlankingCode;
+	/* YUV422 output */
+	case VIDEOFMT_422_SMP: /* YUV422 semi-planar */
+	case VIDEOFMT_422_CCIR:/* YUV422 CCIR656 */
+		pBlankingCodes = &YUVBlankingCode;
 		if (colorspace == COLORSPACE_RGB)
-			pCoefficients = &conversion_matrix[RGBLimited_YCbCr601];
+			pCoefficients = &conversion_matrix[RGBLimited_ITU601];
 		break;
 	}
 
@@ -2371,20 +2371,20 @@ tda1997x_set_video_outputformat(struct tda1997x_platform_data *pdata)
 	reg = pdata->vidout_delay_clk << 4;
 	if (pdata->vidout_clkmode == CLOCK_SINGLE_EDGE) {  /* single edge */
 		switch (pdata->vidout_format) {
-			case VIDEOFMT_444:     /* RGB/YCbCr 4:4:4 */
-			case VIDEOFMT_422_SMP: /* YCbCr 4:2:2 semi-planar */
+			case VIDEOFMT_444:     /* RGB444/YUV444 */
+			case VIDEOFMT_422_SMP: /* YUV422 semi-planar */
 				break;
-			case VIDEOFMT_422_CCIR:/* YCbCr 4:2:2 CCIR656 */
+			case VIDEOFMT_422_CCIR:/* YUV422 CCIR656 */
 				reg |= 0x01; /* clk_x2 */
 				break;
 		}
 	} else {                               /* dual edge */
 		switch (pdata->vidout_format) {
-			case VIDEOFMT_444:     /* RGB/YCbCr 4:4:4 */
-			case VIDEOFMT_422_SMP: /* YCbCr 4:2:2 semi-planar */
+			case VIDEOFMT_444:     /* RGB444/YUV444 */
+			case VIDEOFMT_422_SMP: /* YUV422 semi-planar */
 				reg |= 0x02; /* clk_div2 */
 				break;
-			case VIDEOFMT_422_CCIR:/* YCbCr 4:2:2 CCIR656 */
+			case VIDEOFMT_422_CCIR:/* YUV422 CCIR656 */
 				break;
 		}
 	}
