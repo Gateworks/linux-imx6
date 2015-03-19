@@ -1061,6 +1061,8 @@ struct tda1997x_platform_data {
 	/* Video port configs */
 	u8   vidout_port_config[9];
 	u8   vidout_port_config_no;
+	/* Max pixel rate (MP/sec) */
+	int max_pixel_rate;
 };
 
 /**
@@ -2920,6 +2922,8 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 			res->horizfreq, res->interlaced?'i':'p',
 			vPerCmp, hPerCmp, hsWidthCmp);
 		if (vPerCmp && hPerCmp && hsWidthCmp) {
+			int pixrate;
+
 			/* resolutiontype used to determine Default Colorimetry */
 			switch (res->height) {
 				case 480:
@@ -2935,11 +2939,42 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 				default:
 					tda1997x->resolutiontype = RESTYPE_PC;
 			}
+
 			printk(KERN_INFO "%s: matched resolution: %dx%d%c@%d %s\n",
 				KBUILD_MODNAME, res->width, res->height,
 				res->interlaced?'i':'p',
 				res->horizfreq,
 				restype_names[tda1997x->resolutiontype]);
+
+			/* validate input mode */
+			pixrate = (res->width * res->height * res->horizfreq) /
+				  1000000;
+			if (res->interlaced)
+				pixrate /= 2;
+			switch(tda1997x->pdata->vidout_format) {
+			case VIDEOFMT_444:
+			case VIDEOFMT_422_SMP:
+				/* FIXME: have not figured out how to get HS output asserted on 2nd field */ 
+				if (res->interlaced) {
+					printk(KERN_INFO "%s: Error %s: interlaced not supported\n", KBUILD_MODNAME,
+					       vidfmt_names[tda1997x->pdata->vidout_format]);
+					return NULL;
+				}
+				break;
+			case VIDEOFMT_422_CCIR:
+				/* BT656 requires 2-clocks per pixel */
+				pixrate *= 2;
+				break;
+			}
+			if (tda1997x->pdata->max_pixel_rate &&
+			    (pixrate > tda1997x->pdata->max_pixel_rate))
+			{
+				printk(KERN_INFO "%s: Error: %dMP/s exceeds max of %dMP/s\n", KBUILD_MODNAME,
+				       pixrate,
+				       tda1997x->pdata->max_pixel_rate);
+				return NULL;
+			}
+
 			return res;
 		}
 	}
@@ -3965,7 +4000,7 @@ static int tda1997x_get_of_property(struct device *dev,
 	const char *vidout_fmt, *vidout_clk, *audout_fmt;
 	u32 hdcp, ddc_slave, blc, trc;
 	u32 port_configs;
-	u32 audout_clk, audout_layout;
+	u32 audout_clk, audout_layout, max_pixel_rate = 0;
 	int err;
 
 	/* defaults (use inverted vs/hs/de) */
@@ -4024,6 +4059,8 @@ static int tda1997x_get_of_property(struct device *dev,
 		return err;
 	}
 	pdata->vidout_port_config_no = port_configs;
+	/* max pixrate */
+	of_property_read_u32(np, "max-pixel-rate", &max_pixel_rate);
 
 	/* audio output format */
 	err = of_property_read_string(np, "audout_fmt", &audout_fmt);
@@ -4050,6 +4087,7 @@ static int tda1997x_get_of_property(struct device *dev,
 	pdata->vidout_trc = trc;
 	pdata->vidout_blc = blc;
 	pdata->vidout_clkmode = parse_vidout_clkmode(vidout_clk);
+	pdata->max_pixel_rate = max_pixel_rate;
 	pdata->audout_layout = audout_layout;
 	pdata->audout_format = parse_audout_fmt(audout_fmt);
 	switch (audout_clk) {
@@ -4205,6 +4243,8 @@ static int tda1997x_probe(struct i2c_client *client,
 	pr_info("video out format: %s\n", vidfmt_names[pdata->vidout_format]);
 	if (tda1997x->cec_enabled)
 		pr_info("CEC slave address 0x%02x\n", tda1997x->cec_slave);
+	if (tda1997x->pdata->max_pixel_rate)
+		pr_info("max pixel rate: %d MP/sec\n", pdata->max_pixel_rate);
 
 	/* Attach a second dummy i2c_client for CEC register access */
 	tda1997x->client_cec = i2c_new_dummy(client->adapter, tda1997x->cec_slave);
