@@ -3114,7 +3114,7 @@ tda1997x_parse_infoframe(struct tda1997x_data *tda1997x, int type)
 				tda1997x->vendor[i] = d[4 + i];
 			for (i = 0; i < 16; i++)
 				tda1997x->product[i] = d[4 + 8 + i];
-			printk(KERN_INFO "%s: Detected: %s %s\n", KBUILD_MODNAME,
+			printk(KERN_INFO "%s: Source Product Descriptor: %s %s\n", KBUILD_MODNAME,
 				tda1997x->vendor, tda1997x->product);
 			break;
 
