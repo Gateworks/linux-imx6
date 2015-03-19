@@ -114,7 +114,7 @@ static int gsc_wdt_probe(struct platform_device *pdev)
 		platform_set_drvdata(pdev, NULL);
 		return ret;
 	}
-	dev_info(&pdev->dev, "registerted watchdog (nowayout=%d)\n",
+	dev_info(&pdev->dev, "registered watchdog (nowayout=%d)\n",
 		 nowayout);
 
 	return 0;
