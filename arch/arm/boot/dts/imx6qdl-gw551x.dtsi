@@ -366,6 +366,7 @@
 		interrupts = <7 IRQ_TYPE_EDGE_FALLING>;
 		hdcp = <0>; /* HDCP disabled */
 		ddc_slave = <0x74>; /* DDC slave addres */
+		max-pixel-rate = <180>; /* IMX6 CSI max pixel rate 180MP/sec */
 		/* regulators */
 		DOVDD-supply = <&reg_3p3>;
 		AVDD-supply = <&reg_1p8b>;

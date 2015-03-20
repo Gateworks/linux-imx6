@@ -558,6 +558,7 @@
 		DVDD-supply = <&reg_1p8v>;
 		hdcp = <0>; /* HDCP disabled */
 		ddc_slave = <0x74>; /* DDC slave addres */
+		max-pixel-rate = <180>; /* IMX6 CSI max pixel rate 180MP/sec */
 		/* video output format */
 		vidout_fmt = "422_smp"; /* YUV422 */
 		vidout_clkmode = "single_edge"; /* 1x clock */
