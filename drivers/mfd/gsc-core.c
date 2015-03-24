@@ -103,7 +103,7 @@ static int __gsc_i2c_read(u8 reg, u8 *val)
 		 * -EIO returned when i2c device is busy
 		 */
 		if (ret != -EAGAIN && ret != -EIO)
-			continue;
+			break;
 	}
 	if (ret < 0) {
 		dev_err(&gsc_priv->client->dev, "<< 0x%02x %d\n", reg, ret);
