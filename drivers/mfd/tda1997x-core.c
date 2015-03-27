@@ -4454,10 +4454,8 @@ static int tda1997x_probe(struct i2c_client *client,
 
 	/* set video output mode */
 	tda1997x_set_video_outputformat(tda1997x->pdata);
-	if (tda1997x->pdata->vidout_port_config) {
-		for (i = 0; i < tda1997x->pdata->vidout_port_config_no; i++)
-			io_write(REG_VP35_32_CTRL + i, tda1997x->pdata->vidout_port_config[i]);
-	}
+	for (i = 0; i < tda1997x->pdata->vidout_port_config_no; i++)
+		io_write(REG_VP35_32_CTRL + i, tda1997x->pdata->vidout_port_config[i]);
 
 	/* configure audio output mode */
 	tda1997x_configure_audio_formatter(tda1997x->pdata, 0);
