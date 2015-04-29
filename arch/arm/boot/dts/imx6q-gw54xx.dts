@@ -10,7 +10,6 @@
  */
 
 /dts-v1/;
-
 #include "imx6q.dtsi"
 #include "imx6qdl-gw54xx.dtsi"
 
