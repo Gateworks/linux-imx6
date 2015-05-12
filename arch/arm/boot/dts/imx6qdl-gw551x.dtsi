@@ -372,11 +372,11 @@
 		AVDD-supply = <&reg_1p8b>;
 		DVDD-supply = <&reg_1p8a>;
 		/* video output format */
-		vidout_fmt = "422_ccir"; /* BT656 */
-		vidout_trc = <1>; /* insert timing codes (SAV/EAV) in stream */
-		vidout_blc = <1>; /* insert blanking codes in stream */
+		vidout_fmt = "422_smp"; /* YUV422 */
+		vidout_trc = <0>; /* no timing codes (SAV/EAV) in stream */
+		vidout_blc = <0>; /* no blanking codes in stream */
 		vidout_clkmode = "single_edge"; /* 1x clock */
-		vidout_portcfg = [ 00 00 00 82 81 00 00 00 00 ];
+		vidout_portcfg = [ 00 00 00 88 87 00 82 81 00 ];
 		/* audio output format */
 		audout_fmt = "i2s16"; /* I2S bus, 16bit per ch */
 		audout_sysclk = <128>; /* 128fs clkmode */
