@@ -42,6 +42,7 @@
 #define TEMPSENSE1			0x0190
 #define TEMPSENSE1_MEASURE_FREQ		0xffff
 
+#define OCOTP_MEM0			0x0480
 #define OCOTP_ANA1			0x04e0
 
 /* The driver supports 1 passive trip point and 1 critical trip point */
@@ -52,17 +53,10 @@ enum imx_thermal_trip {
 };
 
 /*
- * It defines the temperature in millicelsius for passive trip point
- * that will trigger cooling action when crossed.
+ * The temperature delta from max in millicelsius for passive
+ * trip point that will trigger cooling action when crossed.
  */
-#define IMX_TEMP_PASSIVE		85000
 #define IMX_TEMP_PASSIVE_COOL_DELTA	10000
-
-/*
- * The maximum die temperature on imx parts is 105C, let's give some cushion
- * for noise and possible temperature rise between measurements.
- */
-#define IMX_TEMP_CRITICAL		100000
 
 #define IMX_POLLING_DELAY		2000 /* millisecond */
 #define IMX_PASSIVE_DELAY		1000
@@ -79,6 +73,8 @@ struct imx_thermal_data {
 	unsigned long trip_temp[IMX_TRIP_NUM];
 	u32 c1, c2; /* See formula in imx_get_sensor_data() */
 	struct clk *thermal_clk;
+	u32 temp_max;
+	const char *temp_grade;
 };
 
 static int imx_get_temp(struct thermal_zone_device *tz, unsigned long *temp)
@@ -327,6 +323,7 @@ static int imx_thermal_probe(struct platform_device *pdev)
 	struct imx_thermal_data *data;
 	struct cpumask clip_cpus;
 	struct regmap *map;
+	u32 val;
 	int ret;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
@@ -380,8 +377,40 @@ static int imx_thermal_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	data->trip_temp[IMX_TRIP_PASSIVE] = IMX_TEMP_PASSIVE;
-	data->trip_temp[IMX_TRIP_CRITICAL] = IMX_TEMP_CRITICAL;
+	/* For IMX6Q use OTP for thermal grade */
+	ret = regmap_read(map, OCOTP_MEM0, &val);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to read temp grade: %d\n",
+			ret);
+		return ret;
+	}
+
+	/* The maximum die temp is specified by the Temperature Grade */
+	switch ((val >> 6) & 0x3) {
+	case 0: /* Commercial (0 to 95C) */
+		data->temp_grade = "Commercial";
+		data->temp_max = 95000;
+		break;
+	case 1: /* Extended Commercial (-20 to 105C) */
+		data->temp_grade = "Extended Commercial";
+		data->temp_max = 105000;
+		break;
+	case 2: /* Industrial (-40 to 105C) */
+		data->temp_grade = "Industrial";
+		data->temp_max = 105000;
+		break;
+	case 3: /* Automotive (-40 to 125C) */
+		data->temp_grade = "Automotive";
+		data->temp_max = 125000;
+		break;
+	}
+
+	/*
+	 * Let's give some cushion for noise and possible temperature rise
+	 * between measurements.
+	 */
+	data->trip_temp[IMX_TRIP_CRITICAL] = data->temp_max - 5000;
+	data->trip_temp[IMX_TRIP_PASSIVE] = data->temp_max - 10000;
 	data->tz = thermal_zone_device_register("imx_thermal_zone",
 						IMX_TRIP_NUM,
 						(1 << IMX_TRIP_NUM) - 1,
@@ -397,6 +426,12 @@ static int imx_thermal_probe(struct platform_device *pdev)
 		devfreq_cooling_unregister(data->cdev[1]);
 		return ret;
 	}
+
+	dev_info(&pdev->dev, "%s CPU temperature grade\n", data->temp_grade);
+	dev_info(&pdev->dev, "max:%dC crit:%ldC passive:%ldC\n",
+		 data->temp_max / 1000,
+		 data->trip_temp[IMX_TRIP_CRITICAL] / 1000,
+		 data->trip_temp[IMX_TRIP_PASSIVE] / 1000);
 
 	data->mode = THERMAL_DEVICE_ENABLED;
 
