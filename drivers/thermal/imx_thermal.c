@@ -315,6 +315,40 @@ static int imx_get_sensor_data(struct platform_device *pdev)
 	data->c1 = temp64;
 	data->c2 = n1 * data->c1 + 1000 * t1;
 
+	/* use OTP for thermal grade */
+	ret = regmap_read(map, OCOTP_MEM0, &val);
+	if (ret) {
+		dev_err(&pdev->dev, "failed to read temp grade: %d\n", ret);
+		return ret;
+	}
+
+	/* The maximum die temp is specified by the Temperature Grade */
+	switch ((val >> 6) & 0x3) {
+	case 0: /* Commercial (0 to 95C) */
+		data->temp_grade = "Commercial";
+		data->temp_max = 95000;
+		break;
+	case 1: /* Extended Commercial (-20 to 105C) */
+		data->temp_grade = "Extended Commercial";
+		data->temp_max = 105000;
+		break;
+	case 2: /* Industrial (-40 to 105C) */
+		data->temp_grade = "Industrial";
+		data->temp_max = 105000;
+		break;
+	case 3: /* Automotive (-40 to 125C) */
+		data->temp_grade = "Automotive";
+		data->temp_max = 125000;
+		break;
+	}
+
+	/*
+	 * Let's give some cushion for noise and possible temperature rise
+	 * between measurements.
+	 */
+	data->trip_temp[IMX_TRIP_CRITICAL] = data->temp_max - 5000;
+	data->trip_temp[IMX_TRIP_PASSIVE] = data->temp_max - 10000;
+
 	return 0;
 }
 
@@ -377,40 +411,6 @@ static int imx_thermal_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* For IMX6Q use OTP for thermal grade */
-	ret = regmap_read(map, OCOTP_MEM0, &val);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to read temp grade: %d\n",
-			ret);
-		return ret;
-	}
-
-	/* The maximum die temp is specified by the Temperature Grade */
-	switch ((val >> 6) & 0x3) {
-	case 0: /* Commercial (0 to 95C) */
-		data->temp_grade = "Commercial";
-		data->temp_max = 95000;
-		break;
-	case 1: /* Extended Commercial (-20 to 105C) */
-		data->temp_grade = "Extended Commercial";
-		data->temp_max = 105000;
-		break;
-	case 2: /* Industrial (-40 to 105C) */
-		data->temp_grade = "Industrial";
-		data->temp_max = 105000;
-		break;
-	case 3: /* Automotive (-40 to 125C) */
-		data->temp_grade = "Automotive";
-		data->temp_max = 125000;
-		break;
-	}
-
-	/*
-	 * Let's give some cushion for noise and possible temperature rise
-	 * between measurements.
-	 */
-	data->trip_temp[IMX_TRIP_CRITICAL] = data->temp_max - 5000;
-	data->trip_temp[IMX_TRIP_PASSIVE] = data->temp_max - 10000;
 	data->tz = thermal_zone_device_register("imx_thermal_zone",
 						IMX_TRIP_NUM,
 						(1 << IMX_TRIP_NUM) - 1,
