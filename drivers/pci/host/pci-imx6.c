@@ -488,12 +488,15 @@ static int imx6_pcie_start_link(struct pcie_port *pp)
 	if (ret)
 		goto out;
 
+#if 0   /* Disable Gen2 */
 	/* Allow Gen2 mode after the link is up. */
 	tmp = readl(pp->dbi_base + PCIE_RC_LCR);
 	tmp &= ~PCIE_RC_LCR_MAX_LINK_SPEEDS_MASK;
 	tmp |= PCIE_RC_LCR_MAX_LINK_SPEEDS_GEN2;
 	writel(tmp, pp->dbi_base + PCIE_RC_LCR);
-
+#else
+	dev_info(pp->dev, "Link: Gen2 disabled\n");
+#endif
 	/*
 	 * Start Directed Speed Change so the best possible speed both link
 	 * partners support can be negotiated.
@@ -540,7 +543,7 @@ out:
 		}
 	} else {
 		tmp = readl(pp->dbi_base + 0x80);
-		dev_dbg(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
+		dev_info(pp->dev, "Link up, Gen=%i\n", (tmp >> 16) & 0xf);
 	}
 
 	return ret;
