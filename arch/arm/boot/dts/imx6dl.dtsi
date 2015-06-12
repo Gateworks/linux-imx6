@@ -22,16 +22,16 @@
 			reg = <0>;
 			next-level-cache = <&L2>;
 			operating-points = <
-				/* vmin@freq + 35mV (1GHz ommited) */
+				/* vmin@freq + 35mV */
 				/* kHz    uV */
-				996000  1275000
+				996000  1285000
 				792000  1185000
-				396000  1085000
+				396000  1160000
 			>;
 			fsl,soc-operating-points = <
-				/* vmin@freq + 35mV (1GHz ommited) */
+				/* vmin@freq + 35mV */
 				/* ARM kHz      SOC-PU uV */
-				996000            1175000
+				996000            1185000
 				792000            1185000
 				396000            1185000
 			>;
