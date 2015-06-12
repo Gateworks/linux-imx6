@@ -337,13 +337,6 @@ static bool ltc3676_volatile_reg(struct device *dev, unsigned int reg)
 	return false;
 }
 
-static struct reg_default ltc3676_reg_defaults[] = {
-	{ LTC3676_DVB1B, 0x39 },
-	{ LTC3676_DVB2B, 0x39 },
-	{ LTC3676_DVB3B, 0x39 },
-	{ LTC3676_DVB4B, 0x39 },
-};
-
 static const struct regmap_config ltc3676_regmap_config = {
 	.reg_bits = 8,
 	.val_bits = 8,
@@ -351,8 +344,6 @@ static const struct regmap_config ltc3676_regmap_config = {
 	.readable_reg = ltc3676_readable_reg,
 	.volatile_reg = ltc3676_volatile_reg,
 	.max_register = LTC3676_CLIRQ,
-	.reg_defaults = ltc3676_reg_defaults,
-	.num_reg_defaults = ARRAY_SIZE(ltc3676_reg_defaults),
 	.use_single_rw = true,
 	.cache_type = REGCACHE_RBTREE,
 };
