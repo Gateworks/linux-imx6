@@ -280,7 +280,7 @@
 
 &gpmi {
 	pinctrl-names = "default";
-	pinctrl-0 = <&pinctrl_gpmi_nand_2>;
+	pinctrl-0 = <&pinctrl_gpmi_nand>;
 	status = "okay";
 };
 
