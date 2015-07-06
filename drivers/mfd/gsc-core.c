@@ -344,6 +344,11 @@ static struct attribute_group attr_group = {
 	.attrs = gsc_attrs,
 };
 
+static void gsc_poweroff(void)
+{
+	gsc_powerdown(ULONG_MAX);
+}
+
 static int
 gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -402,6 +407,13 @@ gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		ret = of_platform_populate(client->dev.of_node, NULL, NULL,
 					   &client->dev);
 	}
+
+	/*
+	 * if no specific power off function in board file, power off system by
+	 * GSC
+	 */
+	if (!pm_power_off)
+		pm_power_off = gsc_poweroff;
 
 	return ret;
 }
