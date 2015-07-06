@@ -766,6 +766,7 @@ static int stop_preview(cam_data *cam)
 static int mxc_v4l2_g_fmt(cam_data *cam, struct v4l2_format *f)
 {
 	int retval = 0;
+	struct v4l2_format cam_fmt;
 
 	pr_debug("%s: %s type=%d\n", __func__, cam->sensor->name, f->type);
 
@@ -773,6 +774,13 @@ static int mxc_v4l2_g_fmt(cam_data *cam, struct v4l2_format *f)
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		pr_debug("   type is V4L2_BUF_TYPE_VIDEO_CAPTURE\n");
 		f->fmt.pix = cam->v2f.fmt.pix;
+
+		/* XXX: The below is a hack for the tda1997x driver */
+		cam_fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+		vidioc_int_g_fmt_cap(cam->sensor, &cam_fmt);
+		if (cam_fmt.fmt.pix.pixelformat == IPU_PIX_FMT_GENERIC_16 &&
+		    strcmp(cam->sensor->name, "tda1997x-video") == 0)
+			f->fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
 		break;
 	case V4L2_BUF_TYPE_VIDEO_OVERLAY:
 		pr_debug("   type is V4L2_BUF_TYPE_VIDEO_OVERLAY\n");
