@@ -346,7 +346,17 @@ static struct attribute_group attr_group = {
 
 static void gsc_poweroff(void)
 {
-	gsc_powerdown(ULONG_MAX);
+	dev_info(&gsc_priv->client->dev, "GSC powerdown"
+		 " - press pushbutton to wake\n");
+	mutex_lock(&gsc_priv->io_lock);
+	__gsc_i2c_write(GSC_TIME + 0, 0xff);
+	__gsc_i2c_write(GSC_TIME + 1, 0xff);
+	__gsc_i2c_write(GSC_TIME + 2, 0xff);
+	__gsc_i2c_write(GSC_TIME + 3, 0xff);
+	__gsc_i2c_update(GSC_CTRL_1, 0, 1 << GSC_CTRL_1_ACTIVATE_SLEEP |
+			 1 << GSC_CTRL_1_SLEEP_ENABLE);
+	/* board should be powered down at this point */
+	mutex_unlock(&gsc_priv->io_lock);
 }
 
 static int
