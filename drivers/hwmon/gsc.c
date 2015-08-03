@@ -182,6 +182,9 @@ static inline int gsp_read(struct i2c_client *client, u8 reg)
 			return err;
 		adc |= (b << (8*i));
 	}
+	if (reg == GSP_REG_TEMP_IN && adc > 0x8000)
+		adc -= 0xffff;
+
 	return adc;
 }
 
