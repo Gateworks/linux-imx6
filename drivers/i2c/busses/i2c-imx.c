@@ -208,6 +208,8 @@ static int i2c_imx_acked(struct imx_i2c_struct *i2c_imx)
 {
 	if (readb(i2c_imx->base + IMX_I2C_I2SR) & I2SR_RXAK) {
 		dev_dbg(&i2c_imx->adapter.dev, "<%s> No ACK\n", __func__);
+		if (of_machine_is_compatible("gw,ventana"))
+			return -EAGAIN;
 		return -EIO;  /* No ACK */
 	}
 
@@ -569,6 +571,10 @@ static int __init i2c_imx_probe(struct platform_device *pdev)
 	i2c_imx->adapter.nr 		= pdev->id;
 	i2c_imx->adapter.dev.of_node	= pdev->dev.of_node;
 	i2c_imx->base			= base;
+	if (of_machine_is_compatible("gw,ventana")) {
+		dev_info(&pdev->dev, "Adding retries for Ventana GSC\n");
+		i2c_imx->adapter.retries = 3;
+	}
 
 	pinctrl = devm_pinctrl_get_select_default(&pdev->dev);
 	if (IS_ERR(pinctrl)) {
