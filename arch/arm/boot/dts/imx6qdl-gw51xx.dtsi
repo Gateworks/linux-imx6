@@ -123,11 +123,6 @@
 	};
 };
 
-&cpu0 {
-	arm-supply = <&reg_vdd_arm>;
-	soc-supply = <&reg_vdd_soc>;
-};
-
 &fec {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_enet>;
@@ -137,8 +132,7 @@
 };
 
 &gpc {
-	/* use ldo-bypass */
-	fsl,ldo-bypass = <1>;
+	fsl,ldo-bypass = <0>;
 };
 
 &gpmi {
