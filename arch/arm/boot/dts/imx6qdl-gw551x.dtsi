@@ -136,12 +136,6 @@
 	status = "okay";
 };
 
-&cpu0 {
-	arm-supply = <&reg_vdd_arm>;
-	soc-supply = <&reg_vdd_soc>;
-	pu-supply = <&pu_dummy>; /* ldo-bypass */
-};
-
 &flexcan1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_flexcan1>;
@@ -155,18 +149,13 @@
 	fsl,cpu_pupscr_sw = <0xf>;
 	fsl,cpu_pdnscr_iso2sw = <0x1>;
 	fsl,cpu_pdnscr_iso = <0x1>;
-	fsl,ldo-bypass = <1>;
-	pu-supply = <&pu_dummy>; /* ldo-bypass */
+	fsl,ldo-bypass = <0>;
 };
 
 &gpmi {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_gpmi_nand>;
 	status = "okay";
-};
-
-&gpu {
-	pu-supply = <&pu_dummy>; /* ldo-bypass */
 };
 
 &hdmi_audio {
@@ -550,9 +539,3 @@
 &usbh1 {
 	status = "okay";
 };
-
-&vpu {
-	pu-supply = <&pu_dummy>; /* ldo-bypass */
-};
-
-
