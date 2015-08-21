@@ -401,6 +401,7 @@
 		regulators {
 			/* VDD_ARM */
 			reg_vdd_arm: sw1ab {
+				regulator-name = "vddarm";
 				regulator-min-microvolt = <300000>;
 				regulator-max-microvolt = <1875000>;
 				regulator-boot-on;
@@ -410,6 +411,7 @@
 
 			/* VDD_SOC */
 			reg_vdd_soc: sw1c {
+				regulator-name = "vddsoc";
 				regulator-min-microvolt = <300000>;
 				regulator-max-microvolt = <1875000>;
 				regulator-boot-on;
@@ -419,6 +421,7 @@
 
 			/* VDD_HIGH */
 			reg_3p0v: sw2 {
+				regulator-name = "vdd3p0";
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <3950000>;
 				regulator-boot-on;
@@ -427,6 +430,7 @@
 
 			/* VDD_DDR */
 			reg_ddra: sw3a {
+				regulator-name = "vddddra";
 				regulator-min-microvolt = <400000>;
 				regulator-max-microvolt = <1975000>;
 				regulator-boot-on;
@@ -435,6 +439,7 @@
 
 			/* VDD_DDR */
 			reg_ddrb: sw3b {
+				regulator-name = "vddddrb";
 				regulator-min-microvolt = <400000>;
 				regulator-max-microvolt = <1975000>;
 				regulator-boot-on;
@@ -443,17 +448,20 @@
 
 			/* VDD_1P8 */
 			reg_1p8v: sw4 {
+				regulator-name = "vdd1p8";
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <3300000>;
 			};
 
 			/* VDD_5P0 */
 			reg_swbst: swbst {
+				regulator-name = "vdd5p0";
 				regulator-min-microvolt = <5000000>;
 				regulator-max-microvolt = <5150000>;
 			};
 
 			reg_snvs: vsnvs {
+				regulator-name = "vddsnvs";
 				regulator-min-microvolt = <1000000>;
 				regulator-max-microvolt = <3000000>;
 				regulator-boot-on;
@@ -462,12 +470,14 @@
 
 			/* VDD_VREF */
 			reg_vref: vrefddr {
+				regulator-name = "vddvref";
 				regulator-boot-on;
 				regulator-always-on;
 			};
 
 			/* VDD_PCI_1P5_1 */
 			reg_1p5va: vgen1 {
+				regulator-name = "vdd1p5a";
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1550000>;
 				regulator-boot-on;
@@ -476,6 +486,7 @@
 
 			/* VDD_PCI_1P5_2 */
 			reg_1p5vb: vgen2 {
+				regulator-name = "vdd1p5b";
 				regulator-min-microvolt = <800000>;
 				regulator-max-microvolt = <1550000>;
 				regulator-boot-on;
@@ -490,6 +501,7 @@
 
 			/* VDD_AUD_1P8 */
 			reg_aud_1p8v: vgen4 {
+				regulator-name = "vdd1p8a";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
@@ -497,6 +509,7 @@
 
 			/* VDD_2P5 */
 			reg_2p5v: vgen5 {
+				regulator-name = "vdd2p5";
 				regulator-min-microvolt = <1800000>;
 				regulator-max-microvolt = <3300000>;
 				regulator-always-on;
