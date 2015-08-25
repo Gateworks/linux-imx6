@@ -241,6 +241,7 @@
 				regulator-ramp-delay = <7000>;
 				regulator-boot-on;
 				regulator-always-on;
+				linux,phandle = <&reg_vdd_soc>;
 			};
 
 			/* VDD_1P8 (1+R1/R2 = 2.505): ENET-PHY */
@@ -261,6 +262,7 @@
 				regulator-ramp-delay = <7000>;
 				regulator-boot-on;
 				regulator-always-on;
+				linux,phandle = <&reg_vdd_arm>;
 			};
 
 			/* VDD_DDR (1+R1/R2 = 2.105) */
