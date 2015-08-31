@@ -158,7 +158,11 @@ static int alarm_set_rtc(struct timespec *ts)
 	int rv = 0;
 
 	rtc_time_to_tm(ts->tv_sec, &new_rtc_tm);
+#if defined(CONFIG_RTC_HCTOSYS_DEVICE)
+	rtc_dev = rtc_class_open(CONFIG_RTC_HCTOSYS_DEVICE);
+#else
 	rtc_dev = alarmtimer_get_rtcdev();
+#endif
 	rv = do_settimeofday(ts);
 	if (rv < 0)
 		return rv;
