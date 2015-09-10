@@ -117,7 +117,7 @@ static int imx_tda1997x_probe(struct platform_device *pdev)
 	cpu_pdev = of_find_device_by_node(cpu_np);
 	if (!cpu_pdev) {
 		dev_err(&pdev->dev, "failed to find SSI platform device\n");
-		ret = -EINVAL;
+		ret = -EPROBE_DEFER;
 		goto fail;
 	}
 
@@ -145,14 +145,16 @@ static int imx_tda1997x_probe(struct platform_device *pdev)
 	data->card.owner = THIS_MODULE;
 	data->card.dai_link = &data->dai;
 
+	platform_set_drvdata(pdev, &data->card);
+	snd_soc_card_set_drvdata(&data->card, data);
+
 	/* register card with ASoC core */
-	ret = snd_soc_register_card(&data->card);
+	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
 		goto fail;
 	}
 
-	platform_set_drvdata(pdev, data);
 fail:
 	if (cpu_np)
 		of_node_put(cpu_np);
@@ -160,15 +162,6 @@ fail:
 		of_node_put(codec_np);
 
 	return ret;
-}
-
-static int imx_tda1997x_remove(struct platform_device *pdev)
-{
-	struct imx_tda1997x_data *data = platform_get_drvdata(pdev);
-
-	snd_soc_unregister_card(&data->card);
-
-	return 0;
 }
 
 static const struct of_device_id imx_tda1997x_dt_ids[] = {
@@ -184,7 +177,6 @@ static struct platform_driver imx_tda1997x_audio_driver = {
 		.of_match_table = imx_tda1997x_dt_ids,
 	},
 	.probe = imx_tda1997x_probe,
-	.remove = imx_tda1997x_remove,
 };
 
 module_platform_driver(imx_tda1997x_audio_driver);
