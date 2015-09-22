@@ -517,6 +517,7 @@
 				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x0001b0b0 /* user3 led */
 				MX6QDL_PAD_SD2_CLK__GPIO1_IO10		0x4001b0b0 /* LVDS_GPIO */
 				MX6QDL_PAD_SD2_CMD__GPIO1_IO11		0x0001b0b0 /* LVDSTCH_IRQ# */
+				MX6QDL_PAD_SD3_DAT4__GPIO7_IO01		0x4001b0b0 /* UART1_TEN */
 				MX6QDL_PAD_SD4_DAT0__GPIO2_IO08		0x4001b0b0 /* MSATA_EN */
 				MX6QDL_PAD_SD4_DAT3__GPIO2_IO11		0x4001b0b0 /* UART2_EN# */
 			 >;
@@ -675,6 +676,7 @@
 &uart1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart1_2>;
+	fsl,rs485-gpio-txen = <&gpio7 1 GPIO_ACTIVE_HIGH>;
 	status = "okay";
 };
 
