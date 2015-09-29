@@ -7,6 +7,7 @@ Required properties:
 
 Optional properties:
 - fsl,uart-has-rtscts: indicate that RTS/CTS signals are used
+- fsl,rs485-gpio-txen : Indicate a GPIO is used as TXEN instead of RTS
 
 Note: Each uart controller should have an alias correctly numbered
 in "aliases" node.
