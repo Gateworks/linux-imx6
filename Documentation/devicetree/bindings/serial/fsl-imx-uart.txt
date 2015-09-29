@@ -6,6 +6,7 @@ Required properties:
 - interrupts : Should contain uart interrupt
 
 Optional properties:
+- fsl,rs485-gpio-txen : Indicate a GPIO is used as TXEN instead of RTS
 - fsl,uart-has-rtscts : Indicate the uart has rts and cts
 - fsl,irda-mode : Indicate the uart supports irda mode
 - fsl,dte-mode : Indicate the uart works in DTE mode. The uart works
