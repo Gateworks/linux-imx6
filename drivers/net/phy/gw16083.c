@@ -75,6 +75,8 @@ struct mv88e1111_priv {
 	struct mv88e1111_port_state	port5;
 	struct mv88e1111_port_state	port6;
 	struct kobject			*sysfs_kobj;
+	struct delayed_work work;
+	struct workqueue_struct *workq;
 };
 
 enum {
@@ -431,27 +433,20 @@ static DEVICE_ATTR(ethernet6_mode, S_IRUGO, portmode_show, NULL);
  * PHY driver
  */
 
-static int
-mv88e6176_config_init(struct phy_device *pdev)
-{
-	dev_dbg(&pdev->dev, "%s\n", __func__);
-	pdev->state = PHY_RUNNING;
-
-	return 0;
-}
-
 /* check MV88E1111 PHY status and MV88E6176 GPIO */
-static int
-mv88e6176_read_status(struct phy_device *pdev)
+static void
+mv88e6176_work(struct work_struct *work)
 {
-	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
+	struct mv88e1111_priv *priv =
+		container_of(work, struct mv88e1111_priv, work.work);
+	struct phy_device *pdev = priv->phydev;
 	struct mv88e1111_port_state *state;
 	bool serdes, sfp_present, sfp_signal;
 	int port;
-	int ret = 0;
 	u16 gpio;
 
 	dev_dbg(&pdev->dev, "%s", __func__);
+	mutex_lock(&pdev->lock);
 	gpio = read_switch_scratch(pdev, MV_GPIO_DATA);
 	for (port = 5; port < 7; port++) {
 		serdes = (read_switch_port_phy(pdev, port, MII_M1111_PHY_EXT_SR)
@@ -522,22 +517,40 @@ mv88e6176_read_status(struct phy_device *pdev)
 				state->sfp_enabled = true;
 		}
 	}
+	mutex_unlock(&pdev->lock);
 
-	return ret;
+	queue_delayed_work(priv->workq, &priv->work, HZ);
+}
+
+static int
+mv88e6176_read_status(struct phy_device *pdev)
+{
+	return 0;
 }
 
 static int
 mv88e6176_config_aneg(struct phy_device *pdev)
 {
-	dev_dbg(&pdev->dev, "%s", __func__);
+	return 0;
+}
+
+static int
+mv88e6176_config_init(struct phy_device *pdev)
+{
+	dev_dbg(&pdev->dev, "%s\n", __func__);
+	pdev->state = PHY_RUNNING;
+
 	return 0;
 }
 
 static void
 mv88e6176_remove(struct phy_device *pdev)
 {
+	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
+
 	dev_dbg(&pdev->dev, "%s", __func__);
 
+	destroy_workqueue(priv->workq);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet1);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet2);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet3);
@@ -662,6 +675,12 @@ mv88e6176_probe(struct phy_device *pdev)
 
 	/* Add a nice symlink to the real device */
 	ret = sysfs_create_link(kernel_kobj, &pdev->dev.kobj, "gw16083");
+
+	INIT_DELAYED_WORK(&priv->work, mv88e6176_work);
+	priv->workq = create_singlethread_workqueue("gw16083");
+	if (!priv->workq)
+		return -ENODEV;
+	queue_delayed_work(priv->workq, &priv->work, 0);
 
 	dev_dbg(&pdev->dev, "initial state: GPIO=0x%02x "
 		"Port5_serdes=%d Port6_serdes=%d\n",
