@@ -358,7 +358,7 @@ static int mv88e6352_setup(struct dsa_switch *ds)
 
 static int mv88e6352_port_to_phy_addr(int port)
 {
-	if (port >= 0 && port <= 4)
+	if (port >= 0 && port <= 7)
 		return port;
 	return -EINVAL;
 }
