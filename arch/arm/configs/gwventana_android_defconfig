@@ -1784,6 +1784,7 @@ CONFIG_INPUT_GPIO=y
 # CONFIG_INPUT_IMS_PCU is not set
 # CONFIG_INPUT_CMA3000 is not set
 # CONFIG_INPUT_ISL29023 is not set
+CONFIG_LSM9DS1=y
 
 #
 # Hardware I/O ports
