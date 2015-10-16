@@ -479,15 +479,6 @@ mv88e6176_work(struct work_struct *work)
 	int port;
 	u16 gpio;
 
-#if IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
-	if (pdev->attached_dev && !switch_plat_data.netdev) {
-		switch_plat_data.netdev = &pdev->attached_dev->dev;
-		switch_plat_data.chip[0].host_dev = &pdev->bus->dev;
-		platform_device_register(&switch_device);
-		dev_info(&pdev->dev, "registered GW16083 DSA switch\n");
-	}
-#endif
-
 	mutex_lock(&pdev->lock);
 	gpio = read_switch_scratch(pdev, MV_GPIO_DATA);
 	for (port = 5; port < 7; port++) {
@@ -626,6 +617,9 @@ mv88e6176_probe(struct phy_device *pdev)
 	u32 id, reg;
 	struct mv88e1111_priv *priv;
 	struct device *dev;
+#if IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
+	struct net_device *netdev = NULL;
+#endif
 
 	dev_dbg(&pdev->dev, "%s: addr=0x%02x bus=%s:%s gw16083_client=%p\n",
 		__func__, pdev->addr, pdev->bus->name, pdev->bus->id,
@@ -654,6 +648,34 @@ mv88e6176_probe(struct phy_device *pdev)
 			return 0;
 		}
 	}
+
+#if IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
+	/*
+	 * Find the netdev this bus is hanging off of and register with DSA:
+	 *  The netdev must be an Intel I210 (igb) with Gateworks MAC addr
+	 */
+	read_lock(&dev_base_lock);
+	for_each_netdev(&init_net, netdev) {
+		if (netdev->dev.parent &&
+		    !strcmp(netdev->dev.parent->driver->name, "igb") &&
+		    (netdev->perm_addr[0] == 0x00) &&
+		    (netdev->perm_addr[1] == 0xd0) &&
+		    (netdev->perm_addr[2] == 0x12))
+		{
+			switch_plat_data.netdev = &netdev->dev;
+			switch_plat_data.chip[0].host_dev = &pdev->bus->dev;
+			break;
+		}
+	}
+	read_unlock(&dev_base_lock);
+
+	if (switch_plat_data.netdev) {
+		platform_device_register(&switch_device);
+		dev_info(dev, "registered GW16083 DSA switch\n");
+	} else {
+		dev_err(dev, "failed to find netdev for DSA switch\n");
+	}
+#endif
 
 	/*
 	 * port5/6 config: MV88E1111 PHY
