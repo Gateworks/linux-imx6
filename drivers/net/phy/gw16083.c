@@ -602,6 +602,17 @@ mv88e6176_remove(struct phy_device *pdev)
 	sysfs_remove_link(kernel_kobj, "gw16083");
 }
 
+/*
+ * mv88e6176_probe - called any time an MV88E6176 is found on an mdio bus
+ *  Determine if this MV88E6176 is indeed on a GW16083 and if so configure
+ *  the port5/port6 phy and register a background procedure for monitoring
+ *  their states to support SFP vs Copper switching.
+ *
+ * Verify this is a GW16083 by ensuring:
+ *   - the phy address matches that of a GW16083
+ *   - the mdio bus is from an i210 device (igb driver)
+ *   - there are MV881111 PHY's hanging off of Port5 and Port6
+ */
 static int
 mv88e6176_probe(struct phy_device *pdev)
 {
@@ -626,7 +637,19 @@ mv88e6176_probe(struct phy_device *pdev)
 	if (strcmp(pdev->bus->name, "igb_enet_mii_bus") != 0)
 		return 0;
 
-	dev_info(&gw16083_client->dev, "%s: MV88E6176 7-port switch detected",
+	/* verify Port5/Port6 have an MV88E1111 PHY hanging off them */
+	for (port = 5; port < 7; port++) {
+		id = read_switch_port_phy(pdev, port,
+					  MII_M1111_PHY_IDENT0) << 16;
+		id |= read_switch_port_phy(pdev, port, MII_M1111_PHY_IDENT1);
+		if ((id & MII_M1111_PHY_ID_MASK) != MII_M1111_PHY_ID) {
+			dev_err(&gw16083_client->dev,
+				"Port%d: No MV88E1111 PHY detected", port);
+			return 0;
+		}
+	}
+
+	dev_info(&pdev->dev, "%s: Configuring MV88E6176 7-port switch",
 		 pdev->bus->id);
 
 	/*
@@ -641,25 +664,15 @@ mv88e6176_probe(struct phy_device *pdev)
 	 *   R0_15: phy reset
 	 */
 	for (port = 5; port < 7; port++) {
-#ifndef RGMII_DELAY_ON_PHY
-		write_switch_port(pdev, port, MV_PORT_PHYS_CONTROL, 0xC003);
-#endif
-
-		id = read_switch_port_phy(pdev, port,
-					  MII_M1111_PHY_IDENT0) << 16;
-		id |= read_switch_port_phy(pdev, port, MII_M1111_PHY_IDENT1);
-		if ((id & MII_M1111_PHY_ID_MASK) != MII_M1111_PHY_ID) {
-			dev_err(&gw16083_client->dev,
-				"Port%d: No MV88E1111 PHY detected", port);
-			return 0;
-		}
-
 #ifdef RGMII_DELAY_ON_PHY
 		/* phy rx/tx delay */
 		reg = read_switch_port_phy(pdev, port, MII_M1111_PHY_EXT_CR);
 		reg |= (1<<1) | (1<<7);
 		write_switch_port_phy(pdev, port, MII_M1111_PHY_EXT_CR, reg);
+#else
+		write_switch_port(pdev, port, MV_PORT_PHYS_CONTROL, 0xC003);
 #endif
+
 		/* led config */
 		write_switch_port_phy(pdev, port, MII_M1111_PHY_LED_CONTROL,
 				      MII_M1111_PHY_LED_PULSE_STR);
@@ -695,6 +708,7 @@ mv88e6176_probe(struct phy_device *pdev)
 	priv->port6.port = 6;
 	dev_set_drvdata(&pdev->dev, priv);
 
+	/* register sysfs API */
 #if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
 	ret |= device_create_file(&pdev->dev, &dev_attr_lan1);
 	ret |= device_create_file(&pdev->dev, &dev_attr_lan2);
