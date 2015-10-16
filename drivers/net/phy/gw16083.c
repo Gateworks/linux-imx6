@@ -327,7 +327,7 @@ static int gw16083_get_port(const char* name)
 	int i;
 	int map[] = { 3, 2, 1, 0, 5, 6 };
 
-	if (strncasecmp(name, "ETHERNET", 8) != 0 || strlen(name) != 9)
+	if (strncasecmp(name, "ETHERNET", 8) != 0)
 		return -1;
 	i = name[8] - '0';
 	if (i < 1 || i > 6)
