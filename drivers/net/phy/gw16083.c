@@ -327,9 +327,9 @@ static int gw16083_get_port(const char* name)
 	int i;
 	int map[] = { 3, 2, 1, 0, 5, 6 };
 
-	if (strncasecmp(name, "ETHERNET", 8) != 0)
+	if (strncasecmp(name, "LAN", 3) != 0)
 		return -1;
-	i = name[8] - '0';
+	i = name[3] - '0';
 	if (i < 1 || i > 6)
 		return -1;
 	return map[i-1];
@@ -368,19 +368,19 @@ static ssize_t port_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(ethernet1, S_IWUSR | S_IRUGO, port_show, port_store);
-static DEVICE_ATTR(ethernet2, S_IWUSR | S_IRUGO, port_show, port_store);
-static DEVICE_ATTR(ethernet3, S_IWUSR | S_IRUGO, port_show, port_store);
-static DEVICE_ATTR(ethernet4, S_IWUSR | S_IRUGO, port_show, port_store);
-static DEVICE_ATTR(ethernet5, S_IWUSR | S_IRUGO, port_show, port_store);
-static DEVICE_ATTR(ethernet6, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan1, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan2, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan3, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan4, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan5, S_IWUSR | S_IRUGO, port_show, port_store);
+static DEVICE_ATTR(lan6, S_IWUSR | S_IRUGO, port_show, port_store);
 #else
-static DEVICE_ATTR(ethernet1, S_IRUGO, port_show, NULL);
-static DEVICE_ATTR(ethernet2, S_IRUGO, port_show, NULL);
-static DEVICE_ATTR(ethernet3, S_IRUGO, port_show, NULL);
-static DEVICE_ATTR(ethernet4, S_IRUGO, port_show, NULL);
-static DEVICE_ATTR(ethernet5, S_IRUGO, port_show, NULL);
-static DEVICE_ATTR(ethernet6, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan1, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan2, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan3, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan4, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan5, S_IRUGO, port_show, NULL);
+static DEVICE_ATTR(lan6, S_IRUGO, port_show, NULL);
 #endif
 #endif /* #if IS_ENABLED(CONFIG_NET_DSA_MV88E6352) */
 
@@ -431,13 +431,11 @@ static ssize_t portmode_store(struct device *dev, struct device_attribute *attr,
 	return count;
 }
 
-static DEVICE_ATTR(ethernet5_mode, S_IWUSR | S_IRUGO, portmode_show,
-		   portmode_store);
-static DEVICE_ATTR(ethernet6_mode, S_IWUSR | S_IRUGO, portmode_show,
-		   portmode_store);
+static DEVICE_ATTR(lan5_mode, S_IWUSR | S_IRUGO, portmode_show, portmode_store);
+static DEVICE_ATTR(lan6_mode, S_IWUSR | S_IRUGO, portmode_show, portmode_store);
 #else
-static DEVICE_ATTR(ethernet5_mode, S_IRUGO, portmode_show, NULL);
-static DEVICE_ATTR(ethernet6_mode, S_IRUGO, portmode_show, NULL);
+static DEVICE_ATTR(lan5_mode, S_IRUGO, portmode_show, NULL);
+static DEVICE_ATTR(lan6_mode, S_IRUGO, portmode_show, NULL);
 #endif
 
 static ssize_t portsfp_show(struct device *dev, struct device_attribute *attr,
@@ -456,8 +454,8 @@ static ssize_t portsfp_show(struct device *dev, struct device_attribute *attr,
 	return sprintf(buf, "%s\n", state->sfp_id);
 }
 
-static DEVICE_ATTR(ethernet5_sfp, S_IRUGO, portsfp_show, NULL);
-static DEVICE_ATTR(ethernet6_sfp, S_IRUGO, portsfp_show, NULL);
+static DEVICE_ATTR(lan5_sfp, S_IRUGO, portsfp_show, NULL);
+static DEVICE_ATTR(lan6_sfp, S_IRUGO, portsfp_show, NULL);
 
 /*
  * PHY driver
@@ -590,17 +588,17 @@ mv88e6176_remove(struct phy_device *pdev)
 
 	destroy_workqueue(priv->workq);
 #if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
-	device_remove_file(&pdev->dev, &dev_attr_ethernet1);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet2);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet3);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet4);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet5);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet6);
+	device_remove_file(&pdev->dev, &dev_attr_lan1);
+	device_remove_file(&pdev->dev, &dev_attr_lan2);
+	device_remove_file(&pdev->dev, &dev_attr_lan3);
+	device_remove_file(&pdev->dev, &dev_attr_lan4);
+	device_remove_file(&pdev->dev, &dev_attr_lan5);
+	device_remove_file(&pdev->dev, &dev_attr_lan6);
 #endif
-	device_remove_file(&pdev->dev, &dev_attr_ethernet5_sfp);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet6_sfp);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet5_mode);
-	device_remove_file(&pdev->dev, &dev_attr_ethernet6_mode);
+	device_remove_file(&pdev->dev, &dev_attr_lan5_sfp);
+	device_remove_file(&pdev->dev, &dev_attr_lan6_sfp);
+	device_remove_file(&pdev->dev, &dev_attr_lan5_mode);
+	device_remove_file(&pdev->dev, &dev_attr_lan6_mode);
 	sysfs_remove_link(kernel_kobj, "gw16083");
 }
 
@@ -700,17 +698,17 @@ mv88e6176_probe(struct phy_device *pdev)
 	dev_set_drvdata(&pdev->dev, priv);
 
 #if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet1);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet2);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet3);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet4);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet6);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan1);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan2);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan3);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan4);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan5);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan6);
 #endif
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5_sfp);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet6_sfp);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5_mode);
-	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet6_mode);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan5_sfp);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan6_sfp);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan5_mode);
+	ret |= device_create_file(&pdev->dev, &dev_attr_lan6_mode);
 
 	if (unlikely(ret))
 		dev_err(&pdev->dev, "Failed creating attrs\n");
