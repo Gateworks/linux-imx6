@@ -626,7 +626,6 @@ mv88e6176_probe(struct phy_device *pdev)
 	if (strcmp(pdev->bus->name, "igb_enet_mii_bus") != 0)
 		return 0;
 
-	//dev_info(&pdev->dev, "Detected");
 	dev_info(&gw16083_client->dev, "%s: MV88E6176 7-port switch detected",
 		 pdev->bus->id);
 
@@ -653,7 +652,6 @@ mv88e6176_probe(struct phy_device *pdev)
 			dev_err(&gw16083_client->dev,
 				"Port%d: No MV88E1111 PHY detected", port);
 			return 0;
-			//continue;
 		}
 
 #ifdef RGMII_DELAY_ON_PHY
