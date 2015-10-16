@@ -55,6 +55,7 @@
 #undef FAIL_ON_CHECKSUM_ERR	/* fail to configure SFP if checksum bad */
 #define PORT_POWER_CONTROL	/* ports can be enabled/disabled via sysfs */
 #define PORT_MODE_CONTROL	/* ports 5/6 can have SFP/RJ45 mode forced */
+#define RGMII_DELAY_ON_PHY	/* implement Port5/6 tx/rx delay on PHY vs sw */
 
 MODULE_DESCRIPTION("GW16083 driver");
 MODULE_AUTHOR("Tim Harvey");
