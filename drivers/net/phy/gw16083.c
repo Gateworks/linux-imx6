@@ -137,10 +137,12 @@ int write_switch_port(struct phy_device *pdev, int port, u8 regaddr, u16 val)
  */
 int read_switch_port_phy(struct phy_device *pdev, int port, u8 regaddr)
 {
+	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
 	u16 reg;
 	int i;
 
-	dev_dbg(&pdev->dev, "read_phy: port%d reg=0x%02x\n", port, regaddr);
+	dev_dbg(&priv->client->dev, "read_phy: port%d reg=0x%02x\n", port,
+		regaddr);
 	reg = SMIBUSY | SMIMODE22 | SMIOP_READ;
 	reg |= port << DEVADDR;
 	reg |= regaddr << REGADDR;
@@ -166,10 +168,11 @@ int read_switch_port_phy(struct phy_device *pdev, int port, u8 regaddr)
  */
 int write_switch_port_phy(struct phy_device *pdev, int port, u8 addr, u16 reg)
 {
+	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
 	int i;
 
-	dev_dbg(&pdev->dev, "write_phy: port%d reg=0x%02x val=0x%04x\n", port,
-		addr, reg);
+	dev_dbg(&priv->client->dev, "write_phy: port%d reg=0x%02x val=0x%04x\n",
+		port, addr, reg);
 	pdev->bus->write(pdev->bus, MV_GLOBAL2, MV_SMI_PHY_DATA, reg);
 	reg = SMIBUSY | SMIMODE22 | SMIOP_WRITE;
 	reg |= port << DEVADDR;
@@ -206,6 +209,7 @@ inline void write_switch_scratch(struct phy_device *pdev, u8 reg, u8 val)
 /* enable or disable an SFP's TXEN signal */
 static int enable_sfp_txen(struct phy_device *pdev, int port, bool enable)
 {
+	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
 	u8 gpio;
 	int bit;
 
@@ -220,7 +224,7 @@ static int enable_sfp_txen(struct phy_device *pdev, int port, bool enable)
 	else
 		gpio &= (1 << bit);
 	write_switch_scratch(pdev, MV_GPIO_DATA, gpio);
-	dev_info(&pdev->dev, "Port%d: SFP TX %s\n", port, enable ?
+	dev_info(&priv->client->dev, "Port%d: SFP TX %s\n", port, enable ?
 		 "enabled" : "disabled");
 	return 0;
 }
@@ -232,18 +236,19 @@ static int enable_sfp_txen(struct phy_device *pdev, int port, bool enable)
 static int config_mv88e1111_port_sfp(struct phy_device *pdev, int port,
 				     bool sfp)
 {
+	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
 	u16 reg;
 
 	if (port != 5 && port != 6)
 		return -EINVAL;
 
-	dev_dbg(&pdev->dev, "%s: Port%d %s\n", __func__, port,
+	dev_dbg(&priv->client->dev, "%s: Port%d %s\n", __func__, port,
 		sfp ? "SFP" : "copper");
 	if (sfp) {
 		enable_sfp_txen(pdev, port, 1);
 
 		/* configure MV88E6176 Physical Control Port Register */
-		dev_info(&pdev->dev,
+		dev_info(&priv->client->dev,
 			 "Port%d: SFP: force 1000mbps link up "
 			 "(auto-negotiate duplex)\n",
 			 port);
@@ -260,7 +265,7 @@ static int config_mv88e1111_port_sfp(struct phy_device *pdev, int port,
 		enable_sfp_txen(pdev, port, 0);
 
 		/* configure MV88E6176 Physical Control Port Register */
-		dev_info(&pdev->dev,
+		dev_info(&priv->client->dev,
 			 "Port%d: Copper: set auto-neg link/duplex/speed\n",
 			 port);
 		reg = read_switch_port(pdev, port, MV_PORT_PHYS_CONTROL);
@@ -269,7 +274,7 @@ static int config_mv88e1111_port_sfp(struct phy_device *pdev, int port,
 		write_switch_port(pdev, port, MV_PORT_PHYS_CONTROL, reg);
 		reg = read_switch_port(pdev, port, MV_PORT_PHYS_CONTROL);
 	}
-	dev_dbg(&pdev->dev, "%s: Port%d %s PORT_PHYS_CONTROL=0x%04x\n",
+	dev_dbg(&priv->client->dev, "%s: Port%d %s PORT_PHYS_CONTROL=0x%04x\n",
 		__func__, port, sfp ? "SFP" : "copper",
 		read_switch_port(pdev, port, MV_PORT_PHYS_CONTROL));
 
@@ -468,6 +473,7 @@ mv88e6176_work(struct work_struct *work)
 	struct mv88e1111_priv *priv =
 		container_of(work, struct mv88e1111_priv, work.work);
 	struct phy_device *pdev = priv->phydev;
+	struct device *dev = &priv->client->dev;
 	struct mv88e1111_port_state *state;
 	bool serdes, sfp_present, sfp_signal;
 	int port;
@@ -487,7 +493,7 @@ mv88e6176_work(struct work_struct *work)
 	for (port = 5; port < 7; port++) {
 		serdes = (read_switch_port_phy(pdev, port, MII_M1111_PHY_EXT_SR)
 			 & (1<<13)) ? 1 : 0;
-		dev_dbg(&pdev->dev, "%s: Port%d GPIO:0x%02x SerDes:%d\n",
+		dev_dbg(dev, "%s: Port%d GPIO:0x%02x SerDes:%d\n",
 			__func__, port, gpio, serdes);
 		switch(port) {
 		case 5:
@@ -509,7 +515,7 @@ mv88e6176_work(struct work_struct *work)
 		 */
 		if (state->sfp_present != sfp_present) {
 			state->sfp_present = sfp_present;
-			dev_info(&pdev->dev, "Port%d: SFP %s\n",
+			dev_info(dev, "Port%d: SFP %s\n",
 				 port, sfp_present ? "inserted" : "removed");
 			if (state->sfp_present) {
 				if (gw16083_read_port_sfp(priv->client, state))
@@ -527,12 +533,12 @@ mv88e6176_work(struct work_struct *work)
 		}
 		if (state->sfp_signal != sfp_signal) {
 			state->sfp_signal = sfp_signal;
-			dev_info(&pdev->dev, "Port%d: SFP signal %s\n",
+			dev_info(dev, "Port%d: SFP signal %s\n",
 				 port, sfp_signal ? "detected" : "lost");
 		}
 		if (state->serdes != serdes) {
 			state->serdes = serdes;
-			dev_info(&pdev->dev, "Port%d: %s auto-selected\n",
+			dev_info(dev, "Port%d: %s auto-selected\n",
 				 port, serdes ? "SERDES" : "copper");
 
 			/*
@@ -573,7 +579,6 @@ mv88e6176_config_aneg(struct phy_device *pdev)
 static int
 mv88e6176_config_init(struct phy_device *pdev)
 {
-	dev_dbg(&pdev->dev, "%s\n", __func__);
 	pdev->state = PHY_RUNNING;
 
 	return 0;
@@ -584,7 +589,7 @@ mv88e6176_remove(struct phy_device *pdev)
 {
 	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
 
-	dev_dbg(&pdev->dev, "%s", __func__);
+	dev_dbg(&priv->client->dev, "%s", __func__);
 
 	destroy_workqueue(priv->workq);
 #if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
@@ -620,6 +625,7 @@ mv88e6176_probe(struct phy_device *pdev)
 	int ret = 0;
 	u32 id, reg;
 	struct mv88e1111_priv *priv;
+	struct device *dev;
 
 	dev_dbg(&pdev->dev, "%s: addr=0x%02x bus=%s:%s gw16083_client=%p\n",
 		__func__, pdev->addr, pdev->bus->name, pdev->bus->id,
@@ -632,6 +638,7 @@ mv88e6176_probe(struct phy_device *pdev)
 	/* i2c driver needs to be loaded first */
 	if (!gw16083_client)
 		return 0;
+	dev = &gw16083_client->dev;
 
 	/* gw16083 has MV88E1676 hanging off of i210 mdio bus */
 	if (strcmp(pdev->bus->name, "igb_enet_mii_bus") != 0)
@@ -643,14 +650,10 @@ mv88e6176_probe(struct phy_device *pdev)
 					  MII_M1111_PHY_IDENT0) << 16;
 		id |= read_switch_port_phy(pdev, port, MII_M1111_PHY_IDENT1);
 		if ((id & MII_M1111_PHY_ID_MASK) != MII_M1111_PHY_ID) {
-			dev_err(&gw16083_client->dev,
-				"Port%d: No MV88E1111 PHY detected", port);
+			dev_err(dev, "Port%d: No MV88E1111 PHY detected", port);
 			return 0;
 		}
 	}
-
-	dev_info(&pdev->dev, "%s: Configuring MV88E6176 7-port switch",
-		 pdev->bus->id);
 
 	/*
 	 * port5/6 config: MV88E1111 PHY
@@ -663,6 +666,7 @@ mv88e6176_probe(struct phy_device *pdev)
 	 * Register 0: Control Register
 	 *   R0_15: phy reset
 	 */
+	dev_info(dev, "Configuring MV88E6176 7-port switch");
 	for (port = 5; port < 7; port++) {
 #ifdef RGMII_DELAY_ON_PHY
 		/* phy rx/tx delay */
@@ -680,8 +684,7 @@ mv88e6176_probe(struct phy_device *pdev)
 		reg = read_switch_port_phy(pdev, port, MII_M1111_PHY_CONTROL);
 		reg |= MII_M1111_PHY_CONTROL_RESET;
 		write_switch_port_phy(pdev, port, MII_M1111_PHY_CONTROL, reg);
-		dev_info(&gw16083_client->dev,
-			 "Port%d MV88E111 PHY configured\n", port);
+		dev_info(dev, "Port%d: MV88E111 PHY configured\n", port);
 	}
 
 	/*
@@ -734,7 +737,7 @@ mv88e6176_probe(struct phy_device *pdev)
 		return -ENODEV;
 	queue_delayed_work(priv->workq, &priv->work, 0);
 
-	dev_dbg(&pdev->dev, "initial state: GPIO=0x%02x "
+	dev_dbg(dev, "initial state: GPIO=0x%02x "
 		"Port5_serdes=%d Port6_serdes=%d\n",
 		read_switch_scratch(pdev, MV_GPIO_DATA),
 		(read_switch_port_phy(pdev, 5, MII_M1111_PHY_EXT_SR)
@@ -746,7 +749,7 @@ mv88e6176_probe(struct phy_device *pdev)
 }
 
 static struct phy_driver mv88e6176_phy_driver = {
-	.name		= "MV88E6176",
+	.name		= "gw16083",
 	.phy_id		= MV_IDENT_VALUE,
 	.phy_id_mask	= MV_IDENT_MASK,
 	.features	= PHY_BASIC_FEATURES,
