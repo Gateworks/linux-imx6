@@ -276,7 +276,7 @@ static int config_mv88e1111_port_sfp(struct phy_device *pdev, int port,
 	return 0;
 }
 
-#if defined(PORT_POWER_CONTROL)
+#if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352) && defined(PORT_POWER_CONTROL)
 static int enable_switch_port(struct phy_device *pdev, int port, bool enable)
 {
 	struct mv88e1111_priv *priv = dev_get_drvdata(&pdev->dev);
@@ -335,6 +335,7 @@ static int gw16083_get_port(const char* name)
 	return map[i-1];
 }
 
+#if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
 static ssize_t port_show(struct device *dev, struct device_attribute *attr,
 			 char *buf)
 {
@@ -381,22 +382,7 @@ static DEVICE_ATTR(ethernet4, S_IRUGO, port_show, NULL);
 static DEVICE_ATTR(ethernet5, S_IRUGO, port_show, NULL);
 static DEVICE_ATTR(ethernet6, S_IRUGO, port_show, NULL);
 #endif
-
-static ssize_t portsfp_show(struct device *dev, struct device_attribute *attr,
-			     char *buf)
-{
-	struct mv88e1111_priv *priv = dev_get_drvdata(dev);
-	struct mv88e1111_port_state *state;
-
-	state = get_port_state(priv, gw16083_get_port(attr->attr.name));
-	if (!state)
-		return 0;
-
-	if (!state->sfp_present)
-		return 0;
-
-	return sprintf(buf, "%s\n", state->sfp_id);
-}
+#endif /* #if IS_ENABLED(CONFIG_NET_DSA_MV88E6352) */
 
 static ssize_t portmode_show(struct device *dev, struct device_attribute *attr,
 			     char *buf)
@@ -410,9 +396,6 @@ static ssize_t portmode_show(struct device *dev, struct device_attribute *attr,
 
 	return sprintf(buf, "%s\n", state->serdes ? "SFP" : "RJ45");
 }
-static DEVICE_ATTR(ethernet5_sfp, S_IRUGO, portsfp_show, NULL);
-static DEVICE_ATTR(ethernet6_sfp, S_IRUGO, portsfp_show, NULL);
-
 #ifdef PORT_MODE_CONTROL
 static ssize_t portmode_store(struct device *dev, struct device_attribute *attr,
 			      const char *buf, size_t count)
@@ -457,6 +440,24 @@ static DEVICE_ATTR(ethernet5_mode, S_IRUGO, portmode_show, NULL);
 static DEVICE_ATTR(ethernet6_mode, S_IRUGO, portmode_show, NULL);
 #endif
 
+static ssize_t portsfp_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct mv88e1111_priv *priv = dev_get_drvdata(dev);
+	struct mv88e1111_port_state *state;
+
+	state = get_port_state(priv, gw16083_get_port(attr->attr.name));
+	if (!state)
+		return 0;
+
+	if (!state->sfp_present)
+		return 0;
+
+	return sprintf(buf, "%s\n", state->sfp_id);
+}
+
+static DEVICE_ATTR(ethernet5_sfp, S_IRUGO, portsfp_show, NULL);
+static DEVICE_ATTR(ethernet6_sfp, S_IRUGO, portsfp_show, NULL);
 
 /*
  * PHY driver
@@ -588,12 +589,14 @@ mv88e6176_remove(struct phy_device *pdev)
 	dev_dbg(&pdev->dev, "%s", __func__);
 
 	destroy_workqueue(priv->workq);
+#if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
 	device_remove_file(&pdev->dev, &dev_attr_ethernet1);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet2);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet3);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet4);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet5);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet6);
+#endif
 	device_remove_file(&pdev->dev, &dev_attr_ethernet5_sfp);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet6_sfp);
 	device_remove_file(&pdev->dev, &dev_attr_ethernet5_mode);
@@ -696,12 +699,14 @@ mv88e6176_probe(struct phy_device *pdev)
 	priv->port6.port = 6;
 	dev_set_drvdata(&pdev->dev, priv);
 
+#if !IS_ENABLED(CONFIG_NET_DSA_MV88E6352)
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet1);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet2);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet3);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet4);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet6);
+#endif
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5_sfp);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet6_sfp);
 	ret |= device_create_file(&pdev->dev, &dev_attr_ethernet5_mode);
