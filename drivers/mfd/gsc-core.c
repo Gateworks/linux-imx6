@@ -22,6 +22,8 @@
 #include <linux/of_platform.h>
 #include <linux/platform_device.h>
 
+#include <asm/system_misc.h>
+
 #include "gsc-core.h"
 
 #define I2C_RETRIES	3
@@ -54,6 +56,8 @@ struct gsc {
 };
 
 static struct gsc *gsc_priv;
+
+void (*restart_orig)(enum reboot_mode reboot_mode, const char *cmd);
 
 /**
  * gsc_i2c_write - Writes a register to GSC with retries
@@ -359,6 +363,21 @@ static void gsc_poweroff(void)
 	/* board should be powered down at this point */
 }
 
+static void gsc_restart(enum reboot_mode reboot_mode, const char *cmd)
+{
+	/*
+	 * Use gsc_powerdown for usermode reboots (where cmd != NULL).
+	 * For all other cases use original restart handler. The reason we
+	 * can't use gsc_powerdown in all cases is because it can sleep
+	 * during i2c transcations thus can't be called from atomic context.
+	 */
+	if (cmd) {
+		/* board should be power-cycled at this point */
+		gsc_powerdown(2);
+	} else if (restart_orig)
+		restart_orig(reboot_mode, cmd);
+}
+
 static int
 gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
@@ -424,6 +443,11 @@ gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		pm_power_off = gsc_poweroff;
 	}
 
+	/* override the machine restart handler */
+	restart_orig = arm_pm_restart;
+	arm_pm_restart = gsc_restart;
+	dev_info(dev, "registered arm_pm_restart");
+
 	return ret;
 }
 
@@ -433,6 +457,9 @@ static int gsc_remove(struct i2c_client *client)
 
 	if (pm_power_off == gsc_poweroff)
 		pm_power_off = NULL;
+
+	if (arm_pm_restart == gsc_restart)
+		arm_pm_restart = restart_orig;
 
 	sysfs_remove_group(&client->dev.kobj, &attr_group);
 	mfd_remove_devices(gsc->dev);
