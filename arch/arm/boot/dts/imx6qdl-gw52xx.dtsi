@@ -179,6 +179,14 @@
 	status = "okay";
 };
 
+&ecspi3 {
+	fsl,spi-num-chipselects = <1>;
+	cs-gpios = <&gpio4 24 GPIO_ACTIVE_HIGH>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ecspi3>;
+	status = "okay";
+};
+
 &flexcan1 {
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_flexcan1_1>;
@@ -518,6 +526,15 @@
 				MX6QDL_PAD_SD4_DAT0__GPIO2_IO08		0x4001b0b0 /* MSATA_EN */
 				MX6QDL_PAD_SD4_DAT3__GPIO2_IO11		0x4001b0b0 /* UART2_EN# */
 			 >;
+		};
+
+		pinctrl_ecspi3: escpi3grp {
+			fsl,pins = <
+				MX6QDL_PAD_DISP0_DAT0__ECSPI3_SCLK	0x100b1
+				MX6QDL_PAD_DISP0_DAT1__ECSPI3_MOSI	0x100b1
+				MX6QDL_PAD_DISP0_DAT2__ECSPI3_MISO	0x100b1
+				MX6QDL_PAD_DISP0_DAT3__GPIO4_IO24	0x100b1
+			>;
 		};
 
 		pinctrl_gpmi_nand: gpminandgrp {
