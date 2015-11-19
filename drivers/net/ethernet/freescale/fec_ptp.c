@@ -45,6 +45,7 @@
 #include <linux/of_device.h>
 #include <linux/of_gpio.h>
 #include <linux/of_net.h>
+#include <linux/clocksource.h>
 
 #include "fec.h"
 
@@ -244,7 +245,7 @@ static cycle_t fec_ptp_read(const struct cyclecounter *cc)
 	tempval |= FEC_T_CTRL_CAPTURE;
 	writel(tempval, fep->hwp + FEC_ATIME_CTRL);
 
-	if (id_entry->driver_data & FEC_QUIRK_TKT210590)
+	if (id_entry->driver_data & FEC_QUIRK_BUG_CAPTURE)
 		udelay(1);
 
 	return readl(fep->hwp + FEC_ATIME);
@@ -353,6 +354,7 @@ static int fec_ptp_adjfreq(struct ptp_clock_info *ptp, s32 ppb)
 	tmp = readl(fep->hwp + FEC_ATIME_INC) & FEC_T_INC_MASK;
 	tmp |= corr_ns << FEC_T_INC_CORR_OFFSET;
 	writel(tmp, fep->hwp + FEC_ATIME_INC);
+	corr_period = corr_period > 1 ? corr_period - 1 : corr_period;
 	writel(corr_period, fep->hwp + FEC_ATIME_CORR);
 	/* dummy read to update the timer. */
 	timecounter_read(&fep->tc);
@@ -374,23 +376,9 @@ static int fec_ptp_adjtime(struct ptp_clock_info *ptp, s64 delta)
 	struct fec_enet_private *fep =
 	    container_of(ptp, struct fec_enet_private, ptp_caps);
 	unsigned long flags;
-	u64 now;
-	u32 counter;
 
 	spin_lock_irqsave(&fep->tmreg_lock, flags);
-
-	now = timecounter_read(&fep->tc);
-	now += delta;
-
-	/* Get the timer value based on adjusted timestamp.
-	 * Update the counter with the masked value.
-	 */
-	counter = now & fep->cc.mask;
-	writel(counter, fep->hwp + FEC_ATIME);
-
-	/* reset the timecounter */
-	timecounter_init(&fep->tc, &fep->cc, now);
-
+	timecounter_adjtime(&fep->tc, delta);
 	spin_unlock_irqrestore(&fep->tmreg_lock, flags);
 
 	return 0;
@@ -618,6 +606,16 @@ void fec_ptp_init(struct platform_device *pdev)
 	}
 
 	schedule_delayed_work(&fep->time_keep, HZ);
+}
+
+void fec_ptp_stop(struct platform_device *pdev)
+{
+	struct net_device *ndev = platform_get_drvdata(pdev);
+	struct fec_enet_private *fep = netdev_priv(ndev);
+
+	cancel_delayed_work_sync(&fep->time_keep);
+	if (fep->ptp_clock)
+		ptp_clock_unregister(fep->ptp_clock);
 }
 
 /**
