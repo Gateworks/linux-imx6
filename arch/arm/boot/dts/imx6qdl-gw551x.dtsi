@@ -519,6 +519,18 @@
 	status = "okay";
 };
 
+&pwm2 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm2_1>; /* MX6_DIO1 */
+	status = "disabled";
+};
+
+&pwm3 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_pwm3_2>; /* MX6_DIO2 */
+	status = "disabled";
+};
+
 &ssi1 {
 	fsl,mode = "i2s-slave";
 	status = "okay";
