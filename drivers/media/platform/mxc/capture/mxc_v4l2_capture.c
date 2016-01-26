@@ -1667,12 +1667,16 @@ static int mxc_v4l_open(struct file *file)
 		else if (ifparm.u.bt656.mode
 				== V4L2_IF_TYPE_BT656_MODE_NOBT_10BIT)
 			csi_param.data_width = IPU_CSI_DATA_WIDTH_10;
+		else if (ifparm.u.bt656.mode
+				== V4L2_IF_TYPE_BT656_MODE_NOBT_16BIT)
+			csi_param.data_width = IPU_CSI_DATA_WIDTH_16;
 		else
 			csi_param.data_width = IPU_CSI_DATA_WIDTH_8;
 
 
 		csi_param.Vsync_pol = ifparm.u.bt656.nobt_vs_inv;
 		csi_param.Hsync_pol = ifparm.u.bt656.nobt_hs_inv;
+		csi_param.ext_vsync = ifparm.u.bt656.bt_sync_correct;
 
 		csi_param.csi = cam->csi;
 
