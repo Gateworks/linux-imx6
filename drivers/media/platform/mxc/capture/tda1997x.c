@@ -96,6 +96,11 @@ static int ioctl_g_ifparm(struct v4l2_int_device *s, struct v4l2_ifparm *p)
 
 	if (tda1997x_get_vidout_fmt(&fmt))
 		return -ENODEV;
+	sensor->sen.pix.height = fmt.height;
+	sensor->sen.pix.width = fmt.width;
+	sensor->sen.streamcap.timeperframe.denominator = fmt.fps;
+	sensor->sen.streamcap.timeperframe.numerator = 1;
+
 	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.width, fmt.height,
 		fmt.interlaced?'i':'p', fmt.fps);
 
@@ -232,16 +237,14 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 
 	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.width, fmt.height,
 		fmt.interlaced?'i':'p', fmt.fps);
-	sensor->sen.pix.height = fmt.height;
-	sensor->sen.pix.width = fmt.width;
-	sensor->sen.streamcap.timeperframe.denominator = fmt.fps;
-	sensor->sen.streamcap.timeperframe.numerator = 1;
 	switch (f->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
+		f->fmt.pix.width = fmt.width;
+		f->fmt.pix.height = fmt.height;
+		f->fmt.pix.pixelformat = sensor->sen.pix.pixelformat;
 		pr_debug("   Returning size of %dx%d\n",
-			 sensor->sen.pix.width, sensor->sen.pix.height);
-		f->fmt.pix = sensor->sen.pix;
-		pr_debug("   Returning format of %s\n", (char*)&f->fmt.pix.pixelformat);
+			 f->fmt.pix.width, f->fmt.pix.height);
+		pr_debug("   Returning format of %4s\n", (char*)&f->fmt.pix.pixelformat);
 		break;
 
 	case V4L2_BUF_TYPE_PRIVATE: {
@@ -249,7 +252,6 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 		break;
 
 	default:
-		f->fmt.pix = sensor->sen.pix;
 		break;
 	}
 
@@ -267,7 +269,6 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 				 struct v4l2_frmsizeenum *fsize)
 {
-	struct sensor *sensor = s->priv;
 	tda1997x_vidout_fmt_t fmt;
 
 	if (fsize->index >= 1)
@@ -278,10 +279,8 @@ static int ioctl_enum_framesizes(struct v4l2_int_device *s,
 
 	pr_debug("%s: %dx%d%c@%dfps\n", __func__, fmt.height, fmt.width,
 		fmt.interlaced?'i':'p', fmt.fps);
-	sensor->sen.pix.height = fmt.height;
-	sensor->sen.pix.width = fmt.width;
-	fsize->discrete.width = sensor->sen.pix.width;
-	fsize->discrete.height  = sensor->sen.pix.height;
+	fsize->discrete.width = fmt.width;
+	fsize->discrete.height  = fmt.height;
 
 	return 0;
 }
