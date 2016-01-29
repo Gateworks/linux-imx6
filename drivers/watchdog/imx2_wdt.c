@@ -21,6 +21,7 @@
  * Halt on suspend:	Manual		Can be automatic
  */
 
+#include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
@@ -29,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/platform_device.h>
+#include <linux/reboot.h>
 #include <linux/watchdog.h>
 #include <linux/clk.h>
 #include <linux/fs.h>
@@ -38,11 +40,17 @@
 #include <linux/jiffies.h>
 #include <linux/of.h>
 #include <linux/of_device.h>
+#include <linux/of_address.h>
+
+#include <asm/mach-types.h>
+#include <asm/system_misc.h>
 
 #define DRIVER_NAME "imx2-wdt"
 
 #define IMX2_WDT_WCR		0x00		/* Control Register */
 #define IMX2_WDT_WCR_WT		(0xFF << 8)	/* -> Watchdog Timeout Field */
+#define IMX2_WDT_WCR_WDA	(1 << 5)	/* -> External Reset WDOG_B */
+#define IMX2_WDT_WCR_SRS	(1 << 4)	/* -> Software Reset Signal */
 #define IMX2_WDT_WCR_WRE	(1 << 3)	/* -> WDOG Reset Enable */
 #define IMX2_WDT_WCR_WDE	(1 << 2)	/* -> Watchdog Enable */
 #define IMX2_WDT_WCR_WDZST	(1 << 0)	/* -> Watchdog timer Suspend */
@@ -83,6 +91,7 @@ static struct {
 	struct timer_list timer;	/* Pings the watchdog when closed */
 	enum imx_wdt_type wdt_type;
 	u16 wdt_wcr;
+	bool ext_reset;
 } imx2_wdt;
 
 static struct miscdevice imx2_wdt_miscdev;
@@ -103,6 +112,72 @@ static const struct watchdog_info imx2_wdt_info = {
 	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_PRETIMEOUT,
 };
 
+#ifdef CONFIG_MXC_REBOOT_ANDROID_CMD
+void do_switch_recovery(void);
+void do_switch_fastboot(void);
+#endif
+
+static void arch_reset_special_mode(char mode, const char *cmd)
+{
+#ifdef CONFIG_MXC_REBOOT_ANDROID_CMD
+	if (cmd && strcmp(cmd, "recovery") == 0)
+		do_switch_recovery();
+	else if (cmd && strcmp(cmd, "bootloader") == 0)
+		do_switch_fastboot();
+#endif
+}
+
+/*
+ * in the case of a disabled imx2 watchdog dt node, make sure we have a
+ * valid base address for mxc_restart
+ */
+void __init mxc_arch_reset_init_dt(void)
+{
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "fsl,imx21-wdt");
+	imx2_wdt.base = of_iomap(np, 0);
+}
+
+/*
+ * Reset the system. It is called by machine_restart().
+ */
+void mxc_restart(enum reboot_mode mode, const char *cmd)
+{
+	unsigned int wcr_enable = IMX2_WDT_WCR_WDE;
+
+	arch_reset_special_mode(mode, cmd);
+
+	/* Use internal reset or external - not both */
+	if (imx2_wdt.ext_reset)
+		wcr_enable |= IMX2_WDT_WCR_SRS; /* do not assert int reset */
+	else
+		wcr_enable |= IMX2_WDT_WCR_WDA; /* do not assert ext-reset */
+
+	/* Assert SRS signal */
+	__raw_writew(wcr_enable, imx2_wdt.base + IMX2_WDT_WCR);
+	/*
+	 * Due to imx6q errata ERR004346 (WDOG: WDOG SRS bit requires to be
+	 * written twice), we add another two writes to ensure there must be at
+	 * least two writes happen in the same one 32kHz clock period.  We save
+	 * the target check here, since the writes shouldn't be a huge burden
+	 * for other platforms.
+	 */
+	__raw_writew(wcr_enable, imx2_wdt.base + IMX2_WDT_WCR);
+	__raw_writew(wcr_enable, imx2_wdt.base + IMX2_WDT_WCR);
+
+	/* wait for reset to assert... */
+	mdelay(500);
+
+	pr_err("%s: Watchdog reset failed to assert reset\n", __func__);
+
+	/* delay to allow the serial port to show the message */
+	mdelay(50);
+
+	/* we'll take a jump through zero as a poor second */
+	soft_restart(0);
+}
+
 static inline void imx2_wdt_setup(void)
 {
 	u16 val = __raw_readw(imx2_wdt.base + IMX2_WDT_WCR);
@@ -111,8 +186,12 @@ static inline void imx2_wdt_setup(void)
 	val |= IMX2_WDT_WCR_WDZST;
 	/* Strip the old watchdog Time-Out value */
 	val &= ~IMX2_WDT_WCR_WT;
-	/* Generate reset if WDOG times out */
-	val &= ~IMX2_WDT_WCR_WRE;
+	/* Generate internal chip-level reset if WDOG times out */
+	if (!imx2_wdt.ext_reset)
+		val &= ~IMX2_WDT_WCR_WRE;
+	/* Or if external-reset assert WDOG_B reset only on time-out */
+	else
+		val |= IMX2_WDT_WCR_WRE;
 	/* Keep Watchdog Disabled */
 	val &= ~IMX2_WDT_WCR_WDE;
 	/* Set the watchdog's Time-Out value */
@@ -371,6 +450,8 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
 		goto fail;
 	}
 
+	imx2_wdt.ext_reset = of_property_read_bool(pdev->dev.of_node,
+						   "ext-reset-output");
 	imx2_wdt.timeout = clamp_t(unsigned, timeout, 1, IMX2_WDT_MAX_TIME);
 	if (imx2_wdt.timeout != timeout)
 		dev_warn(&pdev->dev, "Initial timeout out of range! "
