@@ -552,6 +552,7 @@ int common_nfc_set_geometry(struct gpmi_nand_data *this)
 	struct mtd_info *mtd = &this->mtd;
 	struct nand_chip *chip = mtd->priv;
 
+#if 0
 	if (chip->ecc_strength_ds > this->devdata->bch_max_ecc_strength) {
 		dev_err(this->dev,
 			"unsupported NAND chip, minimum ecc required %d\n"
@@ -567,6 +568,9 @@ int common_nfc_set_geometry(struct gpmi_nand_data *this)
 		return set_geometry_for_large_oob(this);
 
 	return set_geometry_by_ecc_info(this);
+#else
+	return legacy_set_geometry(this);
+#endif
 }
 
 struct dma_chan *get_dma_chan(struct gpmi_nand_data *this)
