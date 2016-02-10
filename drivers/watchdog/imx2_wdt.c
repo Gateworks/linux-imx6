@@ -30,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/of.h>
+#include <linux/of_address.h>
 #include <linux/platform_device.h>
 #include <linux/reboot.h>
 #include <linux/watchdog.h>
@@ -100,6 +101,18 @@ static const struct watchdog_info imx2_wdt_info = {
 	.identity = "imx2+ watchdog",
 	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_PRETIMEOUT,
 };
+
+/*
+ * in the case of a disabled imx2 watchdog dt node, make sure we have a
+ * valid base address for mxc_restart
+ */
+void __init mxc_arch_reset_init_dt(void)
+{
+	struct device_node *np;
+
+	np = of_find_compatible_node(NULL, NULL, "fsl,imx21-wdt");
+	imx2_wdt.base = of_iomap(np, 0);
+}
 
 void mxc_restart(enum reboot_mode mode, const char *cmd)
 {

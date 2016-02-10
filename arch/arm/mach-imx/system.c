@@ -32,10 +32,6 @@
 #include "common.h"
 #include "hardware.h"
 
-/* machine reset moved to imx2 watchdog */
-void __init mxc_arch_reset_init(void __iomem *base) {}
-void __init mxc_arch_reset_init_dt(void) {}
-
 #ifdef CONFIG_CACHE_L2X0
 void __init imx_init_l2cache(void)
 {
