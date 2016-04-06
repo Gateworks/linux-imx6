@@ -348,21 +348,6 @@ static struct attribute_group attr_group = {
 	.attrs = gsc_attrs,
 };
 
-static void gsc_poweroff(void)
-{
-	dev_info(&gsc_priv->client->dev, "GSC powerdown"
-		" - press pushbutton or cycle Vin to wake\n");
-	mutex_lock(&gsc_priv->io_lock);
-	__gsc_i2c_write(GSC_TIME + 0, 0xff);
-	__gsc_i2c_write(GSC_TIME + 1, 0xff);
-	__gsc_i2c_write(GSC_TIME + 2, 0xff);
-	__gsc_i2c_write(GSC_TIME + 3, 0xff);
-	__gsc_i2c_update(GSC_CTRL_1, 0, 1 << GSC_CTRL_1_ACTIVATE_SLEEP |
-			 1 << GSC_CTRL_1_SLEEP_ENABLE);
-	mutex_unlock(&gsc_priv->io_lock);
-	/* board should be powered down at this point */
-}
-
 static void gsc_restart(enum reboot_mode reboot_mode, const char *cmd)
 {
 	/*
@@ -437,12 +422,6 @@ gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 					   &client->dev);
 	}
 
-	/* If a pm_power_off hook has already been added, leave it alone */
-	if (!pm_power_off) {
-		dev_info(dev, "registered pm_power_off");
-		pm_power_off = gsc_poweroff;
-	}
-
 	/* override the machine restart handler */
 	restart_orig = arm_pm_restart;
 	arm_pm_restart = gsc_restart;
@@ -454,9 +433,6 @@ gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 static int gsc_remove(struct i2c_client *client)
 {
 	struct gsc *gsc = i2c_get_clientdata(client);
-
-	if (pm_power_off == gsc_poweroff)
-		pm_power_off = NULL;
 
 	if (arm_pm_restart == gsc_restart)
 		arm_pm_restart = restart_orig;
