@@ -718,4 +718,10 @@ config SENSOR_FXLS8471
 	depends on I2C
 	default n
 
+config INPUT_LSM9DS1
+	tristate "STMicroelectronics LSM9DS1"
+	depends on INPUT
+	help
+	  Say Y here to enable STMicroelectronics LSM9DS1 inertial module.
+
 endif
