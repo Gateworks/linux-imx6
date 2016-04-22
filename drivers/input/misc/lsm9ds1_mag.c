@@ -1230,7 +1230,7 @@ static int lsm9ds1_mag_probe(struct i2c_client *client,
 	stat->client = client;
 	i2c_set_clientdata(client, stat);
 
-	stat->pdata_mag = kmalloc(sizeof(*stat->pdata_mag), GFP_KERNEL);
+	stat->pdata_mag = kzalloc(sizeof(*stat->pdata_mag), GFP_KERNEL);
 	if(stat->pdata_mag == NULL) {
 		err = -ENOMEM;
 		dev_err(&client->dev,
