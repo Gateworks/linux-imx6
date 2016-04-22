@@ -1507,9 +1507,9 @@ static ssize_t attr_set_polling_rate_acc(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long interval_ms;
+	u32 interval_ms;
 
-	if (strict_strtoul(buf, 10, &interval_ms))
+	if (kstrtou32(buf, 10, &interval_ms))
 		return -EINVAL;
 	if (!interval_ms)
 		return -EINVAL;
@@ -1558,9 +1558,9 @@ static ssize_t attr_set_enable_acc(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long val;
+	u32 val;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtou32(buf, 10, &val))
 		return -EINVAL;
 
 	if (val)
@@ -1605,11 +1605,11 @@ static ssize_t attr_set_range_acc(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long val;
+	u32 val;
 	u8 range;
 	int err;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtou32(buf, 10, &val))
 		return -EINVAL;
 
 	switch (val) {
@@ -1624,7 +1624,7 @@ static ssize_t attr_set_range_acc(struct kobject *kobj,
 		break;
 	default:
 		dev_err(&stat->client->dev, "accelerometer invalid range "
-					"request: %lu, discarded\n", val);
+					"request: %u, discarded\n", val);
 		return -EINVAL;
 	}
 
@@ -1638,7 +1638,7 @@ static ssize_t attr_set_range_acc(struct kobject *kobj,
 	mutex_unlock(&stat->lock);
 
 	dev_info(&stat->client->dev, "accelerometer range set to:"
-							" %lu g\n", val);
+							" %u g\n", val);
 
 	return size;
 }
@@ -1680,11 +1680,11 @@ static ssize_t attr_set_aa_filter(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long val;
+	u32 val;
 	u8 frequency;
 	int err;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtou32(buf, 10, &val))
 		return -EINVAL;
 
 	switch (val) {
@@ -1702,7 +1702,7 @@ static ssize_t attr_set_aa_filter(struct kobject *kobj,
 		break;
 	default:
 		dev_err(&stat->client->dev, "accelerometer invalid filter "
-					"request: %lu, discarded\n", val);
+					"request: %u, discarded\n", val);
 		return -EINVAL;
 	}
 
@@ -1716,7 +1716,7 @@ static ssize_t attr_set_aa_filter(struct kobject *kobj,
 	mutex_unlock(&stat->lock);
 
 	dev_info(&stat->client->dev, "accelerometer anti-aliasing filter "
-					"set to: %lu Hz\n", val);
+					"set to: %u Hz\n", val);
 
 	return size;
 }
@@ -1743,9 +1743,9 @@ static ssize_t attr_set_polling_rate_gyr(struct kobject *kobj,
 	int err;
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long interval_ms;
+	u32 interval_ms;
 
-	if (strict_strtoul(buf, 10, &interval_ms))
+	if (kstrtou32(buf, 10, &interval_ms))
 		return -EINVAL;
 	if (!interval_ms)
 		return -EINVAL;
@@ -1779,9 +1779,9 @@ static ssize_t attr_set_enable_gyr(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long val;
+	u32 val;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtou32(buf, 10, &val))
 		return -EINVAL;
 
 	if (val)
@@ -1825,11 +1825,11 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 {
 	struct device *dev = to_dev(kobj->parent);
 	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	unsigned long val;
+	u32 val;
 	u8 range;
 	int err;
 
-	if (strict_strtoul(buf, 10, &val))
+	if (kstrtou32(buf, 10, &val))
 		return -EINVAL;
 
 	switch (val) {
@@ -1843,7 +1843,7 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 		range = LSM9DS1_GYR_FS_2000DPS;
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid range request: %lu,"
+		dev_err(&stat->client->dev, "invalid range request: %u,"
 				" discarded\n", val);
 		return -EINVAL;
 	}
@@ -1854,7 +1854,7 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 		stat->pdata_gyr->fs_range = range;
 	mutex_unlock(&stat->lock);
 
-	dev_info(&stat->client->dev, "range set to: %lu dps\n", val);
+	dev_info(&stat->client->dev, "range set to: %u dps\n", val);
 
 	return size;
 }
