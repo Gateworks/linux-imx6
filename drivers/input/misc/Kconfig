@@ -687,4 +687,10 @@ config INPUT_ISL29023
 	  This driver can also be built as a module.  If so, the module
 	  will be called isl29023.
 
+config INPUT_LSM9DS1
+	tristate "STMicroelectronics LSM9DS1"
+	depends on INPUT
+	help
+	  Say Y here to enable STMicroelectronics LSM9DS1 inertial module.
+
 endif
