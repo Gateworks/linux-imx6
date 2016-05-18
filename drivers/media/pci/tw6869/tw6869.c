@@ -463,7 +463,7 @@ static void tw6869_fill_pix_format(struct tw6869_vch *vch,
 {
 	pix->width = 720;
 	pix->height = (vch->std & V4L2_STD_625_50) ? 576 : 480;
-	pix->field = V4L2_FIELD_INTERLACED_BT;
+	pix->field = V4L2_FIELD_INTERLACED;
 	pix->colorspace = V4L2_COLORSPACE_SMPTE170M;
 	pix->bytesperline = pix->width * 2;
 	pix->sizeimage = pix->bytesperline * pix->height;
