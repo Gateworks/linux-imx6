@@ -241,6 +241,8 @@ static int ioctl_g_fmt_cap(struct v4l2_int_device *s, struct v4l2_format *f)
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE:
 		f->fmt.pix.width = fmt.width;
 		f->fmt.pix.height = fmt.height;
+		f->fmt.pix.field = fmt.interlaced ?
+			V4L2_FIELD_INTERLACED : V4L2_FIELD_NONE;
 		f->fmt.pix.pixelformat = sensor->sen.pix.pixelformat;
 		pr_debug("   Returning size of %dx%d\n",
 			 f->fmt.pix.width, f->fmt.pix.height);
