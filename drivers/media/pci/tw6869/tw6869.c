@@ -97,6 +97,7 @@ struct tw6869_vch {
 	struct mutex mlock;
 	struct vb2_queue queue;
 	struct list_head buf_list;
+	struct delayed_work hw_rst;
 	spinlock_t lock;
 
 	struct v4l2_ctrl_handler hdl;
@@ -295,6 +296,8 @@ static unsigned int tw6869_virq(struct tw6869_dev *dev,
 		dev_info(&dev->pdev->dev, "vch%u signal %s\n",
 			ID2CH(id), sig ? "detected" : "lost");
 		vch->sig = sig;
+		if (sig && vch->sequence)
+			mod_delayed_work(system_wq, &vch->hw_rst, HZ / 5);
 	}
 
 	if (err || (vch->pb != pb)) {
@@ -617,6 +620,8 @@ static int stop_streaming(struct vb2_queue *vq)
 		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
 		list_del(&buf->list);
 	}
+
+	cancel_delayed_work_sync(&vch->hw_rst);
 	spin_unlock_irqrestore(&vch->lock, flags);
 
 	return 0;
@@ -946,6 +951,19 @@ static const struct v4l2_file_operations tw6869_fops = {
 	.poll = vb2_fop_poll,
 };
 
+static void tw_delayed_dma_rst(struct work_struct *work)
+{
+	struct tw6869_vch *vch =
+		container_of(to_delayed_work(work), struct tw6869_vch, hw_rst);
+	struct tw6869_dev *dev = vch->dev;
+	unsigned long flags;
+
+	dev_info(&dev->pdev->dev, "vch%i deferred reset\n", vch->id);
+	spin_lock_irqsave(&dev->rlock, flags);
+	tw6869_id_dma_cmd(dev, vch->id, TW_DMA_RST);
+	spin_unlock_irqrestore(&dev->rlock, flags);
+}
+
 static int tw6869_vch_register(struct tw6869_vch *vch)
 {
 	struct tw6869_dev *dev = vch->dev;
@@ -976,6 +994,7 @@ static int tw6869_vch_register(struct tw6869_vch *vch)
 	tw6869_fill_pix_format(vch, &vch->format);
 
 	mutex_init(&vch->mlock);
+	INIT_DELAYED_WORK(&vch->hw_rst, tw_delayed_dma_rst);
 
 	/* Initialize the vb2 queue */
 	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
