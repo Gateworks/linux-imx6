@@ -92,6 +92,7 @@ struct tw6869_vch {
 	struct tw6869_buf *p_buf;
 	struct tw6869_buf *b_buf;
 	unsigned int pb;
+	unsigned int sig;
 
 	struct mutex mlock;
 	struct vb2_queue queue;
@@ -277,6 +278,7 @@ static void tw6869_id_dma_cmd(struct tw6869_dev *dev,
 static unsigned int tw6869_virq(struct tw6869_dev *dev,
 				unsigned int id,
 				unsigned int pb,
+				unsigned int sig,
 				unsigned int err)
 {
 	struct tw6869_vch *vch = &dev->vch[ID2CH(id)];
@@ -287,6 +289,12 @@ static unsigned int tw6869_virq(struct tw6869_dev *dev,
 	if (!vb2_is_streaming(&vch->queue) || !vch->p_buf || !vch->b_buf) {
 		spin_unlock(&vch->lock);
 		return TW_DMA_OFF;
+	}
+
+	if (vch->sig != sig) {
+		dev_info(&dev->pdev->dev, "vch%u signal %s\n",
+			ID2CH(id), sig ? "detected" : "lost");
+		vch->sig = sig;
 	}
 
 	if (err || (vch->pb != pb)) {
@@ -378,11 +386,12 @@ static irqreturn_t tw6869_irq(int irq, void *dev_id)
 
 	for (id = 0; id < (2 * TW_CH_MAX); id++) {
 		unsigned int verr = fifo_sts & TW_VERR(id);
+		unsigned int sig = !((fifo_sts >> id) & 0x1);
 
 		if ((dma_en & BIT(id)) && ((int_sts & BIT(id)) || verr)) {
 			unsigned int pb = !!(pb_sts & BIT(id));
 			unsigned int cmd = (BIT(id) & TW_VID) ?
-				tw6869_virq(dev, id, pb, verr) :
+				tw6869_virq(dev, id, pb, sig, verr) :
 				tw6869_airq(dev, id, pb);
 
 			if (cmd) {
