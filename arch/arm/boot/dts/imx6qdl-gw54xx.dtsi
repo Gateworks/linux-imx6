@@ -24,6 +24,7 @@
 		mxcfb1 = &mxcfb2;
 		mxcfb2 = &mxcfb3;
 		nand = &gpmi;
+		spi2 = &ecspi2;
 		ssi0 = &ssi1;
 		ssi1 = &ssi2;
 		usb0 = &usbh1;
@@ -263,6 +264,15 @@
 	phy-mode = "rgmii-id";
 	phy-reset-gpios = <&gpio1 30 GPIO_ACTIVE_LOW>;
 	status = "okay";
+};
+
+&ecspi2 {
+	fsl,spi-num-chipselects = <1>;
+	cs-gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_ecspi2>;
+	status = "okay";
+
 };
 
 &flexcan1 {
@@ -856,6 +866,15 @@
 				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
 				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0x4001b0a8
 				MX6QDL_PAD_ENET_TXD0__GPIO1_IO30	0x4001b0b0 /* PHY_RST# */
+			>;
+		};
+
+		pinctrl_ecspi2: escpi2grp {
+			fsl,pins = <
+				MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK	0x100b1
+				MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI	0x100b1
+				MX6QDL_PAD_EIM_OE__ECSPI2_MISO	0x100b1
+				MX6QDL_PAD_EIM_RW__GPIO2_IO26	0x100b1
 			>;
 		};
 
