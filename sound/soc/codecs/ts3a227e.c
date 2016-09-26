@@ -28,6 +28,8 @@ struct ts3a227e {
 	unsigned int buttons_held;
 };
 
+static struct ts3a227e *static_ts3a227e;
+
 /* Button values to be reported on the jack */
 static const int ts3a227e_buttons[] = {
 	SND_JACK_BTN_0,
@@ -219,10 +221,10 @@ static irqreturn_t ts3a227e_interrupt(int irq, void *data)
  * events 0-3 will be routed to the given jack.  Jack can be null to stop
  * reporting.
  */
-int ts3a227e_enable_jack_detect(struct snd_soc_component *component,
+int ts3a227e_enable_jack_detect(struct snd_soc_card *card,
 				struct snd_soc_jack *jack)
 {
-	struct ts3a227e *ts3a227e = snd_soc_component_get_drvdata(component);
+	struct ts3a227e *ts3a227e = static_ts3a227e;
 
 	snd_jack_set_key(jack->jack, SND_JACK_BTN_0, KEY_MEDIA);
 	snd_jack_set_key(jack->jack, SND_JACK_BTN_1, KEY_VOICECOMMAND);
@@ -236,7 +238,7 @@ int ts3a227e_enable_jack_detect(struct snd_soc_component *component,
 }
 EXPORT_SYMBOL_GPL(ts3a227e_enable_jack_detect);
 
-static struct snd_soc_component_driver ts3a227e_soc_driver;
+static struct snd_soc_codec_driver ts3a227e_codec_driver;
 
 static const struct regmap_config ts3a227e_regmap_config = {
 	.val_bits = 8,
@@ -278,6 +280,7 @@ static int ts3a227e_i2c_probe(struct i2c_client *i2c,
 	ts3a227e = devm_kzalloc(&i2c->dev, sizeof(*ts3a227e), GFP_KERNEL);
 	if (ts3a227e == NULL)
 		return -ENOMEM;
+	static_ts3a227e = ts3a227e;
 
 	i2c_set_clientdata(i2c, ts3a227e);
 
@@ -301,8 +304,9 @@ static int ts3a227e_i2c_probe(struct i2c_client *i2c,
 		return ret;
 	}
 
-	ret = devm_snd_soc_register_component(&i2c->dev, &ts3a227e_soc_driver,
-					      NULL, 0);
+	ret = snd_soc_register_codec(&i2c->dev, &ts3a227e_codec_driver,
+				     NULL, 0);
+
 	if (ret)
 		return ret;
 
