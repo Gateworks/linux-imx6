@@ -35,7 +35,8 @@ enum chips { gsp };
 #define GSP_REG_IO1		0x1d
 #define GSP_REG_IO2 		0x20
 #define GSP_REG_PCIE		0x23
-#define GSP_REG_CURRENT		0x26
+#define GSP_REG_IO3		0x26
+#define GSP_REG_IO4		0x29
 #define GSP_FAN_0		0x2C
 #define GSP_FAN_1		0x2E
 #define GSP_FAN_2		0x30
@@ -62,7 +63,8 @@ static const struct gsp_sensor_info gsp_sensors[] = {
 	{"io1", GSP_REG_IO1},
 	{"io2", GSP_REG_IO2},
 	{"pci2", GSP_REG_PCIE},
-	{"current", GSP_REG_CURRENT},
+	{"io3", GSP_REG_IO3},
+	{"io4", GSP_REG_IO4},
 	{"fan_point0", GSP_FAN_0},
 	{"fan_point1", GSP_FAN_1},
 	{"fan_point2", GSP_FAN_2},
@@ -170,7 +172,7 @@ static inline int gsp_read(struct i2c_client *client, u8 reg)
 	unsigned int adc, i, err;
 	u8 b;
 
-	if (reg == GSP_REG_TEMP_IN || reg > GSP_REG_CURRENT)
+	if (reg == GSP_REG_TEMP_IN || reg >= GSP_FAN_0)
 		i = 2;
 	else
 		i = 3;
@@ -251,6 +253,8 @@ static SENSOR_DEVICE_ATTR(in11_input, S_IRUGO, show_adc, NULL, 12);
 static SENSOR_DEVICE_ATTR(in11_label, S_IRUGO, show_label, NULL, 12);
 static SENSOR_DEVICE_ATTR(in12_input, S_IRUGO, show_adc, NULL, 13);
 static SENSOR_DEVICE_ATTR(in12_label, S_IRUGO, show_label, NULL, 13);
+static SENSOR_DEVICE_ATTR(in13_input, S_IRUGO, show_adc, NULL, 14);
+static SENSOR_DEVICE_ATTR(in13_label, S_IRUGO, show_label, NULL, 14);
 
 static SENSOR_DEVICE_ATTR(fan0_point0, S_IRUGO | S_IWUSR, show_adc, store_fan, 14);
 static SENSOR_DEVICE_ATTR(fan0_point1, S_IRUGO | S_IWUSR, show_adc, store_fan, 15);
@@ -274,6 +278,7 @@ static struct attribute *gsp_attributes[] = {
 	&sensor_dev_attr_in10_input.dev_attr.attr,
 	&sensor_dev_attr_in11_input.dev_attr.attr,
 	&sensor_dev_attr_in12_input.dev_attr.attr,
+	&sensor_dev_attr_in13_input.dev_attr.attr,
 
 	&sensor_dev_attr_temp0_label.dev_attr.attr,
 	&sensor_dev_attr_in0_label.dev_attr.attr,
@@ -289,6 +294,7 @@ static struct attribute *gsp_attributes[] = {
 	&sensor_dev_attr_in10_label.dev_attr.attr,
 	&sensor_dev_attr_in11_label.dev_attr.attr,
 	&sensor_dev_attr_in12_label.dev_attr.attr,
+	&sensor_dev_attr_in13_label.dev_attr.attr,
 
 	&sensor_dev_attr_fan0_point0.dev_attr.attr,
 	&sensor_dev_attr_fan0_point1.dev_attr.attr,
