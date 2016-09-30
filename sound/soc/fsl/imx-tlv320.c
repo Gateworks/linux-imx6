@@ -9,16 +9,17 @@
  * http://www.opensource.org/licenses/gpl-license.html
  * http://www.gnu.org/copyleft/gpl.html
  */
-#define DEBUG
 
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/i2c.h>
 #include <linux/clk.h>
+#include <sound/jack.h>
 #include <sound/soc.h>
 
 #include "../codecs/tlv320aic23.h"
+#include "../codecs/ts3a227e.h"
 #include "imx-audmux.h"
 
 #define DAI_NAME_SIZE	32
@@ -32,10 +33,18 @@ struct imx_tlv320_data {
 	unsigned int clk_frequency;
 };
 
+static struct snd_soc_jack headset_jack;
+
+static struct snd_soc_aux_dev imx_tlv320_headset_dev = {
+	.name = "Headset Chip",
+	.codec_name = "ts3a227e.2-003b",
+};
+
 static int imx_tlv320_dai_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct imx_tlv320_data *data = snd_soc_card_get_drvdata(rtd->card);
 	struct device *dev = rtd->card->dev;
+	struct snd_soc_dapm_context *dapm = &rtd->codec->dapm;
 	int ret;
 
 	ret = snd_soc_dai_set_sysclk(rtd->codec_dai, 0,
@@ -44,6 +53,16 @@ static int imx_tlv320_dai_init(struct snd_soc_pcm_runtime *rtd)
 		dev_err(dev, "could not set codec driver clock params\n");
 		return ret;
 	}
+
+	/* not connected */
+	snd_soc_dapm_nc_pin(dapm, "MONO_LOUT");
+	snd_soc_dapm_nc_pin(dapm, "HPLCOM");
+	snd_soc_dapm_nc_pin(dapm, "HPRCOM");
+	snd_soc_dapm_nc_pin(dapm, "Left Line Out");
+	snd_soc_dapm_nc_pin(dapm, "Right Line Out");
+
+	/* leave mic bias on for headset button detect while no stream active */
+	dapm->idle_bias_off = false;
 
 	return 0;
 }
@@ -93,6 +112,29 @@ static int imx_tlv320_audmux_config(struct platform_device *pdev)
 			IMX_AUDMUX_V2_PDCR_RXDSEL(int_port));
 	if (ret) {
 		dev_err(&pdev->dev, "audmux external port setup failed\n");
+		return ret;
+	}
+
+	return 0;
+}
+
+static int imx_tlv320_late_probe(struct snd_soc_card *card)
+{
+	struct snd_soc_codec *codec = card->rtd[0].codec;
+	int ret;
+
+	ret = snd_soc_jack_new(codec, "Headset Jack",
+			       SND_JACK_HEADSET |
+			       SND_JACK_BTN_0 | SND_JACK_BTN_1 |
+			       SND_JACK_BTN_2 | SND_JACK_BTN_3,
+			       &headset_jack);
+	if (ret) {
+		dev_err(card->dev, "could not register headset jack detect\n");
+		return ret;
+	}
+	ret = ts3a227e_enable_jack_detect(card, &headset_jack);
+	if (ret) {
+		dev_err(card->dev, "could not enable jack detect\n");
 		return ret;
 	}
 
@@ -175,6 +217,9 @@ static int imx_tlv320_probe(struct platform_device *pdev)
 	data->card.dai_link = &data->dai;
 	data->card.dapm_widgets = imx_tlv320_dapm_widgets;
 	data->card.num_dapm_widgets = ARRAY_SIZE(imx_tlv320_dapm_widgets);
+	data->card.aux_dev = &imx_tlv320_headset_dev;
+	data->card.num_aux_devs = 1;
+	data->card.late_probe = imx_tlv320_late_probe;
 
 	platform_set_drvdata(pdev, &data->card);
 	snd_soc_card_set_drvdata(&data->card, data);
