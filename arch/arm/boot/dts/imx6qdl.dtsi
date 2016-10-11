@@ -973,6 +973,18 @@
 				status = "disabled";
 			};
 
+			usdhc3: usdhc@02198000 {
+				compatible = "fsl,imx6q-usdhc";
+				reg = <0x02198000 0x4000>;
+				interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&clks IMX6QDL_CLK_USDHC3>,
+					 <&clks IMX6QDL_CLK_USDHC3>,
+					 <&clks IMX6QDL_CLK_USDHC3>;
+				clock-names = "ipg", "ahb", "per";
+				bus-width = <4>;
+				status = "disabled";
+			};
+
 			usdhc2: usdhc@02194000 {
 				compatible = "fsl,imx6q-usdhc";
 				reg = <0x02194000 0x4000>;
@@ -985,17 +997,6 @@
 				status = "disabled";
 			};
 
-			usdhc3: usdhc@02198000 {
-				compatible = "fsl,imx6q-usdhc";
-				reg = <0x02198000 0x4000>;
-				interrupts = <0 24 IRQ_TYPE_LEVEL_HIGH>;
-				clocks = <&clks IMX6QDL_CLK_USDHC3>,
-					 <&clks IMX6QDL_CLK_USDHC3>,
-					 <&clks IMX6QDL_CLK_USDHC3>;
-				clock-names = "ipg", "ahb", "per";
-				bus-width = <4>;
-				status = "disabled";
-			};
 
 			usdhc4: usdhc@0219c000 {
 				compatible = "fsl,imx6q-usdhc";
