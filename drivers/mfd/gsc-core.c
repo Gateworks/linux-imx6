@@ -53,6 +53,7 @@ struct gsc {
 	struct platform_device *gsc;
 	struct platform_device *wdt;
 	struct platform_device *input;
+	unsigned char power_disable;
 };
 
 static struct gsc *gsc_priv;
@@ -254,6 +255,8 @@ int gsc_powerdown(unsigned long secs)
 
 	if (!gsc_priv)
 		return -ENODEV;
+	if (!gsc_priv->power_disable)
+		return -EINVAL;
 
 	dev_info(&gsc_priv->client->dev, "GSC powerdown for %ld seconds\n",
 		 secs);
@@ -311,10 +314,14 @@ static ssize_t gsc_store(struct device *dev, struct device_attribute *attr,
 			 const char *buf, size_t count)
 {
 	const char *name = attr->attr.name;
+	struct gsc *gsc = dev_get_drvdata(dev);
 	int ret;
 
 	if (strcasecmp(name, "powerdown") == 0) {
 		long value;
+
+		if (!gsc->power_disable)
+			return -EINVAL;
 
 		ret = strict_strtol(buf, 0, &value);
 		if (ret == 0)
@@ -416,16 +423,20 @@ gsc_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	if (ret)
 		dev_err(dev, "failed to create sysfs attrs\n");
 
-	if (client->dev.of_node) {
-		printk("Populating platform devices\n");
-		ret = of_platform_populate(client->dev.of_node, NULL, NULL,
-					   &client->dev);
-	}
+	gsc->power_disable = !of_property_read_bool(client->dev.of_node,
+						    "no-power-disable");
+	printk("Power disable:%d\n", gsc->power_disable);
 
-	/* override the machine restart handler */
-	restart_orig = arm_pm_restart;
-	arm_pm_restart = gsc_restart;
-	dev_info(dev, "registered arm_pm_restart");
+	dev_dbg(dev, "Populating platform devices\n");
+	ret = of_platform_populate(client->dev.of_node, NULL, NULL,
+				   &client->dev);
+
+	if (gsc->power_disable) {
+		/* override the machine restart handler */
+		restart_orig = arm_pm_restart;
+		arm_pm_restart = gsc_restart;
+		dev_info(dev, "registered arm_pm_restart");
+	}
 
 	return ret;
 }
