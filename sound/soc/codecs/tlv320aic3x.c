@@ -631,7 +631,7 @@ static const struct snd_soc_dapm_widget aic3x_dapm_widgets[] = {
 	/* Mic Bias */
 	SND_SOC_DAPM_SUPPLY("Mic Bias", MICBIAS_CTRL, 6, 0,
 			 mic_bias_event,
-			 SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_PRE_PMD),
+			 SND_SOC_DAPM_POST_PMU /*| SND_SOC_DAPM_PRE_PMD*/),
 
 	/* Output mixers */
 	SND_SOC_DAPM_MIXER("Left Line Mixer", SND_SOC_NOPM, 0, 0,
