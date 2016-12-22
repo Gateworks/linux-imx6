@@ -262,11 +262,7 @@ void machine_halt(void)
  */
 void machine_power_off(void)
 {
-	local_irq_disable();
-	smp_send_stop();
-
-	if (pm_power_off)
-		pm_power_off();
+	machine_restart(NULL);
 }
 
 /*
