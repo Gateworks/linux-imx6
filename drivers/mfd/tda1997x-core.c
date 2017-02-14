@@ -2413,6 +2413,16 @@ tda1997x_set_video_outputformat(struct tda1997x_platform_data *pdata)
 		reg = 0x0f; /* 27taps for Rv and Bu */
 	io_write(REG_FILTERS_CTRL, reg);
 
+	/* BT656 does not require HS/VS */
+	if ((pdata->vidout_format == VIDEOFMT_422_CCIR)) {
+		pr_info("disabling HS/VS for %s\n",
+			vidfmt_names[pdata->vidout_format]);
+		pdata->vidout_invert_vs = 1;
+		pdata->vidout_invert_hs = 1;
+		pdata->vidout_sel_hs = 3;
+		pdata->vidout_sel_vs = 3;
+	}
+
 	/* Enable Blanking code and timing ref (EAV/SAV) insertion */
 	reg = VP_OUT | pdata->vidout_format;
 	if (pdata->vidout_blc)
@@ -2489,6 +2499,7 @@ tda1997x_set_video_outputformat(struct tda1997x_platform_data *pdata)
 	 *        generator on HS_HREF hardware pin)
 	 *    10: HREF from HDMI (Select HREF signal output from HDMI input sync
 	 *        processor on HS_HREF hardware pin)
+	 *    11: HREF not generated
 	 */
 	io_write(REG_HS_HREF_SEL,
 		(pdata->vidout_delay_hs << 4) |
@@ -2508,6 +2519,7 @@ tda1997x_set_video_outputformat(struct tda1997x_platform_data *pdata)
 	 *        generator on HS_VREF hardware pin) (BSLHDMIRX_SYNCOUTPUT_VREF_VHREF)
 	 *    10: VREF from HDMI (Select HREF signal output from HDMI input sync
 	 *        processor on HS_VREF hardware pin) (BSLHDMIRX_SYNCOUTPUT_VSYNC_HDMI)
+	 *    11: HREF not generated
 	 */
 	io_write(REG_VS_VREF_SEL,
 		(pdata->vidout_delay_vs << 4) |
