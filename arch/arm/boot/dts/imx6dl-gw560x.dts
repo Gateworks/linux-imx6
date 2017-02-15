@@ -11,7 +11,7 @@
 
 /dts-v1/;
 #include "imx6dl.dtsi"
-#include "imx6qdl-gw53xx.dtsi"
+#include "imx6qdl-gw560x.dtsi"
 
 / {
 	model = "Gateworks Ventana i.MX6 DualLite/Solo GW560X";
