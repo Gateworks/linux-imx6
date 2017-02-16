@@ -391,7 +391,7 @@
 
 			/* VDD_ARM (1+R1/R2 = 1.931) */
 			reg_vdd_arm: sw3 {
-				regulator-name = "vddarm";
+				regulator-name = "pmic_vddarm";
 				regulator-min-microvolt = <796551>;
 				regulator-max-microvolt = <1544827>;
 				lltc,fb-voltage-divider = <243000 261000>;
@@ -415,7 +415,7 @@
 			/* VDD_1P0 (1+R1/R2 = 1.01): PCIe/ENET-PHY */
 			reg_1p0v: ldo2 {
 				regulator-name = "vdd1p0";
-				regulator-min-microvolt = <1010000>;
+				regulator-min-microvolt = <950000>;
 				regulator-max-microvolt = <1010000>;
 				lltc,fb-voltage-divider = <78700 200000>;
 				regulator-boot-on;
@@ -432,7 +432,7 @@
 
 			/* VDD_HIGH (1+R1/R2 = 4.17) */
 			reg_3p0v: ldo4 {
-				regulator-name = "vdd3p0";
+				regulator-name = "pmic_vdd3p0";
 				regulator-min-microvolt = <3023250>;
 				regulator-max-microvolt = <3023250>;
 				lltc,fb-voltage-divider = <634000 200000>;
