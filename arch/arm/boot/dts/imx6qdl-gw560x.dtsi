@@ -369,6 +369,41 @@
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
 
+	/* LSM9DS1 magnetic sensor */
+	lsm9ds1-m@0x1c {
+		compatible = "st,lsm9ds1-mag";
+		reg = <0x1C>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_imu_mag>;
+		gpios = <&gpio5 9 GPIO_ACTIVE_LOW>; /* IRQ */
+		rot-matrix = /bits/ 16 <(1) (0) (0)
+			(0) (1) (0)
+			(0) (0) (1)>;
+		poll-interval = <100>;
+		min-interval = <13>;
+		fs-range = <0>;
+	};
+
+	/* LSM9DS1 accelerometer/gyroscope sensor */
+	lsm9ds1-ag@0x6a {
+		compatible = "st,lsm9ds1-acc-gyr";
+		reg = <0x6A>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_imu_acc>;
+		gpios = <&gpio5 6 GPIO_ACTIVE_LOW>, /* INT1 */
+		        <&gpio5 7  GPIO_ACTIVE_LOW>; /* INT2 */
+		rot-matrix = /bits/ 16 <(1) (0) (0)
+			(0) (1) (0)
+			(0) (0) (1)>;
+		g-poll-interval = <100>;
+		g-min-interval = <2>;
+		g-fs-range = <0>;
+		x-poll-interval = <100>;
+		x-min-interval = <1>;
+		x-fs-range = <0>;
+		aa-filter-bw = <0>;
+	};
+
 	pmic: ltc3676@3c {
 		compatible = "lltc,ltc3676";
 		pinctrl-names = "default";
@@ -440,20 +475,6 @@
 				regulator-always-on;
 			};
 		};
-	};
-
-	magnetometer: lsm9ds1@1c {
-		compatible = "lsm9ds1-mag";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_mag>;
-		reg = <0x1c>;
-	};
-
-	accel: lsm9ds1@6a {
-		compatible = "lsm9ds1-acc";
-		pinctrl-names = "default";
-		pinctrl-0 = <&pinctrl_acc>;
-		reg = <0x6a>;
 	};
 
 	keypad: tca8418@34 {
@@ -806,7 +827,7 @@
 			>;
 		};
 
-		pinctrl_acc: accgrp {
+		pinctrl_imu_mag: gpioimxmaggrp {
 			fsl,pins = <
 				MX6QDL_PAD_DISP0_DAT12__GPIO5_IO06	0x0001b0b0 /* SENSE_INT1 */
 				MX6QDL_PAD_DISP0_DAT13__GPIO5_IO07	0x0001b0b0 /* SENSE_INT2 */
@@ -814,7 +835,7 @@
 			>;
 		};
 
-		pinctrl_mag: maggrp {
+		pinctrl_imu_acc: gpioimxaccgrp {
 			fsl,pins = <
 				MX6QDL_PAD_DISP0_DAT14__GPIO5_IO08	0x0001b0b0 /* DRDY_M */
 				MX6QDL_PAD_DISP0_DAT15__GPIO5_IO09	0x0001b0b0 /* MAG_INT */
