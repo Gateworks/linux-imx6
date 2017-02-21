@@ -44,14 +44,6 @@
 		default-on;
 	};
 
-	clocks {
-		codec_osc: codec_osc {
-			#clock-cells = <0>;
-			compatible = "fixed-clock";
-			clock-frequency = <12000000>;
-		};
-	};
-
 	leds {
 		compatible = "gpio-leds";
 		pinctrl-names = "default";
@@ -501,7 +493,7 @@
 	codec: sgtl5000@0a {
 		compatible = "fsl,sgtl5000";
 		reg = <0x0a>;
-		clocks = <&codec_osc>;
+		clocks = <&clks 201>;
 		VDDA-supply = <&reg_aud_1p8v>;
 		VDDIO-supply = <&reg_3p3v>;
 	};
@@ -736,9 +728,10 @@
 			fsl,pins = <
 				/* AUD4 */
 				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC	0x130b0
-				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD	0x130b0
+				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD	0x110b0
 				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS	0x130b0
 				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD	0x130b0
+				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0 /* AUD4_MCK */
 				/* AUD6 */
 				MX6QDL_PAD_DI0_PIN2__AUD6_TXD		0x130b0
 				MX6QDL_PAD_DI0_PIN3__AUD6_TXFS		0x130b0
