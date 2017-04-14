@@ -207,6 +207,12 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_ecspi3>;
 	status = "okay";
+
+	spidev0: spidev@0 {
+		compatible = "spidev";
+		reg = <0>;
+		spi-max-frequency = <60000000>;
+	};
 };
 
 &flexcan1 {
