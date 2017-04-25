@@ -230,7 +230,7 @@
 
 	/* LSM9DS1 magnetic sensor */
 	lsm9ds1-m@0x1c {
-		compatible = "st,lsm9ds1-mag";
+		compatible = "st,lsm9ds1_mag";
 		reg = <0x1C>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_imu_mag>;
@@ -245,12 +245,12 @@
 
 	/* LSM9DS1 accelerometer/gyroscope sensor */
 	lsm9ds1-ag@0x6a {
-		compatible = "st,lsm9ds1-acc-gyr";
+		compatible = "st,lsm9ds1_acc_gyr";
 		reg = <0x6A>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_imu_acc>;
-		gpios = <&gpio7 13 GPIO_ACTIVE_LOW>, /* INT1 */
-		        <&gpio4 5  GPIO_ACTIVE_LOW>; /* INT2 */
+		interrupt-parent = <&gpio7>;
+		interrupts = <13 IRQ_TYPE_EDGE_RISING>;
 		rot-matrix = /bits/ 16 <(1) (0) (0)
 			(0) (1) (0)
 			(0) (0) (1)>;
