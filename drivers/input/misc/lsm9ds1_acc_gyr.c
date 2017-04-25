@@ -1,14 +1,15 @@
-/******************** (C) COPYRIGHT 2013 STMicroelectronics ********************
+/******************** (C) COPYRIGHT 2016 STMicroelectronics ********************
 *
 * File Name          : lsm9ds1_acc_gyr.c
 * Authors            : MSH - C&I BU - Application Team
 *                    : Giuseppe Barba (giuseppe.barba@st.com)
 *                    : Matteo Dameno (matteo.dameno@st.com)
 *                    : Denis Ciocca (denis.ciocca@st.com)
-*                    : Both authors are willing to be considered the contact
+*                    : Lorenzo Bianconi (lorenzo.bianconi@st.com)
+*                    : Authors are willing to be considered the contact
 *                    : and update points for the driver.
 * Version            : V.1.0.0
-* Date               : 2014/Feb/11
+* Date               : 2016/May/16
 * Description        : LSM9DS1 accelerometer & gyroscope driver
 *
 ********************************************************************************
@@ -26,16 +27,14 @@
 * INFORMATION CONTAINED HEREIN IN CONNECTION WITH THEIR PRODUCTS.
 *
 ********************************************************************************/
-//#define DEBUG
 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
-#include <linux/i2c.h>
 #include <linux/workqueue.h>
 #include <linux/input.h>
 #include <linux/kernel.h>
 #include <linux/kobject.h>
-#include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/hrtimer.h>
@@ -44,12 +43,10 @@
 #ifdef CONFIG_OF
 #include <linux/of.h>
 #include <linux/of_device.h>
-#include <linux/of_gpio.h>
 #endif
 
-#include <linux/input/lsm9ds1.h>
+#include "lsm9ds1.h"
 
-#define I2C_AUTO_INCREMENT		(0x80)
 #define MS_TO_NS(x)			(x*1000000L)
 #define REFERENCE_G			(0x0B)
 
@@ -60,19 +57,6 @@
 #define SENSITIVITY_GYR_250		(8750)	/** udps/LSB */
 #define SENSITIVITY_GYR_500		(17500)	/** udps/LSB */
 #define SENSITIVITY_GYR_2000		(70000)	/** udps/LSB */
-
-#define MAX_I2C_VAL			(0x7FFF)
-
-/** Accelerometer range in ug */
-#define ACC_MAX_POS			(MAX_I2C_VAL * SENSITIVITY_ACC_8G)
-#define ACC_MAX_NEG			(-MAX_I2C_VAL * SENSITIVITY_ACC_8G)
-
-/** Gyroscope range in udps */
-#define GYR_MAX_POS			(MAX_I2C_VAL * SENSITIVITY_GYR_2000)
-#define GYR_MAX_NEG			(-MAX_I2C_VAL * SENSITIVITY_GYR_2000)
-
-#define FUZZ				(0)
-#define FLAT				(0)
 
 #define FILTER_50			(50)/** Anti-Aliasing 50 Hz */
 #define FILTER_105			(105)/** Anti-Aliasing 105 Hz */
@@ -176,6 +160,8 @@
 #define INT1_CTRL_BOOT_MASK		(0x04)
 #define INT1_CTRL_DRDY_G_MASK		(0x02)
 #define INT1_CTRL_DRDY_XL_MASK		(0x01)
+#define INT1_CTRL_DRDY_BOTH		(INT1_CTRL_DRDY_XL_MASK | \
+					 INT1_CTRL_DRDY_G_MASK)
 
 /* INT2_A/G pin control register. */
 #define INT2_CTRL			(0x0D)
@@ -263,8 +249,6 @@
 static struct kobject *acc_kobj;
 static struct kobject *gyr_kobj;
 
-struct workqueue_struct *lsm9ds1_acc_gyr_workqueue = 0;
-
 #define to_dev(obj) container_of(obj, struct device, kobj)
 
 struct output_rate{
@@ -309,8 +293,6 @@ struct lsm9ds1_acc_gyr_main_platform_data default_lsm9ds1_main_platform_data = {
 		{0, 1, 0},
 		{0, 0, 1},
 	},
-	.gpio_int1 = LSM9DS1_INT1_GPIO_DEF,
-	.gpio_int2 = LSM9DS1_INT2_GPIO_DEF,
 };
 
 struct interrupt_enable {
@@ -322,51 +304,6 @@ struct interrupt_enable {
 struct interrupt_value {
 	int value;
 	u8 address;
-};
-
-struct lsm9ds1_acc_gyr_status {
-	struct i2c_client *client;
-	struct lsm9ds1_acc_gyr_main_platform_data *pdata_main;
-	struct lsm9ds1_acc_platform_data *pdata_acc;
-	struct lsm9ds1_gyr_platform_data *pdata_gyr;
-
-	struct mutex lock;
-	struct work_struct input_work_acc;
-	struct work_struct input_work_gyr;
-
-	struct hrtimer hr_timer_acc;
-	ktime_t ktime_acc;
-	struct hrtimer hr_timer_gyr;
-        ktime_t ktime_gyr;
-
-	struct input_dev *input_dev_acc;
-	struct input_dev *input_dev_gyr;
-	//struct input_dev *input_dev_temp;
-
-	int8_t hw_initialized;
-	/* hw_working=-1 means not tested yet */
-	int8_t hw_working;
-
-	atomic_t enabled_acc;
-        atomic_t enabled_gyr;
-        atomic_t enabled_temp;
-
-	int32_t temp_value_dec;
-	uint32_t temp_value_flo;
-
-	int32_t on_before_suspend;
-	int32_t use_smbus;
-
-	int32_t sensitivity_acc;
-	int32_t sensitivity_gyr;
-
-	int irq1;
-	struct work_struct irq1_work;
-	struct workqueue_struct *irq1_work_queue;
-
-	int irq2;
-	struct work_struct irq2_work;
-	struct workqueue_struct *irq2_work_queue;	
 };
 
 struct reg_rw {
@@ -435,7 +372,7 @@ static struct status_registers {
 	.reference_g =
 		{.address = REFERENCE_G, 	.default_val = DEF_ZERO,},
 	.int1_ctrl =
-		{.address = INT1_CTRL,		.default_val = DEF_ZERO,},
+		{.address = INT1_CTRL,		.default_val = INT1_CTRL_DRDY_BOTH,},
 	.int2_ctrl =
 		{.address = INT2_CTRL,		.default_val = DEF_ZERO,},
 	.who_am_i =
@@ -493,241 +430,102 @@ static struct status_registers {
 };
 /*****************************************************************************/
 
-static int lsm9ds1_i2c_write(struct lsm9ds1_acc_gyr_status *stat, u8 *buf, int len)
-{
-	int ret;
-	u8 reg = buf[0];
-	u8 value;
-#ifdef DEBUG
-	unsigned int ii;
-#endif
-	struct i2c_msg msg = {
-		.addr = stat->client->addr,
-		.flags = 0,
-		.len = len + 1,
-		.buf = buf,
-	};
-
-	if (len > 1)
-		reg |= I2C_AUTO_INCREMENT;
-
-	value = buf[1];
-
-	if (stat->use_smbus) {
-		if (len == 1) {
-			ret = i2c_smbus_write_byte_data(stat->client,
-								reg, value);
-#ifdef DEBUG
-			dev_warn(&stat->client->dev,
-				"i2c_smbus_write_byte_data: ret=%d, len:%d, "
-				"command=0x%02x, value=0x%02x\n",
-				ret, len, reg , value);
-#endif
-			return ret;
-		} else if (len > 1) {
-			ret = i2c_smbus_write_i2c_block_data(stat->client,
-							reg, len, buf + 1);
-#ifdef DEBUG
-			dev_warn(&stat->client->dev,
-				"i2c_smbus_write_i2c_block_data: ret=%d, "
-				"len:%d, command=0x%02x, ",
-				ret, len, reg);
-			for (ii = 0; ii < (len + 1); ii++)
-				printk(KERN_DEBUG "value[%d]=0x%02x,",
-								ii, buf[ii]);
-
-			printk("\n");
-#endif
-			return ret;
-		}
-	}
-
-	ret = i2c_transfer(stat->client->adapter, &msg, 1);
-
-	return (ret == 1) ? 0 : 1;
-}
-
-static int lsm9ds1_i2c_read(struct lsm9ds1_acc_gyr_status *stat, u8 *buf,
-								  int len)
-{
-	int ret;
-	u8 cmd = buf[0];
-#ifdef DEBUG
-	unsigned int ii;
-#endif
-	struct i2c_msg msgs[] = {
-		{
-			.addr = stat->client->addr,
-			.flags = 0,
-			.len = 1,
-			.buf = buf,
-		},
-		{
-			.addr = stat->client->addr,
-			.flags = I2C_M_RD,
-			.len = len,
-			.buf = buf,
-		}
-	};
-
-	if (len > 1)
-		cmd |= I2C_AUTO_INCREMENT;
-
-	if (stat->use_smbus) {
-		if (len == 1) {
-			ret = i2c_smbus_read_byte_data(stat->client, cmd);
-			buf[0] = ret & 0xff;
-#ifdef DEBUG
-			dev_warn(&stat->client->dev,
-				"i2c_smbus_read_byte_data: ret=0x%02x, len:%d ,"
-				"command=0x%02x, buf[0]=0x%02x\n",
-				ret, len, cmd , buf[0]);
-#endif
-		} else if (len > 1) {
-			ret = i2c_smbus_read_i2c_block_data(stat->client,
-								cmd, len, buf);
-#ifdef DEBUG
-			dev_warn(&stat->client->dev,
-				"i2c_smbus_read_i2c_block_data: ret:%d len:%d, "
-				"command=0x%02x, ",
-				ret, len, cmd);
-			for (ii = 0; ii < len; ii++)
-				printk(KERN_DEBUG "buf[%d]=0x%02x,",
-								ii, buf[ii]);
-
-			printk("\n");
-#endif
-		} else
-			ret = -1;
-
-		if (ret < 0) {
-			dev_err(&stat->client->dev,
-				"read transfer error: len:%d, command=0x%02x\n",
-				len, cmd);
-			return 0;
-		}
-		return len;
-	}
-
-	ret = i2c_transfer(stat->client->adapter, msgs, 2);
-
-	return (ret == 2) ? 0 : 1;
-}
-
-static int lsm9ds1_acc_device_power_off(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_device_power_off(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int err;
-	u8 buf[2];
+	u8 buf[1];
 
-	buf[0] = status_registers.ctrl_reg6_xl.address;
-	buf[1] = (LSM9DS1_ACC_ODR_MASK & LSM9DS1_ACC_ODR_OFF) |
-	((~LSM9DS1_ACC_ODR_MASK) & status_registers.ctrl_reg6_xl.resume_val);
+	buf[0] = (LSM9DS1_ACC_ODR_MASK & LSM9DS1_ACC_ODR_OFF) |
+		 (~LSM9DS1_ACC_ODR_MASK &
+		  status_registers.ctrl_reg6_xl.resume_val);
 
-	err = lsm9ds1_i2c_write(stat, buf, 1);
-
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg6_xl.address,
+			     1, buf);
 	if (err < 0)
-		dev_err(&stat->client->dev, "accelerometer soft power off "
+		dev_err(dev->dev, "accelerometer soft power off "
 							"failed: %d\n", err);
 
-	if (stat->pdata_acc->power_off) {
-		stat->pdata_acc->power_off();
+	if (dev->pdata_acc->power_off) {
+		dev->pdata_acc->power_off();
 	}
 
-	atomic_set(&stat->enabled_acc, 0);
-	dev_info(&stat->client->dev, "accelerometer switched off.");
+	atomic_set(&dev->enabled_acc, 0);
+	dev->acc_skip_cnt = 0;
+	dev_info(dev->dev, "accelerometer switched off.");
 
 	return 0;
 }
 
-static int lsm9ds1_gyr_device_power_off(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_device_power_off(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int err;
-	u8 buf[2];
+	u8 buf[1];
 
-	buf[0] = status_registers.ctrl_reg1_g.address;
-	buf[1] = (LSM9DS1_GYR_ODR_MASK & LSM9DS1_GYR_ODR_OFF) |
-	((~LSM9DS1_GYR_ODR_MASK) & status_registers.ctrl_reg1_g.resume_val);
+	buf[0] = (LSM9DS1_GYR_ODR_MASK & LSM9DS1_GYR_ODR_OFF) |
+		 (~LSM9DS1_GYR_ODR_MASK &
+		  status_registers.ctrl_reg1_g.resume_val);
 
-	err = lsm9ds1_i2c_write(stat, buf, 1);
-	
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg1_g.address,
+			     1, buf);
 	if (err < 0)
-		dev_err(&stat->client->dev, "gyroscope soft power off "
+		dev_err(dev->dev, "gyroscope soft power off "
 							"failed: %d\n", err);
 
-	if (stat->pdata_gyr->power_off) {
-		stat->pdata_gyr->power_off();
+	if (dev->pdata_gyr->power_off) {
+		dev->pdata_gyr->power_off();
 	}
 
-	atomic_set(&stat->enabled_gyr, 0);
-	dev_info(&stat->client->dev, "gyroscope switched off.");
+	atomic_set(&dev->enabled_gyr, 0);
+	dev->gyr_skip_cnt = 0;
+	dev_info(dev->dev, "gyroscope switched off");
 
 	return 0;
 }
 
-static int lsm9ds1_gyr_disable(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_disable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	if (atomic_cmpxchg(&stat->enabled_gyr, 1, 0)) {
-		cancel_work_sync(&stat->input_work_gyr);
-		hrtimer_cancel(&stat->hr_timer_gyr);
-		lsm9ds1_gyr_device_power_off(stat);
-	}
+	if (atomic_cmpxchg(&dev->enabled_gyr, 1, 0))
+		lsm9ds1_gyr_device_power_off(dev);
 
 	return 0;
 }
 
-static int lsm9ds1_acc_disable(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_disable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	if (atomic_cmpxchg(&stat->enabled_acc, 1, 0)) {
-		if (atomic_read(&stat->enabled_gyr) > 0)
-			lsm9ds1_gyr_disable(stat);
+	if (atomic_cmpxchg(&dev->enabled_acc, 1, 0)) {
+		if (atomic_read(&dev->enabled_gyr) > 0)
+			lsm9ds1_gyr_disable(dev);
 
-		cancel_work_sync(&stat->input_work_acc);
-		hrtimer_cancel(&stat->hr_timer_acc);
-		lsm9ds1_acc_device_power_off(stat);
+		lsm9ds1_acc_device_power_off(dev);
 
-		if(stat->pdata_main->gpio_int1 >= 0)
-			disable_irq_nosync(stat->irq1);
-		if(stat->pdata_main->gpio_int2 >= 0)
-			disable_irq_nosync(stat->irq2);
+		if (dev->irq > 0)
+			disable_irq(dev->irq);
 	}
 
 	return 0;
 }
 
-static void lsm9ds1_acc_input_cleanup(struct lsm9ds1_acc_gyr_status *stat)
+int lsm9ds1_acc_gyr_disable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	input_unregister_device(stat->input_dev_acc);
-	input_free_device(stat->input_dev_acc);
+	int err;
+
+	err = lsm9ds1_acc_disable(dev);
+	if (err < 0)
+		return err;
+	return lsm9ds1_gyr_disable(dev);
+}
+EXPORT_SYMBOL(lsm9ds1_acc_gyr_disable);
+
+static void lsm9ds1_acc_input_cleanup(struct lsm9ds1_acc_gyr_dev *dev)
+{
+	input_unregister_device(dev->input_dev_acc);
+	input_free_device(dev->input_dev_acc);
 }
 
-static void lsm9ds1_gyr_input_cleanup(struct lsm9ds1_acc_gyr_status *stat)
+static void lsm9ds1_gyr_input_cleanup(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	input_unregister_device(stat->input_dev_gyr);
-	input_free_device(stat->input_dev_gyr);
-}
-
-enum hrtimer_restart poll_function_read_acc(struct hrtimer *timer)
-{
-	struct lsm9ds1_acc_gyr_status *stat;
-
-
-	stat = container_of((struct hrtimer *)timer,
-				struct lsm9ds1_acc_gyr_status, hr_timer_acc);
-
-	queue_work(lsm9ds1_acc_gyr_workqueue, &stat->input_work_acc);
-	return HRTIMER_NORESTART;
-}
-
-enum hrtimer_restart poll_function_read_gyr(struct hrtimer *timer)
-{
-	struct lsm9ds1_acc_gyr_status *stat;
-
-
-	stat = container_of((struct hrtimer *)timer,
-				struct lsm9ds1_acc_gyr_status, hr_timer_gyr);
-
-	queue_work(lsm9ds1_acc_gyr_workqueue, &stat->input_work_gyr);
-	return HRTIMER_NORESTART;
+	input_unregister_device(dev->input_dev_gyr);
+	input_free_device(dev->input_dev_gyr);
 }
 
 static void lsm9ds1_validate_polling(unsigned int *min_interval,
@@ -738,15 +536,15 @@ static void lsm9ds1_validate_polling(unsigned int *min_interval,
 	*poll_interval = max(*poll_interval, *min_interval);
 }
 
-static int lsm9ds1_acc_validate_pdata(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_validate_pdata(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int res = -EINVAL;
 
-	lsm9ds1_validate_polling(&stat->pdata_acc->min_interval,
-				 &stat->pdata_acc->poll_interval,
+	lsm9ds1_validate_polling(&dev->pdata_acc->min_interval,
+				 &dev->pdata_acc->poll_interval,
 				(unsigned int)LSM9DS1_ACC_MIN_POLL_PERIOD_MS);
 
-	switch (stat->pdata_acc->aa_filter_bandwidth) {
+	switch (dev->pdata_acc->aa_filter_bandwidth) {
 	case LSM9DS1_ACC_BW_50:
 		res = 1;
 		break;
@@ -760,56 +558,56 @@ static int lsm9ds1_acc_validate_pdata(struct lsm9ds1_acc_gyr_status *stat)
 		res = 1;
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid accelerometer "
+		dev_err(dev->dev, "invalid accelerometer "
 			"bandwidth selected: %u\n",
-				stat->pdata_acc->aa_filter_bandwidth);
+				dev->pdata_acc->aa_filter_bandwidth);
 	}
 
 	return res;
 }
 
-static int lsm9ds1_gyr_validate_pdata(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_validate_pdata(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	/* checks for correctness of minimal polling period */
-	lsm9ds1_validate_polling(&stat->pdata_gyr->min_interval, 
-				 &stat->pdata_gyr->poll_interval,
+	lsm9ds1_validate_polling(&dev->pdata_gyr->min_interval, 
+				 &dev->pdata_gyr->poll_interval,
 				(unsigned int)LSM9DS1_GYR_MIN_POLL_PERIOD_MS);
 
 	/* Enforce minimum polling interval */
-	if (stat->pdata_gyr->poll_interval < stat->pdata_gyr->min_interval) {
-		dev_err(&stat->client->dev,
+	if (dev->pdata_gyr->poll_interval < dev->pdata_gyr->min_interval) {
+		dev_err(dev->dev,
 			"minimum poll interval violated\n");
 		return -EINVAL;
 	}
 	return 0;
 }
 
-
-static int lsm9ds1_acc_gyr_hw_init(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_gyr_check_whoami(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	int err = -1;
-	u8 buf[1];
+	int err;
+	u8 data;
 
-	dev_info(&stat->client->dev, "%s: hw init start\n", LSM9DS1_ACC_GYR_DEV_NAME);
-
-	buf[0] = status_registers.who_am_i.address;
-	err = lsm9ds1_i2c_read(stat, buf, 1);
-	
+	err = dev->tf->read(dev->dev, status_registers.who_am_i.address, 1,
+			    &data);
 	if (err < 0) {
-		dev_warn(&stat->client->dev, "Error reading WHO_AM_I: is device"
-		" available/working?\n");
-		goto err_firstread;
-	} else
-		stat->hw_working = 1;
-
-	if (buf[0] != status_registers.who_am_i.default_val) {
-	dev_err(&stat->client->dev,
-		"device unknown. Expected: 0x%02x,"
-		" Replies: 0x%02x\n", status_registers.who_am_i.default_val, 
-					buf[0]);
-		err = -1;
-		goto err_unknown_device;
+		dev_warn(dev->dev, "Error reading WHO_AM_I\n");
+		return err;
 	}
+
+	if (data != status_registers.who_am_i.default_val) {
+		dev_err(dev->dev, "device unknown 0x%02x - 0x%02x\n",
+			status_registers.who_am_i.default_val, data);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int lsm9ds1_acc_gyr_hw_init(struct lsm9ds1_acc_gyr_dev *dev)
+{
+#ifdef LSM9DS1_DEBUG
+	dev_info(dev->dev, "%s: hw init start\n", LSM9DS1_ACC_GYR_DEV_NAME);
+#endif
 
 	status_registers.act_ths.resume_val =
 				status_registers.act_ths.default_val;
@@ -872,174 +670,166 @@ static int lsm9ds1_acc_gyr_hw_init(struct lsm9ds1_acc_gyr_status *stat)
 	status_registers.int_gen_dur_g.resume_val =
 				status_registers.int_gen_dur_g.default_val;
 
-	stat->temp_value_dec = NDTEMP;
+	dev->temp_value_dec = NDTEMP;
 
-	stat->hw_initialized = 1;
-	dev_info(&stat->client->dev, "%s: hw init done\n", LSM9DS1_ACC_GYR_DEV_NAME);
+#ifdef LSM9DS1_DEBUG
+	dev_info(dev->dev, "%s: hw init done\n", LSM9DS1_ACC_GYR_DEV_NAME);
+#endif
 
 	return 0;
-
-err_unknown_device:
-err_firstread:
-	stat->hw_working = 0;
-	stat->hw_initialized = 0;
-	return err;
 }
 
-static int lsm9ds1_acc_device_power_on(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_device_power_on(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int err = -1;
-	u8 buf[9];
+	u8 buf[7];
 
-	if (stat->pdata_acc->power_on) {
-		err = stat->pdata_acc->power_on();
+	if (dev->pdata_acc->power_on) {
+		err = dev->pdata_acc->power_on();
 		if (err < 0) {
-			dev_err(&stat->client->dev,
+			dev_err(dev->dev,
 				"accelerometer power_on failed: %d\n", err);
 			return err;
 		}
 	}
 
-	buf[0] = status_registers.ctrl_reg4.address;
- 	buf[1] = status_registers.ctrl_reg4.resume_val;
- 	buf[2] = status_registers.ctrl_reg5_xl.resume_val;
-	buf[3] = status_registers.ctrl_reg6_xl.resume_val;
-	buf[4] = status_registers.ctrl_reg7_xl.resume_val;
-	buf[5] = status_registers.ctrl_reg8.resume_val;
-	buf[6] = status_registers.ctrl_reg9.resume_val;
-	buf[7] = status_registers.ctrl_reg10.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 7);
+ 	buf[0] = status_registers.ctrl_reg4.resume_val;
+ 	buf[1] = status_registers.ctrl_reg5_xl.resume_val;
+	buf[2] = status_registers.ctrl_reg6_xl.resume_val;
+	buf[3] = status_registers.ctrl_reg7_xl.resume_val;
+	buf[4] = status_registers.ctrl_reg8.resume_val;
+	buf[5] = status_registers.ctrl_reg9.resume_val;
+	buf[6] = status_registers.ctrl_reg10.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg4.address,
+			     7, buf);
 	if (err < 0)
 		goto err_resume_state;
 	
-	buf[0] = status_registers.int_gen_cfg_xl.address;
-	buf[1] = status_registers.int_gen_cfg_xl.resume_val;
-	buf[2] = status_registers.int_gen_ths_x_xl.resume_val;
-	buf[3] = status_registers.int_gen_ths_y_xl.resume_val;
-	buf[4] = status_registers.int_gen_ths_z_xl.resume_val;
-	buf[5] = status_registers.int_gen_dur_xl.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 5);
+	buf[0] = status_registers.int_gen_cfg_xl.resume_val;
+	buf[1] = status_registers.int_gen_ths_x_xl.resume_val;
+	buf[2] = status_registers.int_gen_ths_y_xl.resume_val;
+	buf[3] = status_registers.int_gen_ths_z_xl.resume_val;
+	buf[4] = status_registers.int_gen_dur_xl.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.int_gen_cfg_xl.address,
+			     5, buf);
 	if (err < 0)
 		goto err_resume_state;
 	
-	buf[0] = status_registers.int1_ctrl.address;
-	buf[1] = status_registers.int1_ctrl.resume_val;
-	buf[2] = status_registers.int2_ctrl.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 2);
+	buf[0] = status_registers.int1_ctrl.resume_val;
+	buf[1] = status_registers.int2_ctrl.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.int1_ctrl.address,
+			     2, buf);
 	if (err < 0)
 		goto err_resume_state;
 	
-	buf[0] = status_registers.fifo_ctrl.address;
-	buf[1] = status_registers.fifo_ctrl.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = status_registers.fifo_ctrl.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.fifo_ctrl.address,
+			     1, buf);
 	if (err < 0)
 		goto err_resume_state;
 	
-	buf[0] = status_registers.ctrl_reg8.address;
-	buf[1] = status_registers.ctrl_reg8.resume_val;
-	buf[2] = status_registers.ctrl_reg9.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 2);
+	buf[0] = status_registers.ctrl_reg8.resume_val;
+	buf[1] = status_registers.ctrl_reg9.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg8.address,
+			     2, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	atomic_set(&stat->enabled_acc, 1);
+	atomic_set(&dev->enabled_acc, 1);
 
 	return 0;
 
 err_resume_state:
-	atomic_set(&stat->enabled_acc, 0);
-	dev_err(&stat->client->dev, "accelerometer hw power on error "
+	atomic_set(&dev->enabled_acc, 0);
+	dev_err(dev->dev, "accelerometer hw power on error "
 				"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
 	return err;
 }
 
-static int lsm9ds1_gyr_device_power_on(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_device_power_on(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int err = -1;
-	u8 buf[9];
+	u8 buf[8];
 
-
-	if (stat->pdata_gyr->power_on) {
-		err = stat->pdata_gyr->power_on();
+	if (dev->pdata_gyr->power_on) {
+		err = dev->pdata_gyr->power_on();
 		if (err < 0) {
-			dev_err(&stat->client->dev,
+			dev_err(dev->dev,
 				"gyroscope power_on failed: %d\n", err);
 			return err;
 		}
 	}
 
-	buf[0] = status_registers.act_ths.address;
-	buf[1] = status_registers.act_ths.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = status_registers.act_ths.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.act_ths.address,
+			     1, buf);
 	if (err < 0)
 		goto err_resume_state;
 	
-	buf[0] = status_registers.reference_g.address;
-	buf[1] = status_registers.reference_g.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = status_registers.reference_g.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.reference_g.address,
+			     1, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	buf[0] = status_registers.ctrl_reg1_g.address;
-	buf[1] = status_registers.ctrl_reg1_g.resume_val;
-	buf[2] = status_registers.ctrl_reg2_g.resume_val;
-	buf[3] = status_registers.ctrl_reg3_g.resume_val;
-	buf[4] = status_registers.orient_cfg_g.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 4);
+	buf[0] = status_registers.ctrl_reg1_g.resume_val;
+	buf[1] = status_registers.ctrl_reg2_g.resume_val;
+	buf[2] = status_registers.ctrl_reg3_g.resume_val;
+	buf[3] = status_registers.orient_cfg_g.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg1_g.address,
+			     4, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	buf[0] = status_registers.ctrl_reg4.address;
-	buf[1] = status_registers.ctrl_reg4.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = status_registers.ctrl_reg4.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg4.address,
+			     1, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	buf[0] = status_registers.int_gen_cfg_g.address;
-	buf[1] = status_registers.int_gen_cfg_g.resume_val;
-	buf[2] = status_registers.int_gen_ths_xh_g.resume_val;
-	buf[3] = status_registers.int_gen_ths_xl_g.resume_val;
-	buf[4] = status_registers.int_gen_ths_yh_g.resume_val;
-	buf[5] = status_registers.int_gen_ths_yl_g.resume_val;
-	buf[6] = status_registers.int_gen_ths_zh_g.resume_val;
-	buf[7] = status_registers.int_gen_ths_zl_g.resume_val;
-	buf[8] = status_registers.int_gen_dur_g.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 8);
+	buf[0] = status_registers.int_gen_cfg_g.resume_val;
+	buf[1] = status_registers.int_gen_ths_xh_g.resume_val;
+	buf[2] = status_registers.int_gen_ths_xl_g.resume_val;
+	buf[3] = status_registers.int_gen_ths_yh_g.resume_val;
+	buf[4] = status_registers.int_gen_ths_yl_g.resume_val;
+	buf[5] = status_registers.int_gen_ths_zh_g.resume_val;
+	buf[6] = status_registers.int_gen_ths_zl_g.resume_val;
+	buf[7] = status_registers.int_gen_dur_g.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.int_gen_cfg_g.address,
+			     8, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	buf[0] = status_registers.int1_ctrl.address;
-	buf[1] = status_registers.int1_ctrl.resume_val;
-	buf[2] = status_registers.int2_ctrl.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 2);
+	buf[0] = status_registers.int1_ctrl.resume_val;
+	buf[1] = status_registers.int2_ctrl.resume_val;
+	err = dev->tf->write(dev->dev, status_registers.int1_ctrl.address,
+			     2, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	buf[0] = status_registers.fifo_ctrl.address;
 	buf[1] = status_registers.fifo_ctrl.resume_val;
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	err = dev->tf->write(dev->dev, status_registers.fifo_ctrl.address,
+			     1, buf);
 	if (err < 0)
 		goto err_resume_state;
 
-	atomic_set(&stat->enabled_gyr, 1);
+	atomic_set(&dev->enabled_gyr, 1);
 
 	return 0;
 
 err_resume_state:
-	atomic_set(&stat->enabled_gyr, 0);
-	dev_err(&stat->client->dev, "gyroscope hw power on error "
+	atomic_set(&dev->enabled_gyr, 0);
+	dev_err(dev->dev, "gyroscope hw power on error "
 				"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
 	return err;
 }
 
-static int lsm9ds1_acc_update_fs_range(struct lsm9ds1_acc_gyr_status *stat,
-								u8 new_fs_range)
+static int lsm9ds1_acc_update_fs_range(struct lsm9ds1_acc_gyr_dev *dev,
+				       u8 new_fs_range)
 {
 	int err = -1;
-
 	u16 sensitivity;
-	u8 val;
-	u8 buf[2];
+	u8 val, buf[1];
 
 	switch (new_fs_range) {
 	case LSM9DS1_ACC_FS_2G:
@@ -1052,37 +842,37 @@ static int lsm9ds1_acc_update_fs_range(struct lsm9ds1_acc_gyr_status *stat,
 		sensitivity = SENSITIVITY_ACC_8G;
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid accelerometer "
-				"fs range requested: %u\n", new_fs_range);
+		dev_err(dev->dev, "invalid acc fs range requested: %u\n",
+			new_fs_range);
 		return -EINVAL;
 	}
 
-	val = ((LSM9DS1_ACC_FS_MASK & new_fs_range) | ((~LSM9DS1_ACC_FS_MASK) & 
-				status_registers.ctrl_reg6_xl.resume_val));
+	val = ((LSM9DS1_ACC_FS_MASK & new_fs_range) |
+	       (~LSM9DS1_ACC_FS_MASK &
+		status_registers.ctrl_reg6_xl.resume_val));
 
-	buf[0] = status_registers.ctrl_reg6_xl.address;
-	buf[1] = val;
-
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg6_xl.address,
+			     1, buf);
 	if (err < 0)
 		goto error;
 
 	status_registers.ctrl_reg6_xl.resume_val = val;
-	stat->sensitivity_acc = sensitivity;
+	dev->sensitivity_acc = sensitivity;
 
 	return err;
 
 error:
-	dev_err(&stat->client->dev, "update accelerometer fs range failed "
-		"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
+	dev_err(dev->dev, "update accelerometer fs range failed "
+		"0x%02x: %d\n", buf[0], err);
 	return err;
 }
 
-static int lsm9ds1_gyr_update_fs_range(struct lsm9ds1_acc_gyr_status *stat,
-								u8 new_fs_range)
+static int lsm9ds1_gyr_update_fs_range(struct lsm9ds1_acc_gyr_dev *dev,
+				       u8 new_fs_range)
 {
 	int err = -1;
-	u8 buf[2];
+	u8 buf[1];
 	u8 updated_val;
 
 	u32 sensitivity;
@@ -1098,118 +888,119 @@ static int lsm9ds1_gyr_update_fs_range(struct lsm9ds1_acc_gyr_status *stat,
 		sensitivity = SENSITIVITY_GYR_2000;
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid g range "
+		dev_err(dev->dev, "invalid g range "
 					"requested: %u\n", new_fs_range);
 		return -EINVAL;
 	}
 
-
-	buf[0] = status_registers.ctrl_reg1_g.address;
-	err = lsm9ds1_i2c_read(stat, buf, 1);
-	if (err < 0)
-		goto error;
-
-	updated_val = ((LSM9DS1_GYR_FS_MASK & new_fs_range) | 
-					  ((~LSM9DS1_GYR_FS_MASK) & buf[0]));
+	updated_val = ((LSM9DS1_GYR_FS_MASK & new_fs_range) |
+		       (~LSM9DS1_GYR_FS_MASK & status_registers.ctrl_reg1_g.resume_val));
 	
-	buf[0] = status_registers.ctrl_reg1_g.address;
-	buf[1] = updated_val;
-
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = updated_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg1_g.address,
+			     1, buf);
 	if (err < 0)
 		goto error;
 
 	status_registers.ctrl_reg1_g.resume_val = updated_val;
-	stat->sensitivity_gyr = sensitivity;
+	dev->sensitivity_gyr = sensitivity;
 
 error:
 	return err;
 }
 
-static int lsm9ds1_acc_update_odr(struct lsm9ds1_acc_gyr_status *stat,
-						unsigned int poll_interval_ms)
+static int lsm9ds1_acc_update_odr(struct lsm9ds1_acc_gyr_dev *dev,
+				  unsigned int poll_ms)
 {
-	int err = -1;
-	u8 buf[2];
-	int i;
+	int i, err = 0;
+	u8 buf[1];
 
 	for (i = ARRAY_SIZE(lsm9ds1_acc_odr_table) - 1; i >= 0; i--) {
-		if ((lsm9ds1_acc_odr_table[i].cutoff_ms <= poll_interval_ms)
-								|| (i == 0))
+		if ((lsm9ds1_acc_odr_table[i].cutoff_ms <= poll_ms) ||
+		    (i == 0))
 			break;
 	}
 
-	buf[1] = LSM9DS1_ACC_ODR_MASK & lsm9ds1_acc_odr_table[i].value;
-		buf[1] |= (~LSM9DS1_ACC_ODR_MASK) & 
-				status_registers.ctrl_reg6_xl.resume_val;
+	buf[0] = LSM9DS1_ACC_ODR_MASK & lsm9ds1_acc_odr_table[i].value;
+	buf[0] |= (~LSM9DS1_ACC_ODR_MASK) &
+		  status_registers.ctrl_reg6_xl.resume_val;
 
-	if (atomic_read(&stat->enabled_acc)) {
-		buf[0] = status_registers.ctrl_reg6_xl.address;
-
-		err = lsm9ds1_i2c_write(stat, buf, 1);
+	if (atomic_read(&dev->enabled_acc)) {
+		err = dev->tf->write(dev->dev,
+				     status_registers.ctrl_reg6_xl.address,
+				     1, buf);
 		if (err < 0)
 			goto error;
 	}
 
-	status_registers.ctrl_reg6_xl.resume_val = buf[1];
-	stat->ktime_acc = ktime_set(0, MS_TO_NS(poll_interval_ms));
+	dev->acc_dec_cnt = poll_ms / lsm9ds1_acc_odr_table[i].cutoff_ms;
+	dev->acc_skip_cnt = 0;
+
+	status_registers.ctrl_reg6_xl.resume_val = buf[0];
+
+	dev_info(dev->dev, "accelerometer odr set to %d\n", poll_ms);
 
 	return err;
 
 error:
-	dev_err(&stat->client->dev, "update accelerometer odr failed "
-			"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
+	dev_err(dev->dev, "update accelerometer odr failed "
+			"0x%02x: %d\n", buf[0], err);
 
 	return err;
 }
 
-static int lsm9ds1_gyr_update_odr(struct lsm9ds1_acc_gyr_status *stat,
-						unsigned int poll_interval_ms)
+static int lsm9ds1_gyr_update_odr(struct lsm9ds1_acc_gyr_dev *dev,
+				  unsigned int poll_ms)
 {
-	int err = -1;
-	u8 buf[2];
+	int err = 0;
+	u8 buf[1];
 	u8 val;
 	int i;
 
-	if (atomic_read(&stat->enabled_acc))
-		val = min(poll_interval_ms, stat->pdata_acc->poll_interval);
+	if (atomic_read(&dev->enabled_acc))
+		val = min(poll_ms, dev->pdata_acc->poll_interval);
 	else
-		val = poll_interval_ms;
+		val = poll_ms;
 
 	for (i = ARRAY_SIZE(lsm9ds1_gyr_odr_table) - 1; i >= 0; i--)
 		if ((lsm9ds1_gyr_odr_table[i].cutoff_ms <= val) || (i == 0))
 			break;
 
-	buf[1] = LSM9DS1_GYR_ODR_MASK & lsm9ds1_gyr_odr_table[i].value;
-		buf[1] |= (~LSM9DS1_GYR_ODR_MASK) &
-					status_registers.ctrl_reg1_g.resume_val;
+	buf[0] = LSM9DS1_GYR_ODR_MASK & lsm9ds1_gyr_odr_table[i].value;
+	buf[0] |= (~LSM9DS1_GYR_ODR_MASK) &
+		  status_registers.ctrl_reg1_g.resume_val;
 
-	if (atomic_read(&stat->enabled_gyr)) {
+	if (atomic_read(&dev->enabled_gyr)) {
 		/* Set ODR value */
-		buf[0] = status_registers.ctrl_reg1_g.address;
-
-		err = lsm9ds1_i2c_write(stat, buf, 1);
+		err = dev->tf->write(dev->dev,
+				     status_registers.ctrl_reg1_g.address,
+				     1, buf);
 		if (err < 0)
 			goto error;
 	}
-	status_registers.ctrl_reg1_g.resume_val = buf[1];
-	stat->ktime_gyr = ktime_set(0, MS_TO_NS(poll_interval_ms));
+
+	dev->gyr_dec_cnt = poll_ms / lsm9ds1_gyr_odr_table[i].cutoff_ms;
+	dev->gyr_skip_cnt = 0;
+
+	status_registers.ctrl_reg1_g.resume_val = buf[0];
+
+	dev_info(dev->dev, "gyro odr set to %d\n", poll_ms);
 
 	return err;
 
 error:
-	dev_err(&stat->client->dev, "update accelerometer odr failed "
-			"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
+	dev_err(dev->dev, "update accelerometer odr failed "
+		"0x%02x: %d\n", buf[0], err);
 
 	return err;
 }
 
-static int lsm9ds1_acc_update_filter(struct lsm9ds1_acc_gyr_status *stat,
+static int lsm9ds1_acc_update_filter(struct lsm9ds1_acc_gyr_dev *dev,
 							u8 new_bandwidth)
 {
 	int err = -1;
 	u8 updated_val;
-	u8 buf[2];
+	u8 buf[1];
 
 	switch (new_bandwidth) {
 	case LSM9DS1_ACC_BW_50:
@@ -1221,25 +1012,24 @@ static int lsm9ds1_acc_update_filter(struct lsm9ds1_acc_gyr_status *stat,
 	case LSM9DS1_ACC_BW_408:
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid accelerometer "
+		dev_err(dev->dev, "invalid accelerometer "
 			"update bandwidth requested: %u\n", new_bandwidth);
 		return -EINVAL;
 	}
 
-	buf[0] = status_registers.ctrl_reg6_xl.address;
-	err = lsm9ds1_i2c_read(stat, buf, 1);
+	err = dev->tf->read(dev->dev, status_registers.ctrl_reg6_xl.address, 1,
+			    buf);
 	if (err < 0)
 		goto error;
 
 	status_registers.ctrl_reg6_xl.resume_val = buf[0];
 
 	updated_val = ((LSM9DS1_ACC_BW_MASK & new_bandwidth) |
-					((~LSM9DS1_ACC_BW_MASK) & buf[0]));
+		       (~LSM9DS1_ACC_BW_MASK & buf[0]));
 
-	buf[0] = status_registers.ctrl_reg6_xl.address;
-	buf[1] = updated_val;
-
-	err = lsm9ds1_i2c_write(stat, buf, 1);
+	buf[0] = updated_val;
+	err = dev->tf->write(dev->dev, status_registers.ctrl_reg6_xl.address,
+			     1, buf);
 	if (err < 0)
 		goto error;
 
@@ -1248,92 +1038,65 @@ static int lsm9ds1_acc_update_filter(struct lsm9ds1_acc_gyr_status *stat,
 	return err;
 
 error:
-	dev_err(&stat->client->dev, "update accelerometer fs range failed "
-		"0x%02x,0x%02x: %d\n", buf[0], buf[1], err);
+	dev_err(dev->dev, "update accelerometer fs range failed "
+		"0x%02x: %d\n", buf[0], err);
 	return err;
 }
 
-static int lsm9ds1_acc_enable(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_enable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	int err = -1;
+	if (!atomic_cmpxchg(&dev->enabled_acc, 0, 1)) {
+		int err;
 
-	if (!atomic_cmpxchg(&stat->enabled_acc, 0, 1)) {
-		err = lsm9ds1_acc_device_power_on(stat);
+		err = lsm9ds1_acc_device_power_on(dev);
 		if (err < 0) {
-			atomic_set(&stat->enabled_acc, 0);
-			dev_err(&stat->client->dev, "enable accelerometer "
-				      "failed");
+			atomic_set(&dev->enabled_acc, 0);
+			dev_err(dev->dev, "enable accelerometer failed");
 			return err;
 		}
 
-		hrtimer_start(&stat->hr_timer_acc, stat->ktime_acc, 
-							HRTIMER_MODE_REL);
-
-		if(stat->pdata_main->gpio_int1 >= 0)
-			enable_irq(stat->irq1);
-		if(stat->pdata_main->gpio_int2 >= 0)
-			enable_irq(stat->irq2);
+		if (dev->irq > 0)
+			enable_irq(dev->irq);
 	}
 
 	return 0;
 }
 
-static int lsm9ds1_gyr_enable(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_enable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	int err = -1;
+	if (!atomic_cmpxchg(&dev->enabled_gyr, 0, 1)) {
+		int err;
 
-	if (!atomic_cmpxchg(&stat->enabled_gyr, 0, 1)) {
+		if (atomic_read(&dev->enabled_acc) == 0)
+			lsm9ds1_acc_enable(dev);
 
-		err = lsm9ds1_gyr_device_power_on(stat);
+		err = lsm9ds1_gyr_device_power_on(dev);
 		if (err < 0) {
-			atomic_set(&stat->enabled_gyr, 0);
+			atomic_set(&dev->enabled_gyr, 0);
 			return err;
 		}
-
-		hrtimer_start(&(stat->hr_timer_gyr), stat->ktime_gyr,
-							HRTIMER_MODE_REL);
 	}
 	return 0;
 }
 
-int lsm9ds1_acc_input_open(struct input_dev *input)
+int lsm9ds1_acc_gyr_enable(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	struct lsm9ds1_acc_gyr_status *stat = input_get_drvdata(input);
-	dev_dbg(&stat->client->dev, "%s\n", __func__);
+	int err;
 
-	return lsm9ds1_acc_enable(stat);
+	err = lsm9ds1_acc_enable(dev);
+	if (err < 0)
+		return err;
+	return lsm9ds1_gyr_enable(dev);
 }
+EXPORT_SYMBOL(lsm9ds1_acc_gyr_enable);
 
-void lsm9ds1_acc_input_close(struct input_dev *dev)
-{
-	struct lsm9ds1_acc_gyr_status *stat = input_get_drvdata(dev);
-	dev_dbg(&stat->client->dev, "%s\n", __func__);
-	lsm9ds1_acc_disable(stat);
-}
-
-int lsm9ds1_gyr_input_open(struct input_dev *input)
-{
-	struct lsm9ds1_acc_gyr_status *stat = input_get_drvdata(input);
-	dev_dbg(&stat->client->dev, "%s\n", __func__);
-
-	return lsm9ds1_gyr_enable(stat);
-}
-
-void lsm9ds1_gyr_input_close(struct input_dev *dev)
-{
-	struct lsm9ds1_acc_gyr_status *stat = input_get_drvdata(dev);
-	dev_dbg(&stat->client->dev, "%s\n", __func__);
-	lsm9ds1_gyr_disable(stat);
-}
-
-static int lsm9ds1_acc_get_data(struct lsm9ds1_acc_gyr_status *stat, int *xyz)
+static int lsm9ds1_acc_get_data(struct lsm9ds1_acc_gyr_dev *dev, int *xyz)
 {
 	int i, err = -1;
 	u8 acc_data[6];
-	s32 hw_d[3] = { 0 };
+	s32 hw_d[3];
 
-	acc_data[0] = OUT_X_L_XL;
-	err = lsm9ds1_i2c_read(stat, acc_data, 6);
+	err = dev->tf->read(dev->dev, OUT_X_L_XL, 6, acc_data);
 	if (err < 0)
 		return err;
 
@@ -1341,28 +1104,35 @@ static int lsm9ds1_acc_get_data(struct lsm9ds1_acc_gyr_status *stat, int *xyz)
 	hw_d[1] = ((s32)( (s16)((acc_data[3] << 8) | (acc_data[2]))));
 	hw_d[2] = ((s32)( (s16)((acc_data[5] << 8) | (acc_data[4]))));
 
-	hw_d[0] = hw_d[0] * stat->sensitivity_acc;
-	hw_d[1] = hw_d[1] * stat->sensitivity_acc;
-	hw_d[2] = hw_d[2] * stat->sensitivity_acc;
+#ifdef LSM9DS1_DEBUG
+	dev_info(dev->dev, "%s read x=%X %X(regH regL), x=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, acc_data[1], acc_data[0], hw_d[0]);
+	dev_info(dev->dev, "%s read y=%X %X(regH regL), y=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, acc_data[3], acc_data[2], hw_d[1]);
+	dev_info(dev->dev, "%s read z=%X %X(regH regL), z=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, acc_data[5], acc_data[4], hw_d[2]);
+#endif
+
+	hw_d[0] = hw_d[0] * dev->sensitivity_acc;
+	hw_d[1] = hw_d[1] * dev->sensitivity_acc;
+	hw_d[2] = hw_d[2] * dev->sensitivity_acc;
 
 	for (i = 0; i < 3; i++) {
-		xyz[i] = stat->pdata_main->rot_matrix[0][i] * hw_d[0] +
-				stat->pdata_main->rot_matrix[1][i] * hw_d[1] +
-				stat->pdata_main->rot_matrix[2][i] * hw_d[2];
+		xyz[i] = dev->pdata_main->rot_matrix[0][i] * hw_d[0] +
+				dev->pdata_main->rot_matrix[1][i] * hw_d[1] +
+				dev->pdata_main->rot_matrix[2][i] * hw_d[2];
 	}
 
 	return err;
 }
 
-static int lsm9ds1_gyr_get_data(struct lsm9ds1_acc_gyr_status *stat, int *xyz)
+static int lsm9ds1_gyr_get_data(struct lsm9ds1_acc_gyr_dev *dev, int *xyz)
 {
 	int i, err = 1;
 	u8 gyro_data[6];
-	s32 hw_d[3] = { 0 };
+	s32 hw_d[3];
 
-	gyro_data[0] = OUT_X_L_G;
-	err = lsm9ds1_i2c_read(stat, gyro_data, 6);
-
+	err = dev->tf->read(dev->dev, OUT_X_L_G, 6, gyro_data);
 	if (err < 0)
 		return err;
 
@@ -1370,143 +1140,142 @@ static int lsm9ds1_gyr_get_data(struct lsm9ds1_acc_gyr_status *stat, int *xyz)
 	hw_d[1] = (s32) ((s16)((gyro_data[3]) << 8) | gyro_data[2]);
 	hw_d[2] = (s32) ((s16)((gyro_data[5]) << 8) | gyro_data[4]);
 
-#ifdef DEBUG
-	dev_dbg(&stat->client->dev, "%s read x=%X %X(regH regL), x=%d(dec) [udps]\n",
-		LSM9DS1_GYR_DEV_NAME, gyro_data[1], gyro_data[0], hw_d[0]);
-	dev_dbg(&stat->client->dev, "%s read y=%X %X(regH regL), y=%d(dec) [udps]\n",
-		LSM9DS1_GYR_DEV_NAME, gyro_data[3], gyro_data[2], hw_d[1]);
-	dev_dbg(&stat->client->dev, "%s read z=%X %X(regH regL), z=%d(dec) [udps]\n",
-		LSM9DS1_GYR_DEV_NAME, gyro_data[5], gyro_data[4], hw_d[2]);
+#ifdef LSM9DS1_DEBUG
+	dev_info(dev->dev, "%s read x=%X %X(regH regL), x=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, gyro_data[1], gyro_data[0], hw_d[0]);
+	dev_info(dev->dev, "%s read y=%X %X(regH regL), y=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, gyro_data[3], gyro_data[2], hw_d[1]);
+	dev_info(dev->dev, "%s read z=%X %X(regH regL), z=%d(dec) [udps]\n",
+		 LSM9DS1_GYR_DEV_NAME, gyro_data[5], gyro_data[4], hw_d[2]);
 #endif
 
-	hw_d[0] = hw_d[0] * stat->sensitivity_gyr;
-	hw_d[1] = hw_d[1] * stat->sensitivity_gyr;
-	hw_d[2] = hw_d[2] * stat->sensitivity_gyr;
+	hw_d[0] = hw_d[0] * dev->sensitivity_gyr;
+	hw_d[1] = hw_d[1] * dev->sensitivity_gyr;
+	hw_d[2] = hw_d[2] * dev->sensitivity_gyr;
 
 	for (i = 0; i < 3; i++) {
-		xyz[i] = stat->pdata_main->rot_matrix[0][i] * hw_d[0] +
-				stat->pdata_main->rot_matrix[1][i] * hw_d[1] +
-				stat->pdata_main->rot_matrix[2][i] * hw_d[2];
+		xyz[i] = dev->pdata_main->rot_matrix[0][i] * hw_d[0] +
+				dev->pdata_main->rot_matrix[1][i] * hw_d[1] +
+				dev->pdata_main->rot_matrix[2][i] * hw_d[2];
 	}
 
 	return err;
 }
 
-static void lsm9ds1_acc_report_values(struct lsm9ds1_acc_gyr_status *stat,
-								int *xyz)
+static void lsm9ds1_acc_report_values(struct lsm9ds1_acc_gyr_dev *dev,
+				      int *xyz, s64 timestamp)
 {
-	input_report_abs(stat->input_dev_acc, ABS_X, xyz[0]);
-	input_report_abs(stat->input_dev_acc, ABS_Y, xyz[1]);
-	input_report_abs(stat->input_dev_acc, ABS_Z, xyz[2]);
-	input_sync(stat->input_dev_acc);
+	input_event(dev->input_dev_acc, INPUT_EVENT_TYPE, INPUT_EVENT_X,
+		    xyz[0]);
+	input_event(dev->input_dev_acc, INPUT_EVENT_TYPE, INPUT_EVENT_Y,
+		    xyz[1]);
+	input_event(dev->input_dev_acc, INPUT_EVENT_TYPE, INPUT_EVENT_Z,
+		    xyz[2]);
+	input_event(dev->input_dev_acc, INPUT_EVENT_TYPE, INPUT_EVENT_TIME_MSB,
+		    timestamp >> 32);
+	input_event(dev->input_dev_acc, INPUT_EVENT_TYPE, INPUT_EVENT_TIME_LSB,
+		    timestamp & 0xffffffff);
+	input_sync(dev->input_dev_acc);
 }
 
-static void lsm9ds1_gyr_report_values(struct lsm9ds1_acc_gyr_status *stat,
-								int *xyz)
+static void lsm9ds1_gyr_report_values(struct lsm9ds1_acc_gyr_dev *dev,
+				      int *xyz, s64 timestamp)
 {
-	input_report_abs(stat->input_dev_gyr, ABS_X, xyz[0]);
-	input_report_abs(stat->input_dev_gyr, ABS_Y, xyz[1]);
-	input_report_abs(stat->input_dev_gyr, ABS_Z, xyz[2]);
-	input_sync(stat->input_dev_gyr);
+	input_event(dev->input_dev_gyr, INPUT_EVENT_TYPE, INPUT_EVENT_X,
+		    xyz[0]);
+	input_event(dev->input_dev_gyr, INPUT_EVENT_TYPE, INPUT_EVENT_Y,
+		    xyz[1]);
+	input_event(dev->input_dev_gyr, INPUT_EVENT_TYPE, INPUT_EVENT_Z,
+		    xyz[2]);
+	input_event(dev->input_dev_gyr, INPUT_EVENT_TYPE, INPUT_EVENT_TIME_MSB,
+		    timestamp >> 32);
+	input_event(dev->input_dev_gyr, INPUT_EVENT_TYPE, INPUT_EVENT_TIME_LSB,
+		    timestamp & 0xffffffff);
+	input_sync(dev->input_dev_gyr);
 }
 
-static int lsm9ds1_acc_input_init(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_acc_input_init(struct lsm9ds1_acc_gyr_dev *dev)
 {
 	int err;
 
-	stat->input_dev_acc = input_allocate_device();
-	if (!stat->input_dev_acc) {
-		err = -ENOMEM;
-		dev_err(&stat->client->dev, "accelerometer "
-					"input device allocation failed\n");
-		return err;
+	dev->input_dev_acc = input_allocate_device();
+	if (!dev->input_dev_acc) {
+		dev_err(dev->dev, "acc input allocation failed\n");
+		return -ENOMEM;
 	}
 
-	stat->input_dev_acc->open = lsm9ds1_acc_input_open;
-	stat->input_dev_acc->close = lsm9ds1_acc_input_close;
-	stat->input_dev_acc->name = LSM9DS1_ACC_DEV_NAME;
-	stat->input_dev_acc->id.bustype = BUS_I2C;
-	stat->input_dev_acc->dev.parent = &stat->client->dev;
+	dev->input_dev_acc->name = LSM9DS1_ACC_DEV_NAME;
+	dev->input_dev_acc->id.bustype = dev->bus_type;
+	dev->input_dev_acc->dev.parent = dev->dev;
 
-	input_set_drvdata(stat->input_dev_acc, stat);
+	input_set_drvdata(dev->input_dev_acc, dev);
 
-	set_bit(EV_ABS, stat->input_dev_acc->evbit);
+	set_bit(INPUT_EVENT_TYPE, dev->input_dev_acc->evbit);
+	set_bit(INPUT_EVENT_X, dev->input_dev_acc->mscbit);
+	set_bit(INPUT_EVENT_Y, dev->input_dev_acc->mscbit);
+	set_bit(INPUT_EVENT_Z, dev->input_dev_acc->mscbit);
+	set_bit(INPUT_EVENT_TIME_MSB, dev->input_dev_acc->mscbit);
+	set_bit(INPUT_EVENT_TIME_LSB, dev->input_dev_acc->mscbit);
 
-	input_set_abs_params(stat->input_dev_acc, ABS_X, ACC_MAX_NEG,
-						ACC_MAX_POS, FUZZ, FLAT);
-	input_set_abs_params(stat->input_dev_acc, ABS_Y, ACC_MAX_NEG,
-						ACC_MAX_POS, FUZZ, FLAT);
-	input_set_abs_params(stat->input_dev_acc, ABS_Z,ACC_MAX_NEG,
-						ACC_MAX_POS, FUZZ, FLAT);
-
-	err = input_register_device(stat->input_dev_acc);
+	err = input_register_device(dev->input_dev_acc);
 	if (err) {
-		dev_err(&stat->client->dev,
+		dev_err(dev->dev,
 			"unable to register accelerometer input device %s\n",
-				stat->input_dev_acc->name);
-		input_free_device(stat->input_dev_acc);
+			dev->input_dev_acc->name);
+		input_free_device(dev->input_dev_acc);
 	}
 
 	return err;
 }
 
-static int lsm9ds1_gyr_input_init(struct lsm9ds1_acc_gyr_status *stat)
+static int lsm9ds1_gyr_input_init(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	int err = -1;
+	int err;
 
-	dev_dbg(&stat->client->dev, "%s\n", __func__);
-
-	stat->input_dev_gyr = input_allocate_device();
-	if (!stat->input_dev_gyr) {
-		err = -ENOMEM;
-		dev_err(&stat->client->dev,
-			"input device allocation failed\n");
-		return err;
+	dev->input_dev_gyr = input_allocate_device();
+	if (!dev->input_dev_gyr) {
+		dev_err(dev->dev, "input device allocation failed\n");
+		return -ENOMEM;
 	}
 
-	stat->input_dev_gyr->open = lsm9ds1_gyr_input_open;
-	stat->input_dev_gyr->close = lsm9ds1_gyr_input_close;
-	stat->input_dev_gyr->name = LSM9DS1_GYR_DEV_NAME;
-	stat->input_dev_gyr->id.bustype = BUS_I2C;
-	stat->input_dev_gyr->dev.parent = &stat->client->dev;
+	dev->input_dev_gyr->name = LSM9DS1_GYR_DEV_NAME;
+	dev->input_dev_gyr->id.bustype = dev->bus_type;
+	dev->input_dev_gyr->dev.parent = dev->dev;
 
-	input_set_drvdata(stat->input_dev_gyr, stat);
+	input_set_drvdata(dev->input_dev_gyr, dev);
 
-	set_bit(EV_ABS, stat->input_dev_gyr->evbit);
+	set_bit(INPUT_EVENT_TYPE, dev->input_dev_gyr->evbit);
+	set_bit(INPUT_EVENT_X, dev->input_dev_gyr->mscbit);
+	set_bit(INPUT_EVENT_Y, dev->input_dev_gyr->mscbit);
+	set_bit(INPUT_EVENT_Z, dev->input_dev_gyr->mscbit);
+	set_bit(INPUT_EVENT_TIME_MSB, dev->input_dev_gyr->mscbit);
+	set_bit(INPUT_EVENT_TIME_LSB, dev->input_dev_gyr->mscbit);
 
-	input_set_abs_params(stat->input_dev_gyr, ABS_X, GYR_MAX_NEG,
-							GYR_MAX_POS, 0, 0);
-	input_set_abs_params(stat->input_dev_gyr, ABS_Y, GYR_MAX_NEG,
-							GYR_MAX_POS, 0, 0);
-	input_set_abs_params(stat->input_dev_gyr, ABS_Z, GYR_MAX_NEG,
-							GYR_MAX_POS, 0, 0);
-
-
-	err = input_register_device(stat->input_dev_gyr);
+	err = input_register_device(dev->input_dev_gyr);
 	if (err) {
-		dev_err(&stat->client->dev,
+		dev_err(dev->dev,
 			"unable to register input device %s\n",
-			stat->input_dev_gyr->name);
-		input_free_device(stat->input_dev_gyr);
+			dev->input_dev_gyr->name);
+		input_free_device(dev->input_dev_gyr);
 	}
 
 	return err;
 }
-static void lsm9ds1_input_cleanup(struct lsm9ds1_acc_gyr_status *stat)
+static void lsm9ds1_input_cleanup(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	input_unregister_device(stat->input_dev_acc);
-	input_free_device(stat->input_dev_acc);
+	input_unregister_device(dev->input_dev_acc);
+	input_free_device(dev->input_dev_acc);
 
-	input_unregister_device(stat->input_dev_gyr);
-	input_free_device(stat->input_dev_gyr);
+	input_unregister_device(dev->input_dev_gyr);
+	input_free_device(dev->input_dev_gyr);
 }
 
 static ssize_t attr_set_polling_rate_acc(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long interval_ms;
 
 	if (strict_strtoul(buf, 10, &interval_ms))
@@ -1515,12 +1284,12 @@ static ssize_t attr_set_polling_rate_acc(struct kobject *kobj,
 		return -EINVAL;
 
 	interval_ms = (unsigned int)max((unsigned int)interval_ms,
-						stat->pdata_acc->min_interval);
+						dev->pdata_acc->min_interval);
 
-	mutex_lock(&stat->lock);
-	stat->pdata_acc->poll_interval = (unsigned int)interval_ms;
-	lsm9ds1_acc_update_odr(stat, interval_ms);
-	mutex_unlock(&stat->lock);
+	mutex_lock(&dev->lock);
+	dev->pdata_acc->poll_interval = (unsigned int)interval_ms;
+	lsm9ds1_acc_update_odr(dev, interval_ms);
+	mutex_unlock(&dev->lock);
 
 	return size;
 }
@@ -1530,12 +1299,12 @@ static ssize_t attr_get_polling_rate_acc(struct kobject *kobj,
 					char *buf)
 {
 	unsigned int val;
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 
-	mutex_lock(&stat->lock);
-	val = stat->pdata_acc->poll_interval;
-	mutex_unlock(&stat->lock);
+	mutex_lock(&dev->lock);
+	val = dev->pdata_acc->poll_interval;
+	mutex_unlock(&dev->lock);
 
 	return sprintf(buf, "%u\n", val);
 }
@@ -1544,10 +1313,10 @@ static ssize_t attr_get_enable_acc(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 
-	int val = (int)atomic_read(&stat->enabled_acc);
+	int val = (int)atomic_read(&dev->enabled_acc);
 
 	return sprintf(buf, "%d\n", val);
 }
@@ -1556,17 +1325,17 @@ static ssize_t attr_set_enable_acc(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long val;
 
 	if (strict_strtoul(buf, 10, &val))
 		return -EINVAL;
 
 	if (val)
-		lsm9ds1_acc_enable(stat);
+		lsm9ds1_acc_enable(dev);
 	else
-		lsm9ds1_acc_disable(stat);
+		lsm9ds1_acc_disable(dev);
 
 	return size;
 }
@@ -1575,14 +1344,14 @@ static ssize_t attr_get_range_acc(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
 {
-	struct device *dev = to_dev(kobj->parent);
+	struct device *device = to_dev(kobj->parent);
 	u8 val;
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	int range = 2;
 
-	mutex_lock(&stat->lock);
-	val = stat->pdata_acc->fs_range ;
-	mutex_unlock(&stat->lock);
+	mutex_lock(&dev->lock);
+	val = dev->pdata_acc->fs_range ;
+	mutex_unlock(&dev->lock);
 
 	switch (val) {
 	case LSM9DS1_ACC_FS_2G:
@@ -1603,8 +1372,8 @@ static ssize_t attr_set_range_acc(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long val;
 	u8 range;
 	int err;
@@ -1623,22 +1392,21 @@ static ssize_t attr_set_range_acc(struct kobject *kobj,
 		range = LSM9DS1_ACC_FS_8G;
 		break;
 	default:
-		dev_err(&stat->client->dev, "accelerometer invalid range "
+		dev_err(dev->dev, "accelerometer invalid range "
 					"request: %lu, discarded\n", val);
 		return -EINVAL;
 	}
 
-	mutex_lock(&stat->lock);
-	err = lsm9ds1_acc_update_fs_range(stat, range);
+	mutex_lock(&dev->lock);
+	err = lsm9ds1_acc_update_fs_range(dev, range);
 	if (err < 0) {
-		mutex_unlock(&stat->lock);
+		mutex_unlock(&dev->lock);
 		return err;
 	}
-	stat->pdata_acc->fs_range = range;
-	mutex_unlock(&stat->lock);
+	dev->pdata_acc->fs_range = range;
+	mutex_unlock(&dev->lock);
 
-	dev_info(&stat->client->dev, "accelerometer range set to:"
-							" %lu g\n", val);
+	dev_info(dev->dev, "accelerometer range set to %lu g\n", val);
 
 	return size;
 }
@@ -1647,14 +1415,14 @@ static ssize_t attr_get_aa_filter(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
 {
-	struct device *dev = to_dev(kobj->parent);
+	struct device *device = to_dev(kobj->parent);
 	u8 val;
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	int frequency = FILTER_408;
 
-	mutex_lock(&stat->lock);
-	val = stat->pdata_acc->aa_filter_bandwidth;
-	mutex_unlock(&stat->lock);
+	mutex_lock(&dev->lock);
+	val = dev->pdata_acc->aa_filter_bandwidth;
+	mutex_unlock(&dev->lock);
 
 	switch (val) {
 	case LSM9DS1_ACC_BW_50:
@@ -1678,8 +1446,8 @@ static ssize_t attr_set_aa_filter(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long val;
 	u8 frequency;
 	int err;
@@ -1701,21 +1469,21 @@ static ssize_t attr_set_aa_filter(struct kobject *kobj,
 		frequency = LSM9DS1_ACC_BW_408;
 		break;
 	default:
-		dev_err(&stat->client->dev, "accelerometer invalid filter "
+		dev_err(dev->dev, "accelerometer invalid filter "
 					"request: %lu, discarded\n", val);
 		return -EINVAL;
 	}
 
-	mutex_lock(&stat->lock);
-	err = lsm9ds1_acc_update_filter(stat, frequency);
+	mutex_lock(&dev->lock);
+	err = lsm9ds1_acc_update_filter(dev, frequency);
 	if (err < 0) {
-		mutex_unlock(&stat->lock);
+		mutex_unlock(&dev->lock);
 		return err;
 	}
-	stat->pdata_acc->aa_filter_bandwidth = frequency;
-	mutex_unlock(&stat->lock);
+	dev->pdata_acc->aa_filter_bandwidth = frequency;
+	mutex_unlock(&dev->lock);
 
-	dev_info(&stat->client->dev, "accelerometer anti-aliasing filter "
+	dev_info(dev->dev, "accelerometer anti-aliasing filter "
 					"set to: %lu Hz\n", val);
 
 	return size;
@@ -1726,12 +1494,12 @@ static ssize_t attr_get_polling_rate_gyr(struct kobject *kobj,
 					char *buf)
 {
 	int val;
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 
-	mutex_lock(&stat->lock);
-	val = stat->pdata_gyr->poll_interval;
-	mutex_unlock(&stat->lock);
+	mutex_lock(&dev->lock);
+	val = dev->pdata_gyr->poll_interval;
+	mutex_unlock(&dev->lock);
 
 	return sprintf(buf, "%d\n", val);
 }
@@ -1741,8 +1509,8 @@ static ssize_t attr_set_polling_rate_gyr(struct kobject *kobj,
 					const char *buf, size_t size)
 {
 	int err;
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long interval_ms;
 
 	if (strict_strtoul(buf, 10, &interval_ms))
@@ -1751,13 +1519,13 @@ static ssize_t attr_set_polling_rate_gyr(struct kobject *kobj,
 		return -EINVAL;
 	
 	interval_ms = (unsigned int)max((unsigned int)interval_ms,
-					stat->pdata_gyr->min_interval);
+					dev->pdata_gyr->min_interval);
 
-	mutex_lock(&stat->lock);
-	err = lsm9ds1_gyr_update_odr(stat, interval_ms);
+	mutex_lock(&dev->lock);
+	err = lsm9ds1_gyr_update_odr(dev, interval_ms);
 	if(err >= 0)
-		stat->pdata_gyr->poll_interval = interval_ms;
-	mutex_unlock(&stat->lock);
+		dev->pdata_gyr->poll_interval = interval_ms;
+	mutex_unlock(&dev->lock);
 
 	return size;
 }
@@ -1766,9 +1534,9 @@ static ssize_t attr_get_enable_gyr(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
-	int val = atomic_read(&stat->enabled_gyr);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
+	int val = atomic_read(&dev->enabled_gyr);
 
 	return sprintf(buf, "%d\n", val);
 }
@@ -1777,17 +1545,17 @@ static ssize_t attr_set_enable_gyr(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long val;
 
 	if (strict_strtoul(buf, 10, &val))
 		return -EINVAL;
 
 	if (val)
-		lsm9ds1_gyr_enable(stat);
+		lsm9ds1_gyr_enable(dev);
 	else
-		lsm9ds1_gyr_disable(stat);
+		lsm9ds1_gyr_disable(dev);
 
 	return size;
 }
@@ -1796,13 +1564,13 @@ static ssize_t attr_get_range_gyr(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					char *buf)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	int range = 0;
 	u8 val;
 
-	mutex_lock(&stat->lock);
-	val = stat->pdata_gyr->fs_range;
+	mutex_lock(&dev->lock);
+	val = dev->pdata_gyr->fs_range;
 	switch (val) {
 	case LSM9DS1_GYR_FS_245DPS:
 		range = RANGE_245DPS;
@@ -1814,7 +1582,7 @@ static ssize_t attr_get_range_gyr(struct kobject *kobj,
 		range = RANGE_2000DPS;
 		break;
 	}
-	mutex_unlock(&stat->lock);
+	mutex_unlock(&dev->lock);
 
 	return sprintf(buf, "%d\n", range);
 }
@@ -1823,8 +1591,8 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 					struct kobj_attribute *attr,
 					const char *buf, size_t size)
 {
-	struct device *dev = to_dev(kobj->parent);
-	struct lsm9ds1_acc_gyr_status *stat = dev_get_drvdata(dev);
+	struct device *device = to_dev(kobj->parent);
+	struct lsm9ds1_acc_gyr_dev *dev = dev_get_drvdata(device);
 	unsigned long val;
 	u8 range;
 	int err;
@@ -1843,18 +1611,18 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 		range = LSM9DS1_GYR_FS_2000DPS;
 		break;
 	default:
-		dev_err(&stat->client->dev, "invalid range request: %lu,"
+		dev_err(dev->dev, "invalid range request: %lu,"
 				" discarded\n", val);
 		return -EINVAL;
 	}
 
-	mutex_lock(&stat->lock);
-	err = lsm9ds1_gyr_update_fs_range(stat, range);
+	mutex_lock(&dev->lock);
+	err = lsm9ds1_gyr_update_fs_range(dev, range);
 	if (err >= 0)
-		stat->pdata_gyr->fs_range = range;
-	mutex_unlock(&stat->lock);
+		dev->pdata_gyr->fs_range = range;
+	mutex_unlock(&dev->lock);
 
-	dev_info(&stat->client->dev, "range set to: %lu dps\n", val);
+	dev_info(dev->dev, "range set to: %lu dps\n", val);
 
 	return size;
 }
@@ -1929,540 +1697,399 @@ static void remove_sysfs_interfaces(struct device *dev)
 	kobject_put(gyr_kobj);
 }
 
-static void poll_function_work_acc(struct work_struct *input_work_acc)
-{
-	struct lsm9ds1_acc_gyr_status *stat;
-	int xyz[3] = { 0 };
-	int err;
-
-	stat = container_of((struct work_struct *)input_work_acc,
-			struct lsm9ds1_acc_gyr_status, input_work_acc);
-
-	err = lsm9ds1_acc_get_data(stat, xyz);
-	if (err < 0)
-		dev_err(&stat->client->dev, "get accelerometer data failed\n");
-	else
-		lsm9ds1_acc_report_values(stat, xyz);
-
-	hrtimer_start(&stat->hr_timer_acc, stat->ktime_acc, HRTIMER_MODE_REL);
-}
-
-static void poll_function_work_gyr(struct work_struct *input_work_gyr)
-{
-	struct lsm9ds1_acc_gyr_status *stat;
-	int xyz[3] = { 0 };
-	int err;
-
-	stat = container_of((struct work_struct *)input_work_gyr,
-			struct lsm9ds1_acc_gyr_status, input_work_gyr);
-
-	err = lsm9ds1_gyr_get_data(stat, xyz);
-	if (err < 0)
-		dev_err(&stat->client->dev, "get gyroscope data failed.\n");
-	else
-		lsm9ds1_gyr_report_values(stat, xyz);
-
-	hrtimer_start(&stat->hr_timer_gyr, stat->ktime_gyr, HRTIMER_MODE_REL);
-}
-
 #ifdef CONFIG_OF
-static const struct of_device_id lsm9ds1_acc_gyr_dt_id[] = {
-	{.compatible = "st,lsm9ds1-acc-gyr",},
-	{},
-};
-MODULE_DEVICE_TABLE(of, lsm9ds1_acc_gyr_dt_id);
-
-static int lsm9ds1_acc_gyr_parse_dt(struct lsm9ds1_acc_gyr_status *stat,
-                                        struct device* dev)
+static int lsm9ds1_acc_gyr_parse_dt(struct lsm9ds1_acc_gyr_dev *dev,
+				    struct device* device)
 {
 	struct device_node *dn;
 	uint8_t i, j;
-	uint32_t val;
-	short vect[9];
+	uint32_t val, vect[9];
 
-	if (of_match_device(lsm9ds1_acc_gyr_dt_id, dev)) {
-		dn = dev->of_node;
-		stat->pdata_main->of_node = dn;
+	if (of_match_device(dev->acc_gyr_dt_id, device)) {
+		dn = device->of_node;
+		dev->pdata_main->of_node = dn;
 		
-		stat->pdata_main->gpio_int1 = of_get_gpio(dn, 0);
-		if (!gpio_is_valid(stat->pdata_main->gpio_int1)) {
-			dev_err(dev, "failed to get gpio_int1\n");
-
-			stat->pdata_main->gpio_int1 = LSM9DS1_INT1_GPIO_DEF;
-		}
-
-		stat->pdata_main->gpio_int2 = of_get_gpio(dn, 1);
-		if (!gpio_is_valid(stat->pdata_main->gpio_int2)) {
-			dev_err(dev, "failed to get gpio_int2\n");
-
-			stat->pdata_main->gpio_int2 = LSM9DS1_INT2_GPIO_DEF;
-		}
-
-		if (of_property_read_u16_array(dn, "rot-matrix", vect,
+		if (of_property_read_u32_array(dn, "rot-matrix", vect,
 			      ARRAY_SIZE(vect)) >= 0) {
 			for (j = 0; j < 3; j++) {
 				for (i = 0; i < 3; i++) {
-					stat->pdata_main->rot_matrix[i][j] =
+					dev->pdata_main->rot_matrix[i][j] =
 						(short)vect[3 * j + i];
 				}
 			}
 		} else {
 			for (j = 0; j < 3; j++) {
 				for (i = 0; i < 3; i++) {
-					stat->pdata_main->rot_matrix[i][j] =
+					dev->pdata_main->rot_matrix[i][j] =
 			default_lsm9ds1_main_platform_data.rot_matrix[i][j];
 				}
 			}
 		}
 
 		if (!of_property_read_u32(dn, "g-poll-interval", &val)) {
-			stat->pdata_gyr->poll_interval = val;
+			dev->pdata_gyr->poll_interval = val;
 		} else {
-			stat->pdata_gyr->poll_interval =
+			dev->pdata_gyr->poll_interval =
 				LSM9DS1_GYR_POLL_INTERVAL_DEF;
 		}
 
 		if (!of_property_read_u32(dn, "g-min-interval", &val)) {
-			stat->pdata_gyr->min_interval = val;
+			dev->pdata_gyr->min_interval = val;
 		} else {
-			stat->pdata_gyr->min_interval =
+			dev->pdata_gyr->min_interval =
 				LSM9DS1_GYR_MIN_POLL_PERIOD_MS;
 		}
 
 		if (!of_property_read_u32(dn, "g-fs-range", &val)) {
-			stat->pdata_gyr->fs_range = val;
+			dev->pdata_gyr->fs_range = val;
 		} else {
-			stat->pdata_gyr->fs_range = LSM9DS1_GYR_FS_245DPS;
+			dev->pdata_gyr->fs_range = LSM9DS1_GYR_FS_245DPS;
 		}
 
 		if (!of_property_read_u32(dn, "x-poll-interval", &val)) {
-			stat->pdata_acc->poll_interval = val;
+			dev->pdata_acc->poll_interval = val;
 		} else {
-			stat->pdata_acc->poll_interval =
+			dev->pdata_acc->poll_interval =
 				LSM9DS1_ACC_POLL_INTERVAL_DEF;
 		}
 
 		if (!of_property_read_u32(dn, "x-min-interval", &val)) {
-			stat->pdata_acc->min_interval = val;
+			dev->pdata_acc->min_interval = val;
 		} else {
-			stat->pdata_acc->min_interval =
+			dev->pdata_acc->min_interval =
 				LSM9DS1_ACC_MIN_POLL_PERIOD_MS;
 		}
 
 		if (!of_property_read_u32(dn, "x-fs-range", &val)) {
-			stat->pdata_acc->fs_range = val;
+			dev->pdata_acc->fs_range = val;
 		} else {
-			stat->pdata_acc->fs_range = LSM9DS1_ACC_FS_2G;
+			dev->pdata_acc->fs_range = LSM9DS1_ACC_FS_2G;
 		}
 
 		if (!of_property_read_u32(dn, "aa-filter-bw", &val)) {
-			stat->pdata_acc->fs_range = val;
+			dev->pdata_acc->fs_range = val;
 		} else {
-			stat->pdata_acc->fs_range = LSM9DS1_ACC_BW_408;
+			dev->pdata_acc->fs_range = LSM9DS1_ACC_BW_408;
 		}
 		return 0;
 	}
 	return -1;
 }
-#else
 #endif
 
-
-static int lsm9ds1_acc_gyr_probe(struct i2c_client *client,
-		const struct i2c_device_id *id)
+static irqreturn_t lsm9ds1_acc_gyr_save_timestamp(int irq, void *private)
 {
-	struct lsm9ds1_acc_gyr_status *stat;
-	int err = -1;
-	u32 smbus_func = I2C_FUNC_SMBUS_BYTE_DATA |
-			I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_I2C_BLOCK;
+	struct lsm9ds1_acc_gyr_dev *dev;
 
-	dev_info(&client->dev, "probe start.\n");
-	stat = kzalloc(sizeof(struct lsm9ds1_acc_gyr_status), GFP_KERNEL);
-	if (stat == NULL) {
-		err = -ENOMEM;
-		dev_err(&client->dev,
-				"failed to allocate memory for module data: "
-					"%d\n", err);
-		goto exit_check_functionality_failed;
-	}
+	dev = (struct lsm9ds1_acc_gyr_dev *)private;
 
-	stat->use_smbus = 0;
-	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		dev_warn(&client->dev, "client not i2c capable\n");
-		if (i2c_check_functionality(client->adapter, smbus_func)){
-			stat->use_smbus = 1;
-			dev_warn(&client->dev, "client using SMBUS\n");
-		} else {
-			err = -ENODEV;
-			dev_err(&client->dev, "client nor SMBUS capable\n");
-			goto exit_check_functionality_failed;
+	disable_irq_nosync(irq);
+
+	dev->timestamp = lsm9ds1_get_time_ns();
+
+	return IRQ_WAKE_THREAD;
+}
+
+static irqreturn_t lsm9ds1_acc_gyr_thread_fn(int irq, void *private)
+{
+	u8 data;
+	irqreturn_t ret = IRQ_NONE;
+	struct lsm9ds1_acc_gyr_dev *dev;
+
+	dev = (struct lsm9ds1_acc_gyr_dev *)private;
+
+	if (dev->tf->read(dev->dev, status_registers.status_reg1.address, 1,
+			  &data) < 0)
+		goto out;
+
+	if (data & 0x01) {
+		int xyz[3] = {}, err;
+
+		err = lsm9ds1_acc_get_data(dev, xyz);
+		if (err < 0) {
+			dev_err(dev->dev, "get accelerometer data failed\n");
+		} else if (++dev->acc_skip_cnt >= dev->acc_dec_cnt) {
+			lsm9ds1_acc_report_values(dev, xyz, dev->timestamp);
+			dev->acc_skip_cnt = 0;
 		}
+		ret = IRQ_HANDLED;
 	}
 
-	if(lsm9ds1_acc_gyr_workqueue == 0)
-		lsm9ds1_acc_gyr_workqueue = 
-			create_workqueue("lsm9ds1_acc_gyr_workqueue");
+	if (data & 0x02) {
+		int xyz[3] = {}, err;
 
-	hrtimer_init(&stat->hr_timer_acc, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	stat->hr_timer_acc.function = &poll_function_read_acc;
-	hrtimer_init(&stat->hr_timer_gyr, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-	stat->hr_timer_gyr.function = &poll_function_read_gyr;
+		err = lsm9ds1_gyr_get_data(dev, xyz);
+		if (err < 0) {
+			dev_err(dev->dev, "get gyroscope data failed.\n");
+		} else if (++dev->gyr_skip_cnt >= dev->gyr_dec_cnt) {
+			lsm9ds1_gyr_report_values(dev, xyz, dev->timestamp);
+			dev->gyr_skip_cnt = 0;
+		}
+		ret = IRQ_HANDLED;
+	}
 
-	mutex_init(&stat->lock);
-	mutex_lock(&stat->lock);
-	stat->client = client;
-	i2c_set_clientdata(client, stat);
+out:
+	enable_irq(irq);
+	return ret;
+}
 
-	stat->pdata_main = kzalloc(sizeof(*stat->pdata_main), GFP_KERNEL);
-	stat->pdata_acc = kzalloc(sizeof(*stat->pdata_acc), GFP_KERNEL);
-	stat->pdata_gyr = kzalloc(sizeof(*stat->pdata_gyr), GFP_KERNEL);
+int lsm9ds1_acc_gyr_probe(struct lsm9ds1_acc_gyr_dev *dev, int irq)
+{
+	int err;
 
-	if ((stat->pdata_main == NULL) || (stat->pdata_acc == NULL) ||
-						  (stat->pdata_gyr == NULL)){
+	mutex_lock(&dev->lock);
+
+	err = lsm9ds1_acc_gyr_check_whoami(dev);
+	if (err < 0) {
+		mutex_unlock(&dev->lock);
+		return err;
+	}
+
+	dev->pdata_main = kzalloc(sizeof(*dev->pdata_main), GFP_KERNEL);
+	dev->pdata_acc = kzalloc(sizeof(*dev->pdata_acc), GFP_KERNEL);
+	dev->pdata_gyr = kzalloc(sizeof(*dev->pdata_gyr), GFP_KERNEL);
+
+	if ((dev->pdata_main == NULL) || (dev->pdata_acc == NULL) ||
+	    (dev->pdata_gyr == NULL)){
 		err = -ENOMEM;
-		dev_err(&client->dev,
+		dev_err(dev->dev,
 			"failed to allocate memory for pdata: %d\n", err);
 		goto err_mutexunlock;
 	}
-	stat->pdata_main->pdata_acc = stat->pdata_acc;
-	stat->pdata_main->pdata_gyr = stat->pdata_gyr;
+	dev->pdata_main->pdata_acc = dev->pdata_acc;
+	dev->pdata_main->pdata_gyr = dev->pdata_gyr;
 #ifdef CONFIG_OF
-	lsm9ds1_acc_gyr_parse_dt(stat, &client->dev);
+	lsm9ds1_acc_gyr_parse_dt(dev, dev->dev);
 #else
-	if (client->dev.platform_data == NULL) {
-		memcpy(stat->pdata_main, 
+	if (dev->dev->platform_data == NULL) {
+		memcpy(dev->pdata_main, 
 				&default_lsm9ds1_main_platform_data,
-				sizeof(*stat->pdata_main));
-		memcpy(stat->pdata_acc, &default_lsm9ds1_acc_pdata,
-						sizeof(*stat->pdata_acc));
-		memcpy(stat->pdata_gyr, &default_lsm9ds1_gyr_pdata,
-						sizeof(*stat->pdata_gyr));
-		dev_info(&client->dev, "using default plaform_data for "
+				sizeof(*dev->pdata_main));
+		memcpy(dev->pdata_acc, &default_lsm9ds1_acc_pdata,
+						sizeof(*dev->pdata_acc));
+		memcpy(dev->pdata_gyr, &default_lsm9ds1_gyr_pdata,
+						sizeof(*dev->pdata_gyr));
+		dev_info(dev->dev, "using default plaform_data for "
 					"accelerometer and gyroscope\n");
 	} else {
 		struct lsm9ds1_acc_gyr_main_platform_data *platform_data;
-		platform_data = client->dev.platform_data;
+		platform_data = dev->dev->platform_data;
 
 		if(platform_data == NULL) {
-			memcpy(stat->pdata_main,
+			memcpy(dev->pdata_main,
 				&default_lsm9ds1_main_platform_data,
-				sizeof(*stat->pdata_main));
-			dev_info(&client->dev, "using default plaform_data"
+				sizeof(*dev->pdata_main));
+			dev_info(dev->dev, "using default plaform_data"
 							" for accelerometer\n");
 		} else {
-			memcpy(stat->pdata_main, platform_data,
-						sizeof(*stat->pdata_acc));
+			memcpy(dev->pdata_main, platform_data,
+						sizeof(*dev->pdata_acc));
 		}
 
 		if(platform_data->pdata_acc == NULL) {
-			memcpy(stat->pdata_acc, &default_lsm9ds1_acc_pdata,
-						sizeof(*stat->pdata_acc));
-			dev_info(&client->dev, "using default plaform_data"
+			memcpy(dev->pdata_acc, &default_lsm9ds1_acc_pdata,
+						sizeof(*dev->pdata_acc));
+			dev_info(dev->dev, "using default plaform_data"
 							" for accelerometer\n");
 		} else {
-			memcpy(stat->pdata_acc, platform_data->pdata_acc,
-						sizeof(*stat->pdata_acc));
+			memcpy(dev->pdata_acc, platform_data->pdata_acc,
+						sizeof(*dev->pdata_acc));
 		}
 
 		if(platform_data->pdata_gyr == NULL) {
-			memcpy(stat->pdata_gyr, &default_lsm9ds1_gyr_pdata,
-						sizeof(*stat->pdata_gyr));
-			dev_info(&client->dev, "using default plaform_data"
+			memcpy(dev->pdata_gyr, &default_lsm9ds1_gyr_pdata,
+						sizeof(*dev->pdata_gyr));
+			dev_info(dev->dev, "using default plaform_data"
 							" for gyroscope\n");
 		} else {
-			memcpy(stat->pdata_gyr, platform_data->pdata_gyr,
-						sizeof(*stat->pdata_gyr));
+			memcpy(dev->pdata_gyr, platform_data->pdata_gyr,
+						sizeof(*dev->pdata_gyr));
 		}
 	}
 #endif
 
-	err = lsm9ds1_acc_validate_pdata(stat);
+	err = lsm9ds1_acc_validate_pdata(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "failed to validate platform data for "
+		dev_err(dev->dev, "failed to validate platform data for "
 							"accelerometer \n");
 		goto exit_kfree_pdata;
 	}
 
-	err = lsm9ds1_gyr_validate_pdata(stat);
+	err = lsm9ds1_gyr_validate_pdata(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "failed to validate platform data for "
+		dev_err(dev->dev, "failed to validate platform data for "
 							"gyroscope\n");
 		goto exit_kfree_pdata;
 	}
 
-	if (stat->pdata_acc->init) {
-		err = stat->pdata_acc->init();
+	if (dev->pdata_acc->init) {
+		err = dev->pdata_acc->init();
 		if (err < 0) {
-			dev_err(&client->dev, "accelerometer init failed: "
+			dev_err(dev->dev, "accelerometer init failed: "
 								"%d\n", err);
 			goto err_pdata_acc_init;
 		}
 	}
-	if (stat->pdata_gyr->init) {
-		err = stat->pdata_gyr->init();
+	if (dev->pdata_gyr->init) {
+		err = dev->pdata_gyr->init();
 		if (err < 0) {
-			dev_err(&client->dev, "magnetometer init failed: "
+			dev_err(dev->dev, "magnetometer init failed: "
 								"%d\n", err);
 			goto err_pdata_gyr_init;
 		}
 	}
 
-	if(stat->pdata_main->gpio_int1 >= 0) {
-		if (!gpio_is_valid(stat->pdata_main->gpio_int1)) {
-  			dev_err(&client->dev, "The requested GPIO [%d] is not "
-				"available\n", stat->pdata_main->gpio_int1);
-			err = -EINVAL;
-  			goto err_gpio1_valid;
-		}
-
-		err = gpio_request(stat->pdata_main->gpio_int1,
-						"INTERRUPT_PIN1_LSM9DS1");
-		if(err < 0) {
-			dev_err(&client->dev, "Unable to request GPIO [%d].\n",
-						stat->pdata_main->gpio_int1);
-  			err = -EINVAL;
-			goto err_gpio1_valid;
-		}
-		gpio_direction_input(stat->pdata_main->gpio_int1);
-		stat->irq1 = gpio_to_irq(stat->pdata_main->gpio_int1);
-		if(stat->irq1 < 0) {
-			dev_err(&client->dev, "GPIO [%d] cannot be used as "
-				"interrupt.\n",	stat->pdata_main->gpio_int1);
-			err = -EINVAL;
-			goto err_gpio1_irq;
-		}
-		pr_info("%s: %s has set irq1 to irq: %d, mapped on gpio:%d\n",
-			LSM9DS1_ACC_GYR_DEV_NAME, __func__, stat->irq1,
-						stat->pdata_main->gpio_int1);
-	}
-
-	if(stat->pdata_main->gpio_int2 >= 0) {
-		if (!gpio_is_valid(stat->pdata_main->gpio_int2)) {
-  			dev_err(&client->dev, "The requested GPIO [%d] is not "
-				"available\n", stat->pdata_main->gpio_int2);
-			err = -EINVAL;
-  			goto err_gpio2_valid;
-		}
-
-		err = gpio_request(stat->pdata_main->gpio_int2,
-						"INTERRUPT_PIN2_LSM9DS1");
-		if(err < 0) {
-			dev_err(&client->dev, "Unable to request GPIO [%d].\n",
-						stat->pdata_main->gpio_int2);
-  			err = -EINVAL;
-			goto err_gpio2_valid;
-		}
-		gpio_direction_input(stat->pdata_main->gpio_int2);
-		stat->irq2 = gpio_to_irq(stat->pdata_main->gpio_int2);
-		if(stat->irq2 < 0) {
-			dev_err(&client->dev, "GPIO [%d] cannot be used as "
-				"interrupt.\n", stat->pdata_main->gpio_int2);
-			err = -EINVAL;
-			goto err_gpio2_irq;
-		}
-		pr_info("%s: %s has set irq2 to irq: %d, "
-							"mapped on gpio:%d\n",
-			LSM9DS1_ACC_GYR_DEV_NAME, __func__, stat->irq2,
-						stat->pdata_main->gpio_int2);
-	}
-
-	err = lsm9ds1_acc_gyr_hw_init(stat);
+	err = lsm9ds1_acc_gyr_hw_init(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "hw init failed: %d\n", err);
+		dev_err(dev->dev, "hw init failed: %d\n", err);
 		goto err_hw_init;
 	}
 
-	err = lsm9ds1_acc_device_power_on(stat);
+	err = lsm9ds1_acc_device_power_on(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "accelerometer power on failed: "
+		dev_err(dev->dev, "accelerometer power on failed: "
 								"%d\n", err);
 		goto err_pdata_init;
 	}
 
-	err = lsm9ds1_gyr_device_power_on(stat);
+	err = lsm9ds1_gyr_device_power_on(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "gyroscope power on failed: "
+		dev_err(dev->dev, "gyroscope power on failed: "
 								"%d\n", err);
 		goto err_pdata_init;
 	}
 
-	err = lsm9ds1_acc_update_fs_range(stat, stat->pdata_acc->fs_range);
+	err = lsm9ds1_acc_update_fs_range(dev, dev->pdata_acc->fs_range);
 	if (err < 0) {
-		dev_err(&client->dev, "update accelerometer full scale range "
+		dev_err(dev->dev, "update accelerometer full scale range "
 								"failed\n");
 		goto  err_power_off_acc;
 	}
 
-	err = lsm9ds1_gyr_update_fs_range(stat, stat->pdata_gyr->fs_range);
+	err = lsm9ds1_gyr_update_fs_range(dev, dev->pdata_gyr->fs_range);
 	if (err < 0) {
-		dev_err(&client->dev, "update gyroscope full scale range "
+		dev_err(dev->dev, "update gyroscope full scale range "
 								"failed\n");
 		goto  err_power_off_gyr;
 	}
 
-	err = lsm9ds1_acc_update_odr(stat, stat->pdata_acc->poll_interval);
+	err = lsm9ds1_acc_update_odr(dev, dev->pdata_acc->poll_interval);
 	if (err < 0) {
-		dev_err(&client->dev, "update accelerometer ODR failed\n");
+		dev_err(dev->dev, "update accelerometer ODR failed\n");
 		goto  err_power_off;
 	}
 
-	err = lsm9ds1_gyr_update_odr(stat, stat->pdata_gyr->poll_interval);
+	err = lsm9ds1_gyr_update_odr(dev, dev->pdata_gyr->poll_interval);
 	if (err < 0) {
-		dev_err(&client->dev, "update gyroscope ODR failed\n");
+		dev_err(dev->dev, "update gyroscope ODR failed\n");
 		goto  err_power_off;
 	}
 
-	err = lsm9ds1_acc_update_filter(stat, 
-					stat->pdata_acc->aa_filter_bandwidth);
+	err = lsm9ds1_acc_update_filter(dev, 
+					dev->pdata_acc->aa_filter_bandwidth);
 	if (err < 0) {
-		dev_err(&client->dev, "update accelerometer filter "
+		dev_err(dev->dev, "update accelerometer filter "
 								"failed\n");
 		goto  err_power_off;
 	}
 
-	err = lsm9ds1_acc_input_init(stat);
+	err = lsm9ds1_acc_input_init(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "accelerometer input init failed\n");
+		dev_err(dev->dev, "accelerometer input init failed\n");
 		goto err_power_off;
 	}
 
-	err = lsm9ds1_gyr_input_init(stat);
+	err = lsm9ds1_gyr_input_init(dev);
 	if (err < 0) {
-		dev_err(&client->dev, "gyroscope input init failed\n");
+		dev_err(dev->dev, "gyroscope input init failed\n");
 		goto err_power_off;
 	}
 
-	err = create_sysfs_interfaces(&client->dev);
+	err = create_sysfs_interfaces(dev->dev);
 	if (err < 0) {
-		dev_err(&client->dev, "device %s sysfs register failed\n",
+		dev_err(dev->dev, "device %s sysfs register failed\n",
 			LSM9DS1_ACC_GYR_DEV_NAME);
 		goto err_input_cleanup;
 	}
 
-	lsm9ds1_acc_device_power_off(stat);
-	lsm9ds1_gyr_device_power_off(stat);
-	mutex_unlock(&stat->lock);
+	lsm9ds1_acc_device_power_off(dev);
+	lsm9ds1_gyr_device_power_off(dev);
 
-	INIT_WORK(&stat->input_work_acc, poll_function_work_acc);
-	INIT_WORK(&stat->input_work_gyr, poll_function_work_gyr);
+	if (irq > 0) {
+		dev->irq = irq;
+		err = request_threaded_irq(irq, lsm9ds1_acc_gyr_save_timestamp,
+					   lsm9ds1_acc_gyr_thread_fn,
+					   IRQF_TRIGGER_HIGH, dev->name, dev);
+		if (err)
+			return err;
 
-	dev_info(&client->dev, "%s: probed\n", LSM9DS1_ACC_GYR_DEV_NAME);
+		disable_irq(irq);
+	} else {
+		dev_err(dev->dev, "%s: missing IRQ line\n", __func__);
+		err = -EINVAL;
+		goto err_input_cleanup;
+	}
+
+	mutex_unlock(&dev->lock);
+
+	dev_info(dev->dev, "%s: probed\n", LSM9DS1_ACC_GYR_DEV_NAME);
 	return 0;
 
 err_input_cleanup:
-	lsm9ds1_input_cleanup(stat);
+	lsm9ds1_input_cleanup(dev);
 err_power_off:
 err_power_off_gyr:
-	lsm9ds1_gyr_device_power_off(stat);
+	lsm9ds1_gyr_device_power_off(dev);
 err_power_off_acc:
-	lsm9ds1_acc_device_power_off(stat);
+	lsm9ds1_acc_device_power_off(dev);
 err_hw_init:
-err_gpio2_irq:
-	gpio_free(stat->pdata_main->gpio_int2);
-err_gpio2_valid:
-err_gpio1_irq:
-	gpio_free(stat->pdata_main->gpio_int1);
-err_gpio1_valid:
 err_pdata_init:
 err_pdata_gyr_init:
-	if (stat->pdata_gyr->exit)
-		stat->pdata_gyr->exit();
+	if (dev->pdata_gyr->exit)
+		dev->pdata_gyr->exit();
 err_pdata_acc_init:
-	if (stat->pdata_acc->exit)
-		stat->pdata_acc->exit();
+	if (dev->pdata_acc->exit)
+		dev->pdata_acc->exit();
 exit_kfree_pdata:
-	kfree(stat->pdata_acc);
-	kfree(stat->pdata_gyr);
+	kfree(dev->pdata_acc);
+	kfree(dev->pdata_gyr);
 err_mutexunlock:
-	mutex_unlock(&stat->lock);
-	kfree(stat);
-	if(!lsm9ds1_acc_gyr_workqueue) {
-		flush_workqueue(lsm9ds1_acc_gyr_workqueue);
-		destroy_workqueue(lsm9ds1_acc_gyr_workqueue);
-	}
-exit_check_functionality_failed:
-	dev_err(&stat->client->dev,"%s: Driver Init failed\n",
-						LSM9DS1_ACC_GYR_DEV_NAME);
+	mutex_unlock(&dev->lock);
+
 	return err;
 }
+EXPORT_SYMBOL(lsm9ds1_acc_gyr_probe);
 
-static int lsm9ds1_acc_gyr_remove(struct i2c_client *client)
+int lsm9ds1_acc_gyr_remove(struct lsm9ds1_acc_gyr_dev *dev)
 {
-	struct lsm9ds1_acc_gyr_status *stat = i2c_get_clientdata(client);
+	if (atomic_read(&dev->enabled_gyr)) {
+		lsm9ds1_gyr_disable(dev);
+		lsm9ds1_gyr_input_cleanup(dev);
 
-	if (atomic_read(&stat->enabled_gyr)) {
-		lsm9ds1_gyr_disable(stat);
-		lsm9ds1_gyr_input_cleanup(stat);
-
-		if (stat->pdata_gyr->exit)
-			stat->pdata_gyr->exit();
+		if (dev->pdata_gyr->exit)
+			dev->pdata_gyr->exit();
 	}
 
-	lsm9ds1_acc_disable(stat);
-	lsm9ds1_acc_input_cleanup(stat);
+	lsm9ds1_acc_disable(dev);
+	lsm9ds1_acc_input_cleanup(dev);
 
-	remove_sysfs_interfaces(&client->dev);
+	remove_sysfs_interfaces(dev->dev);
 
-	if (stat->pdata_acc->exit)
-		stat->pdata_acc->exit();
+	if (dev->pdata_acc->exit)
+		dev->pdata_acc->exit();
 
-	if(stat->pdata_main->gpio_int1 >= 0) {
-		free_irq(stat->irq1, stat);
-		gpio_free(stat->pdata_main->gpio_int1);
-		destroy_workqueue(stat->irq1_work_queue);
-	}
+	kfree(dev->pdata_acc);
+	kfree(dev->pdata_gyr);
+	kfree(dev->pdata_main);
 
-	if(stat->pdata_main->gpio_int2 >= 0) {
-		free_irq(stat->irq2, stat);
-		gpio_free(stat->pdata_main->gpio_int2);
-		destroy_workqueue(stat->irq2_work_queue);
-	}
-
-	if(!lsm9ds1_acc_gyr_workqueue) {
-		flush_workqueue(lsm9ds1_acc_gyr_workqueue);
-		destroy_workqueue(lsm9ds1_acc_gyr_workqueue);
-	}
-
-	kfree(stat->pdata_acc);
-	kfree(stat->pdata_gyr);
-	kfree(stat->pdata_main);
-	kfree(stat);
 	return 0;
 }
-
-static const struct i2c_device_id lsm9ds1_acc_gyr_id[]
-				= { { LSM9DS1_ACC_GYR_DEV_NAME, 0 }, { }, };
-
-MODULE_DEVICE_TABLE(i2c, lsm9ds1_acc_gyr_id);
-
-static struct i2c_driver lsm9ds1_acc_gyr_driver = {
-	.driver = {
-			.owner = THIS_MODULE,
-			.name = LSM9DS1_ACC_GYR_DEV_NAME,
-#ifdef CONFIG_OF
-			.of_match_table = 
-				of_match_ptr(lsm9ds1_acc_gyr_dt_id),
-#endif
-		  },
-	.probe = lsm9ds1_acc_gyr_probe,
-	.remove = lsm9ds1_acc_gyr_remove,
-	.id_table = lsm9ds1_acc_gyr_id,
-};
-
-static int __init lsm9ds1_acc_gyr_init(void)
-{
-	return i2c_add_driver(&lsm9ds1_acc_gyr_driver);
-}
-
-static void __exit lsm9ds1_acc_gyr_exit(void)
-{
-	i2c_del_driver(&lsm9ds1_acc_gyr_driver);
-}
-
-module_init(lsm9ds1_acc_gyr_init);
-module_exit(lsm9ds1_acc_gyr_exit);
+EXPORT_SYMBOL(lsm9ds1_acc_gyr_remove);
 
 MODULE_DESCRIPTION("lsm9ds1 accelerometer and gyroscope driver");
-MODULE_AUTHOR("Giuseppe Barba, Matteo Dameno, Denis Ciocca,"
-							" STMicroelectronics");
-MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Giuseppe Barba");
+MODULE_AUTHOR("Matteo Dameno");
+MODULE_AUTHOR("Denis Ciocca");
+MODULE_AUTHOR("Lorenzo Bianconi");
+MODULE_AUTHOR("STMicroelectronics");
+MODULE_LICENSE("GPL v2");

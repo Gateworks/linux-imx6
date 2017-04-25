@@ -70,3 +70,5 @@ obj-$(CONFIG_INPUT_ISL29023)            += isl29023.o
 obj-$(CONFIG_INPUT_MPL3115)		+= mpl3115.o
 obj-$(CONFIG_SENSOR_FXLS8471)       	+= fxls8471.o fxls8471_i2c.o
 obj-$(CONFIG_INPUT_LSM9DS1)		+= lsm9ds1_mag.o lsm9ds1_acc_gyr.o
+obj-$(CONFIG_INPUT_LSM9DS1_I2C)		+= lsm9ds1_mag_i2c.o lsm9ds1_acc_gyr_i2c.o
+obj-$(CONFIG_INPUT_LSM9DS1_SPI)		+= lsm9ds1_mag_spi.o lsm9ds1_acc_gyr_spi.o
