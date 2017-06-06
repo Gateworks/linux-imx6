@@ -1713,6 +1713,9 @@ static ssize_t b_show(struct device *dev, struct device_attribute *attr,
 		}
 		rz = sprintf(buf, "%s\n", sname);
 	}
+	else if (strcasecmp(name, "vidout_fmt") == 0)
+		rz = sprintf(buf, "%s\n",
+			     vidfmt_names[tda1997x->pdata->vidout_format]);
 	else if (strcasecmp(name, "vidmode") == 0) {
 		if (tda1997x->state == STATE_LOCKED) {
 			rz = sprintf(buf, "%dx%d%c@%dHz\n",
@@ -1792,6 +1795,8 @@ static ssize_t b_store(struct device *dev, struct device_attribute *attr,
  */
 static struct device_attribute attr_state =
 	__ATTR(state, 0660, b_show, b_store);
+static struct device_attribute attr_vidout_fmt =
+	__ATTR(vidout_fmt, 0660, b_show, NULL);
 static struct device_attribute attr_vidmode =
 	__ATTR(vidmode, 0660, b_show, NULL);
 static struct device_attribute attr_audmode =
@@ -1811,6 +1816,7 @@ static struct device_attribute attr_reg =
 
 static struct attribute *tda1997x_attrs[] = {
 	&attr_state.attr,
+	&attr_vidout_fmt.attr,
 	&attr_vidmode.attr,
 	&attr_audmode.attr,
 	&attr_vendor.attr,
