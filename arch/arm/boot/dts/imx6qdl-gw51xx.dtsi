@@ -140,14 +140,47 @@
 		pagesize = <16>;
 	};
 
-	gpio: pca9555@23 {
+	gsc: gsc@20 {
+		compatible = "gw,gsc";
+		reg = <0x20>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_gsc>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <4 GPIO_ACTIVE_LOW>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		/* GSC watchdog */
+		watchdog {
+			compatible = "gw,gsc_wdt";
+			status = "okay";
+		};
+
+		/* Linux input events from GSC interrupt events */
+		input {
+			compatible = "gw,gsc_input";
+			interrupt-parent = <&gsc>;
+			interrupts = <0 1 2 5 7>;
+			interrupt-names = "button", "key-erased", "eeprom-wp", "tamper", "button-held";
+			status = "okay";
+		};
+	};
+
+	gsc_gpio: pca9555@23 {
 		compatible = "nxp,pca9555";
 		reg = <0x23>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		interrupt-parent = <&gsc>;
+		interrupts = <4>;
 	};
 
-	rtc: ds1672@68 {
+	gsc_hwmon: hwmon@29 {
+		compatible = "gw,gsc_hwmon";
+		reg = <0x29>;
+	};
+
+	gsc_rtc: ds1672@68 {
 		compatible = "dallas,ds1672";
 		reg = <0x68>;
 	};
@@ -282,6 +315,12 @@
 				MX6QDL_PAD_NANDF_D5__NAND_DATA05	0xb0b1
 				MX6QDL_PAD_NANDF_D6__NAND_DATA06	0xb0b1
 				MX6QDL_PAD_NANDF_D7__NAND_DATA07	0xb0b1
+			>;
+		};
+
+		pinctrl_gsc: gscgrp {
+			fsl,pins = <
+				MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x1b0b0
 			>;
 		};
 
