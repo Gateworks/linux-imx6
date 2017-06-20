@@ -59,6 +59,19 @@
 		};
 	};
 
+	gpio_keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		user_pb {
+			label = "user_pb";
+
+			gpios = <&gsc_gpio 0 GPIO_ACTIVE_LOW>;
+			linux,code = <256>;
+		};
+	};
+
 	memory {
 		reg = <0x10000000 0x20000000>;
 	};
