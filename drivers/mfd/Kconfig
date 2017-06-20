@@ -335,6 +335,20 @@ config MFD_MX25_TSADC
 	  i.MX25 processors. They consist of a conversion queue for general
 	  purpose ADC and a queue for Touchscreens.
 
+config GSC_CORE
+	tristate "Gateworks System Controller Support"
+	depends on I2C
+	select MFD_CORE
+	select GENERIC_IRQ_CHIP
+	select IRQ_DOMAIN
+	help
+	  Say yes here for support of Gateworks System Controller. This is a
+	  system management IC. This driver provides support for accessing
+	  various features of the device.
+
+	  This driver can be built as a module. If built as a module it will
+	  be called "gsc"
+
 config MFD_HI6421_PMIC
 	tristate "HiSilicon Hi6421 PMU/Codec IC"
 	depends on OF
