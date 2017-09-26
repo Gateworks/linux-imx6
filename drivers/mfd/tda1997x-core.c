@@ -2958,8 +2958,11 @@ tda1997x_detect_resolution(struct tda1997x_data *tda1997x)
 					tda1997x->resolutiontype = RESTYPE_PC;
 			}
 
-			printk(KERN_INFO "%s: matched resolution: %dx%d%c@%d %s\n",
-				KBUILD_MODNAME, res->width, res->height,
+			printk(KERN_INFO "%s: matched resolution: for %d/%d/%d "
+				"timings: %dx%d%c@%d %s\n",
+				KBUILD_MODNAME,
+				verticalPeriod, horizontalPeriod, hsWidth,
+				res->width, res->height,
 				res->interlaced?'i':'p',
 				res->horizfreq,
 				restype_names[tda1997x->resolutiontype]);
