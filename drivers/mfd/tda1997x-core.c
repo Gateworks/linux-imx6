@@ -1192,7 +1192,7 @@ int tda1997x_cec_write(u8 reg, u8 val)
 	struct tda1997x_data *tda1997x = &tda1997x_data;
 	int ret = 0;
 
-	mutex_unlock(&tda1997x->cec_lock);
+	mutex_lock(&tda1997x->cec_lock);
 	ret = i2c_smbus_write_byte_data(tda1997x_data.client_cec, reg, val);
 	if (ret < 0) {
 		dev_dbg(&tda1997x_data.client_cec->dev,
