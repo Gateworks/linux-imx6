@@ -1628,14 +1628,14 @@ static ssize_t attr_set_range_gyr(struct kobject *kobj,
 }
 
 static struct kobj_attribute poll_attr_acc =
-	__ATTR(pollrate_ms, 0664, attr_get_polling_rate_acc, 
+	__ATTR(pollrate_ms, 0666, attr_get_polling_rate_acc,
 						attr_set_polling_rate_acc);
 static struct kobj_attribute enable_attr_acc =
-	__ATTR(enable_device, 0664, attr_get_enable_acc, attr_set_enable_acc);
+	__ATTR(enable_device, 0666, attr_get_enable_acc, attr_set_enable_acc);
 static struct kobj_attribute fs_attr_acc =
-	__ATTR(range, 0664, attr_get_range_acc, attr_set_range_acc);
+	__ATTR(range, 0666, attr_get_range_acc, attr_set_range_acc);
 static struct kobj_attribute aa_filter_attr  =
-	__ATTR(anti_aliasing_frequency, 0664, attr_get_aa_filter, 
+	__ATTR(anti_aliasing_frequency, 0666, attr_get_aa_filter,
 							attr_set_aa_filter);
 static struct kobj_attribute poll_attr_gyr =
 	__ATTR(pollrate_ms, 0666, attr_get_polling_rate_gyr, 
