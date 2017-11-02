@@ -235,7 +235,7 @@
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_imu_mag>;
 		gpios = <&gpio1 2 GPIO_ACTIVE_LOW>; /* IRQ */
-		rot-matrix = /bits/ 16 <(1) (0) (0)
+		rot-matrix = <(1) (0) (0)
 			(0) (1) (0)
 			(0) (0) (1)>;
 		poll-interval = <100>;
@@ -251,7 +251,7 @@
 		pinctrl-0 = <&pinctrl_imu_acc>;
 		interrupt-parent = <&gpio7>;
 		interrupts = <13 IRQ_TYPE_EDGE_RISING>;
-		rot-matrix = /bits/ 16 <(1) (0) (0)
+		rot-matrix = <(1) (0) (0)
 			(0) (1) (0)
 			(0) (0) (1)>;
 		g-poll-interval = <100>;
