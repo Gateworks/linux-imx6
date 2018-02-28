@@ -6782,6 +6782,9 @@ S:	Maintained
 F:	Documentation/devicetree/bindings/mfd/gateworks-gsc.yaml
 F:	drivers/mfd/gateworks-gsc.c
 F:	include/linux/mfd/gsc.h
+F:	Documentation/hwmon/gsc-hwmon.rst
+F:	drivers/hwmon/gsc-hwmon.c
+F:	include/linux/platform_data/gsc_hwmon.h
 
 GCC PLUGINS
 M:	Kees Cook <keescook@chromium.org>
