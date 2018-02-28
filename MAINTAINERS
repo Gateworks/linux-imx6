@@ -6775,6 +6775,14 @@ F:	tools/testing/selftests/futex/
 F:	tools/perf/bench/futex*
 F:	Documentation/*futex*
 
+GATEWORKS SYSTEM CONTROLLER (GSC) DRIVER
+M:	Tim Harvey <tharvey@gateworks.com>
+M:	Robert Jones <rjones@gateworks.com>
+S:	Maintained
+F:	Documentation/devicetree/bindings/mfd/gateworks-gsc.yaml
+F:	drivers/mfd/gateworks-gsc.c
+F:	include/linux/mfd/gsc.h
+
 GCC PLUGINS
 M:	Kees Cook <keescook@chromium.org>
 R:	Emese Revfy <re.emese@gmail.com>
