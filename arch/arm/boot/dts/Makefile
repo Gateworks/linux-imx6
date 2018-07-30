@@ -163,6 +163,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6dl-gw553x.dtb \
 	imx6dl-gw560x.dtb \
 	imx6dl-gw5904.dtb \
+	imx6dl-gw5905.dtb \
 	imx6dl-hummingboard.dtb \
 	imx6dl-sabreauto.dtb \
 	imx6dl-sabreauto-flexcan1.dtb \
@@ -186,6 +187,7 @@ dtb-$(CONFIG_ARCH_MXC) += \
 	imx6q-gw553x.dtb \
 	imx6q-gw560x.dtb \
 	imx6q-gw5904.dtb \
+	imx6q-gw5905.dtb \
 	imx6q-phytec-pbab01.dtb \
 	imx6q-sabreauto.dtb \
 	imx6q-sabreauto-flexcan1.dtb \
