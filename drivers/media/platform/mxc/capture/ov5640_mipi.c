@@ -2011,7 +2011,7 @@ static int ov5640_probe(struct i2c_client *client,
 		/* assuming clock enabled by default */
 		ov5640_data.sensor_clk = NULL;
 		dev_err(dev, "clock-frequency missing or invalid\n");
-		return PTR_ERR(ov5640_data.sensor_clk);
+		return -EPROBE_DEFER;
 	}
 
 	retval = of_property_read_u32(dev->of_node, "mclk",
