@@ -40,14 +40,6 @@
 		default-brightness-level = <94>;
 	};
 
-	clock {
-		compatible = "pwm-clock";
-		#clock-cells = <0>;
-		clock-frequency = <25000000>;
-		clock-output-names = "mipi_mclk";
-		pwms = <&pwm2 0 40>; /* 1/40ns = 25MHz */
-	};
-
 	gpio-button {
 		compatible = "gpio-keys";
 		#address-cells = <1>;
@@ -133,6 +125,14 @@
 		};
 	};
 
+	mipi_xclk: mipi_xclk {
+		compatible = "pwm-clock";
+		#clock-cells = <0>;
+		clock-frequency = <25000000>;
+		clock-output-names = "mipi_pwm2";
+		pwms = <&pwm2 0 40>; /* 1/40ns = 25MHz */
+	};
+
 	sound {
 		compatible = "fsl,imx-audio-tlv320";
 		model = "imx-tlv320";
@@ -157,6 +157,14 @@
 		default_bpp = <24>;
 		int_clk = <0>;
 		late_init = <0>;
+		status = "okay";
+	};
+
+	v4l2_cap_0 {
+		compatible = "fsl,imx6q-v4l2-capture";
+		ipu_id = <0>;
+		csi_id = <0>;
+		mclk_source = <0>;
 		status = "okay";
 	};
 
@@ -439,23 +447,21 @@
 		ti,micbias = <4>; /* 2.5V micbias */
 	};
 
-	ov5640_mipi: ov5640_mipi@3c {
-		compatible = "ovti,ov5640_mipi";
+	ov5640_mipi: camera@3c {
+		compatible = "ovti,ov564x_mipi";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_camera>;
 		reg = <0x3c>;
-		clocks = <&clks IMX6QDL_CLK_CKO>;
-		clock-names = "mipi_mclk";
+		clocks = <&mipi_xclk>;
+		clock-names = "csi_mclk";
 		DOVDD-supply = <&reg_1p8v>;
 		AVDD-supply = <&reg_2p5v>;
 		DVDD-supply = <&reg_2p5v>;
-		pwn-gpios = <&gpio1 14 GPIO_ACTIVE_HIGH>;
-		rst-gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-		csi_id = <1>;
-/* needed?
-		mclk = <25000000>;
+		pwn-gpios = <&gpio1 14 0>;
+		rst-gpios = <&gpio1 15 1>;
+		csi_id = <0>;
+		mclk = <24000000>;
 		mclk_source = <0>;
-*/
 	};
 };
 
@@ -491,7 +497,7 @@
 &mipi_csi {
 	status = "okay";
 	ipu_id = <0>;
-	csi_id = <1>;
+	csi_id = <0>;
 	v_channel = <0>;
 	lanes = <2>;
 };
