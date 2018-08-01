@@ -273,6 +273,18 @@
 		fs-range = <0>;
 	};
 
+	fusb302@0x24 {
+		compatible = "fcs,fusb302";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_usbpd>;
+		reg = <0x24>;
+		interrupt-parent = <&gpio4>;
+		interrupts = <10 IRQ_TYPE_EDGE_FALLING>;
+		fcs,max-sink-microvolt = <20000000>;
+		fcs,max-sink-microamp = <3000000>;
+		fcs,max-sink-microwatt = <60000000>;
+	};
+
 	/* LSM9DS1 accelerometer/gyroscope sensor */
 	lsm9ds1-ag@0x6a {
 		compatible = "st,lsm9ds1_acc_gyr";
@@ -721,6 +733,12 @@
 		pinctrl_usbh1: usbh1grp {
 			fsl,pins = <
 				MX6QDL_PAD_EIM_D31__GPIO3_IO31		0x1b0b1
+			>;
+		};
+
+		pinctrl_usbpd: usbpdgrp {
+			fsl,pins = <
+				MX6QDL_PAD_KEY_COL2__GPIO4_IO10		0x1b0b0
 			>;
 		};
 
