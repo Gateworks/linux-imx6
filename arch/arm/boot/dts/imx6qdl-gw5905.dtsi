@@ -25,7 +25,7 @@
 		compatible = "pwm-backlight";
 		pwms = <&pwm1 0 5000000>;
 		brightness-levels = <
-			0  /*1  2  3  4  5  6*/  7  8  9
+			0  1  2  3  4  5  6  7  8  9
 			10 11 12 13 14 15 16 17 18 19
 			20 21 22 23 24 25 26 27 28 29
 			30 31 32 33 34 35 36 37 38 39
@@ -37,7 +37,7 @@
 			90 91 92 93 94 95 96 97 98 99
 			100
 			>;
-		default-brightness-level = <94>;
+		default-brightness-level = <100>;
 	};
 
 	gpio-button {
@@ -75,6 +75,7 @@
 			gpios = <&gpio6 14 GPIO_ACTIVE_HIGH>;
 			linux,default-trigger = "heartbeat";
 		};
+
 		led3: user4 {
 			label = "flash1";
 			gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
@@ -137,7 +138,7 @@
 		compatible = "fsl,imx-audio-tlv320";
 		model = "imx-tlv320";
 		cpu-dai = <&ssi1>;
-		audio-codec = <&codec>;
+		audio-codec = <&tlv320aic3105>;
 		/* routing of sink, source */
 		audio-routing =
 			"LINE1L", "Mic Jack",
@@ -261,7 +262,7 @@
 };
 
 &i2c2 {
-	clock-frequency = <100000>;
+	clock-frequency = <400000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c2>;
 	status = "okay";
@@ -313,7 +314,7 @@
 		aa-filter-bw = <0>;
 	};
 
-	pmic: ltc3676@3c {
+	ltc3676: pmic@3c {
 		compatible = "lltc,ltc3676";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_pmic>;
@@ -395,7 +396,7 @@
 };
 
 &i2c3 {
-	clock-frequency = <100000>;
+	clock-frequency = <400000>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_i2c3>;
 	status = "okay";
@@ -412,23 +413,14 @@
 		int-gpio = <&gpio4 6 GPIO_ACTIVE_LOW>;
 	};
 
-	codec: tlv320aic3105@18 {
+	tlv320aic3105: codec@18 {
 		compatible = "ti,tlv320aic3x";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_tlv320>;
 		reg = <0x18>;
 		gpio-reset = <&gpio5 17 GPIO_ACTIVE_LOW>;
-#if 1
 		clocks = <&clks IMX6QDL_CLK_CKO>;
-#else
-		clocks = <&clks IMX6QDL_CLK_CKO1>;
-		/*clock-names = "csi_mclk";*/
-		mclk = <24000000>;
-		mclk_source = <0>;
-#endif
 		ai3x-micbias-vg = <2>; /* MICBIAS_2_5V */
-		status = "okay";
-
 		/* Regulators */
 		DRVDD-supply = <&reg_3p3v>;
 		AVDD-supply = <&reg_3p3v>;
