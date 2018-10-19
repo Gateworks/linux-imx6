@@ -6,6 +6,7 @@ imx-media-ic-objs := imx-ic-common.o imx-ic-prp.o imx-ic-prpencvf.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-common.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-capture.o
+obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-mem2mem.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-vdic.o
 obj-$(CONFIG_VIDEO_IMX_MEDIA) += imx-media-ic.o
 

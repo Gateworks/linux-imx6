@@ -318,6 +318,17 @@ static int imx_media_probe_complete(struct v4l2_async_notifier *notifier)
 		goto unlock;
 
 	ret = v4l2_device_register_subdev_nodes(&imxmd->v4l2_dev);
+	if (ret)
+		goto unlock;
+
+	/* TODO: check whether we have IC subdevices first */
+	imxmd->m2m_vdev = imx_media_mem2mem_device_init(imxmd);
+	if (IS_ERR(imxmd->m2m_vdev)) {
+		ret = PTR_ERR(imxmd->m2m_vdev);
+		goto unlock;
+	}
+
+	ret = imx_media_mem2mem_device_register(imxmd->m2m_vdev);
 unlock:
 	mutex_unlock(&imxmd->mutex);
 	if (ret)

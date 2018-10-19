@@ -149,6 +149,9 @@ struct imx_media_dev {
 
 	/* for async subdev registration */
 	struct v4l2_async_notifier notifier;
+
+	/* IC scaler/CSC mem2mem video device */
+	struct imx_media_video_dev *m2m_vdev;
 };
 
 enum codespace_sel {
@@ -261,6 +264,13 @@ imx_media_capture_device_next_buf(struct imx_media_video_dev *vdev);
 void imx_media_capture_device_set_format(struct imx_media_video_dev *vdev,
 					 struct v4l2_pix_format *pix);
 void imx_media_capture_device_error(struct imx_media_video_dev *vdev);
+
+/* imx-media-mem2mem.c */
+struct imx_media_video_dev *
+imx_media_mem2mem_device_init(struct imx_media_dev *dev);
+void imx_media_mem2mem_device_remove(struct imx_media_video_dev *vdev);
+int imx_media_mem2mem_device_register(struct imx_media_video_dev *vdev);
+void imx_media_mem2mem_device_unregister(struct imx_media_video_dev *vdev);
 
 /* subdev group ids */
 #define IMX_MEDIA_GRP_ID_CSI2      BIT(8)
