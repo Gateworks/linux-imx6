@@ -544,6 +544,19 @@ void imx_media_fill_default_mbus_fields(struct v4l2_mbus_framefmt *tryfmt,
 	if (tryfmt->field == V4L2_FIELD_ANY)
 		tryfmt->field = fmt->field;
 
+	if (ic_route) {
+		if (tryfmt->colorspace == V4L2_COLORSPACE_DEFAULT)
+			tryfmt->colorspace = fmt->colorspace;
+
+		tryfmt->quantization = is_rgb ?
+			V4L2_QUANTIZATION_FULL_RANGE :
+			V4L2_QUANTIZATION_LIM_RANGE;
+
+		if (tryfmt->ycbcr_enc != V4L2_YCBCR_ENC_601 &&
+		    tryfmt->ycbcr_enc != V4L2_YCBCR_ENC_709)
+			tryfmt->ycbcr_enc = V4L2_YCBCR_ENC_601;
+	}
+
 	/* fill colorimetry if necessary */
 	if (tryfmt->colorspace == V4L2_COLORSPACE_DEFAULT) {
 		tryfmt->colorspace = fmt->colorspace;
@@ -565,13 +578,6 @@ void imx_media_fill_default_mbus_fields(struct v4l2_mbus_framefmt *tryfmt,
 					is_rgb, tryfmt->colorspace,
 					tryfmt->ycbcr_enc);
 		}
-	}
-
-	if (ic_route) {
-		tryfmt->quantization = is_rgb ?
-			V4L2_QUANTIZATION_FULL_RANGE :
-			V4L2_QUANTIZATION_LIM_RANGE;
-		tryfmt->ycbcr_enc = V4L2_YCBCR_ENC_601;
 	}
 }
 EXPORT_SYMBOL_GPL(imx_media_fill_default_mbus_fields);
