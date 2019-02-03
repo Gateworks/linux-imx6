@@ -183,11 +183,13 @@ struct ic_csc_params {
 };
 
 /*
+ * BT.601 encoding from RGB full range to YUV limited range:
+ *
  * Y = R *  .299 + G *  .587 + B *  .114;
  * U = R * -.169 + G * -.332 + B *  .500 + 128.;
  * V = R *  .500 + G * -.419 + B * -.0813 + 128.;
  */
-static const struct ic_csc_params ic_csc_rgb2ycbcr = {
+static const struct ic_csc_params ic_csc_rgb2ycbcr_bt601 = {
 	.coeff = {
 		{ 77, 150, 29 },
 		{ 469, 427, 128 },
@@ -208,11 +210,13 @@ static const struct ic_csc_params ic_csc_rgb2rgb = {
 };
 
 /*
+ * Inverse BT.601 encoding from YUV limited range to RGB full range:
+ *
  * R = (1.164 * (Y - 16)) + (1.596 * (Cr - 128));
  * G = (1.164 * (Y - 16)) - (0.392 * (Cb - 128)) - (0.813 * (Cr - 128));
  * B = (1.164 * (Y - 16)) + (2.017 * (Cb - 128);
  */
-static const struct ic_csc_params ic_csc_ycbcr2rgb = {
+static const struct ic_csc_params ic_csc_ycbcr2rgb_bt601 = {
 	.coeff = {
 		{ 149, 0, 204 },
 		{ 149, 462, 408 },
@@ -238,9 +242,9 @@ static int init_csc(struct ipu_ic *ic,
 		(priv->tpmem_base + ic->reg->tpmem_csc[csc_index]);
 
 	if (inf == IPUV3_COLORSPACE_YUV && outf == IPUV3_COLORSPACE_RGB)
-		params = &ic_csc_ycbcr2rgb;
+		params = &ic_csc_ycbcr2rgb_bt601;
 	else if (inf == IPUV3_COLORSPACE_RGB && outf == IPUV3_COLORSPACE_YUV)
-		params = &ic_csc_rgb2ycbcr;
+		params = &ic_csc_rgb2ycbcr_bt601;
 	else if (inf == IPUV3_COLORSPACE_RGB && outf == IPUV3_COLORSPACE_RGB)
 		params = &ic_csc_rgb2rgb;
 	else {
