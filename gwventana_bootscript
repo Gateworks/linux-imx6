@@ -145,6 +145,9 @@ fi
 # setup bootargs
 setenv bootargs "console=${console},${baudrate} ${root} ${video} ${extra}"
 
+# additional bootargs
+setenv bootargs "${bootargs} pci=nomsi" # MSI+legacy IRQs do not work on IMX6
+
 # Gateworks kernels do not need ramdisk
 setenv rd_addr
 
