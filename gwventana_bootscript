@@ -145,6 +145,9 @@ fi
 # setup bootargs
 setenv bootargs "console=${console},${baudrate} ${root} ${video} ${extra}"
 
+# Gateworks kernels do not need ramdisk
+setenv rd_addr
+
 # load fdt/kernel/ramdisk
 echo "Loading FDT..."
 $fsload $fdt_addr boot/$fdt_file ||
