@@ -27,7 +27,7 @@ setexpr rd_addr $linux_addr + 0x4000000 # allow 64MB for kernel
 if test -z "${mem}" ; then
   # CMA used by etnaviv display driver and coda VPU driver
   # specific requirements depend on display res and encode/decode res
-  setenv mem "cma=64M"
+  setenv mem "cma=64M coherent_pool=32M"
   echo "Detected ${mem_mb}MB DRAM: $mem" 
 fi
 if itest.s "x${mem}" == "xNA" ; then
