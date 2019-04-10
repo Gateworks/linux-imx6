@@ -152,7 +152,7 @@
 	lis2de12@19 {
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_accel>;
-		compatible = "st,lis2dh12-accel", "st,lis2de12-accel";
+		compatible = "st,lis2de12";
 		reg = <0x19>;
 		st,drdy-int-pin = <1>;
                 interrupt-parent = <&gpio7>;
