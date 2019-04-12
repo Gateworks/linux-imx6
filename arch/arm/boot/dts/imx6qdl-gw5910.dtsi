@@ -17,6 +17,19 @@
 		stdout-path = &uart2;
 	};
 
+	gpio_keys {
+		compatible = "gpio-keys";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		eeprom_wp {
+			label = "eeprom_wp";
+			linux,code = <258>; /* BTN_2 */
+			interrupt-parent = <&gsc>;
+			interrupts = <2>;
+		};
+	};
+
 	memory@10000000 {
 		device_type = "memory";
 		reg = <0x10000000 0x20000000>;
@@ -99,6 +112,113 @@
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
 
+	gsc: gsc@20 {
+		compatible = "gw,gsc-v3";
+		reg = <0x20>;
+		interrupt-parent = <&gpio1>;
+		interrupts = <4 1>;
+		interrupt-controller;
+		#interrupt-cells = <1>;
+
+		gsc_hwmon {
+			compatible = "gw,gsc-hwmon";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			hwmon@6 {
+				type = "gw,hwmon-temperature";
+				reg = <0x06>;
+				label = "temp";
+			};
+
+			hwmon@8 {
+				type = "gw,hwmon-voltage";
+				reg = <0x08>;
+				label = "vdd_bat";
+			};
+
+			hwmon@82 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x82>;
+				label = "vdd_vin";
+				gw,voltage-divider = <22100 1000>;
+				gw,voltage-offset = <800>;
+			};
+
+			hwmon@84 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x84>;
+				label = "vdd_5p0";
+				gw,voltage-divider = <22100 10000>;
+			};
+
+			hwmon@86 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x86>;
+				label = "vdd_3p3";
+				gw,voltage-divider = <10000 10000>;
+			};
+
+			hwmon@88 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x88>;
+				label = "vdd_2p5";
+				gw,voltage-divider = <10000 10000>;
+			};
+
+			hwmon@8c {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x8c>;
+				label = "vdd_high";
+				gw,voltage-divider = <10000 10000>;
+			};
+
+			hwmon@8e {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x8e>;
+				label = "vdd_arm";
+			};
+
+			hwmon@90 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x90>;
+				label = "vdd_soc";
+			};
+
+			hwmon@92 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x92>;
+				label = "vdd_ddr";
+			};
+
+			hwmon@98 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x98>;
+				label = "vdd_1p8";
+			};
+
+			hwmon@9a {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x9a>;
+				label = "vdd_1p0";
+			};
+
+			hwmon@9c {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0x9c>;
+				label = "vdd_an1";
+				gw,voltage-divider = <10000 10000>;
+			};
+
+			hwmon@a2 {
+				type = "gw,hwmon-voltage-raw";
+				reg = <0xa2>;
+				label = "vdd_gsc";
+				gw,voltage-divider = <10000 10000>;
+			};
+		};
+	};
+
 	eeprom1: eeprom@50 {
 		compatible = "atmel,24c02";
 		reg = <0x50>;
@@ -123,11 +243,13 @@
 		pagesize = <16>;
 	};
 
-	gpio: pca9555@23 {
+	gsc_gpio: pca9555@23 {
 		compatible = "nxp,pca9555";
 		reg = <0x23>;
 		gpio-controller;
 		#gpio-cells = <2>;
+		interrupt-parent = <&gsc>;
+		interrupts = <4>;
 	};
 
 	rtc: ds1672@68 {
@@ -299,6 +421,7 @@
 		fsl,pins = <
 			MX6QDL_PAD_EIM_D21__I2C1_SCL		0x4001b8b1
 			MX6QDL_PAD_EIM_D28__I2C1_SDA		0x4001b8b1
+			MX6QDL_PAD_GPIO_4__GPIO1_IO04		0x0001b0b0 /* GSC_IRQ# */
 		>;
 	};
 
