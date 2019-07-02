@@ -83,6 +83,19 @@
 		regulator-max-microvolt = <5000000>;
 		regulator-always-on;
 	};
+
+	reg_bt: regulator-bt {
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_reg_bt>;
+		compatible = "regulator-fixed";
+		regulator-name = "bt";
+		gpio = <&gpio1 2 GPIO_ACTIVE_HIGH>;
+		startup-delay-us = <100>;
+		enable-active-high;
+		regulator-min-microvolt = <3300000>;
+		regulator-max-microvolt = <3300000>;
+		regulator-always-on;
+	};
 };
 
 
@@ -316,6 +329,14 @@
 	status = "okay";
 };
 
+/* Sterling-LSB Bluetooth */
+&uart4 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&pinctrl_uart4>;
+	uart-has-rtscts;
+	status = "okay";
+};
+
 /* GPS */
 &uart5 {
 	pinctrl-names = "default";
@@ -486,6 +507,15 @@
 		fsl,pins = <
 			MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA	0x1b0b1
 			MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA	0x1b0b1
+		>;
+	};
+
+	pinctrl_uart4: uart4grp {
+		fsl,pins = <
+			MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA	0x1b0b1
+			MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA	0x1b0b1
+			MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B	0x1b0b1
+			MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B	0x1b0b1
 		>;
 	};
 
