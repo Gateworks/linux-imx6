@@ -555,6 +555,19 @@
 				hsync-len = <60>;
 				vsync-len = <10>;
 				linux,phandle = <&timing2>;
+
+			timing3: dlc0700xdp21lf {
+				clock-frequency = <65000000>;
+				hactive = <1024>;
+				vactive = <600>;
+				hback-porch = <180>;
+				hfront-porch = <40>;
+				vback-porch = <21>;
+				vfront-porch = <7>;
+				hsync-len = <60>;
+				vsync-len = <10>;
+				linux,phandle = <&timing3>;
+			};
 			};
 		};
 	};
