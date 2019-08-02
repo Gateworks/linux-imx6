@@ -231,82 +231,86 @@
 			#size-cells = <0>;
 
 			hwmon@0 {
-				type = <0>;
+				type = "gw,hwmon-temperature";
 				reg = <0x00>;
 				label = "temp";
 			};
 
 			hwmon@2 {
-				type = <2>;
+				type = "gw,hwmon-voltage";
 				reg = <0x02>;
 				label = "vdd_vin";
 			};
 
 			hwmon@5 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x05>;
 				label = "vdd_3p3";
 			};
 
 			hwmon@8 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x08>;
 				label = "vdd_bat";
 			};
 
 			hwmon@b {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x0b>;
 				label = "vdd_5p0";
 			};
 
 			hwmon@e {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0xe>;
 				label = "vdd_arm";
 			};
 
 			hwmon@11 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x11>;
 				label = "vdd_soc";
 			};
 
 			hwmon@14 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x14>;
 				label = "vdd_3p0";
 			};
 
 			hwmon@17 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x17>;
 				label = "vdd_1p5";
 			};
 
 			hwmon@1d {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x1d>;
 				label = "vdd_1p8";
 			};
 
 			hwmon@20 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x20>;
 				label = "vdd_1p0";
 			};
 
 			hwmon@23 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x23>;
 				label = "vdd_2p5";
 			};
 
 			hwmon@29 {
-				type = <1>;
+				type = "gw,hwmon-voltage";
 				reg = <0x29>;
 				label = "vdd_an1";
 			};
+		};
+
+		gsc_watchdog {
+			compatible = "gw,gsc-watchdog";
 		};
 	};
 
