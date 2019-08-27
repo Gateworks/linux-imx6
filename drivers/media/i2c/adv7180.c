@@ -94,6 +94,7 @@
 #define ADV7180_REG_SHAP_FILTER_CTL_1	0x0017
 #define ADV7180_REG_CTRL_2		0x001d
 #define ADV7180_REG_VSYNC_FIELD_CTL_1	0x0031
+#define ADV7180_VSYNC_FIELD_CTL_1_NEWAV 0x12
 #define ADV7180_REG_MANUAL_WIN_CTL_1	0x003d
 #define ADV7180_REG_MANUAL_WIN_CTL_2	0x003e
 #define ADV7180_REG_MANUAL_WIN_CTL_3	0x003f
@@ -935,10 +936,20 @@ static int adv7182_init(struct adv7180_state *state)
 		adv7180_write(state, ADV7180_REG_EXTENDED_OUTPUT_CONTROL, 0x57);
 		adv7180_write(state, ADV7180_REG_CTRL_2, 0xc0);
 	} else {
-		if (state->chip_info->flags & ADV7180_FLAG_V2)
+		if (state->chip_info->flags & ADV7180_FLAG_V2) {
+			/* ITU-R BT.656-4 compatible */
 			adv7180_write(state,
 				      ADV7180_REG_EXTENDED_OUTPUT_CONTROL,
-				      0x17);
+				      ADV7180_EXTENDED_OUTPUT_CONTROL_NTSCDIS);
+			/* Manually set NEWAVMODE */
+			adv7180_write(state,
+				      ADV7180_REG_VSYNC_FIELD_CTL_1,
+				      ADV7180_VSYNC_FIELD_CTL_1_NEWAV);
+			/* Manually set V bit end position in NTSC mode */
+			adv7180_write(state,
+				      ADV7180_REG_NTSC_V_BIT_END,
+				      ADV7180_NTSC_V_BIT_END_MANUAL_NVEND);
+		}
 		else
 			adv7180_write(state,
 				      ADV7180_REG_EXTENDED_OUTPUT_CONTROL,
