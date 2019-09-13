@@ -970,24 +970,31 @@ static int enable_edo_mode(struct gpmi_nand_data *this, int mode)
 	if (!feature)
 		return -ENOMEM;
 
-	nand->select_chip(mtd, 0);
+	/* Only try to set/get features if this ONFI NAND supports it.
+           If SET_GET_FEATURES is not supported, skip it,
+	   and just set the host timing. */
+	if (le16_to_cpu(nand->onfi_params.opt_cmd)
+	    & ONFI_OPT_CMD_SET_GET_FEATURES) {
 
-	/* [1] send SET FEATURE commond to NAND */
-	feature[0] = mode;
-	ret = nand->onfi_set_features(mtd, nand,
-				ONFI_FEATURE_ADDR_TIMING_MODE, feature);
-	if (ret)
-		goto err_out;
+		nand->select_chip(mtd, 0);
 
-	/* [2] send GET FEATURE command to double-check the timing mode */
-	memset(feature, 0, ONFI_SUBFEATURE_PARAM_LEN);
-	ret = nand->onfi_get_features(mtd, nand,
-				ONFI_FEATURE_ADDR_TIMING_MODE, feature);
-	if (ret || feature[0] != mode)
-		goto err_out;
+		/* [1] send SET FEATURE commond to NAND */
+		feature[0] = mode;
+		ret = nand->onfi_set_features(mtd, nand,
+					ONFI_FEATURE_ADDR_TIMING_MODE, feature);
+		if (ret)
+			goto err_out;
 
-	nand->select_chip(mtd, -1);
+		/* [2] send GET FEATURE command to double-check the timing mode */
+		memset(feature, 0, ONFI_SUBFEATURE_PARAM_LEN);
+		ret = nand->onfi_get_features(mtd, nand,
+					ONFI_FEATURE_ADDR_TIMING_MODE, feature);
+		if (ret || feature[0] != mode)
+			goto err_out;
 
+		nand->select_chip(mtd, -1);
+
+	}
 	pm_runtime_get_sync(this->dev);
 	clk_disable_unprepare(r->clock[0]);
 	/* [3] set the main IO clock, 100MHz for mode 5, 80MHz for mode 4. */
