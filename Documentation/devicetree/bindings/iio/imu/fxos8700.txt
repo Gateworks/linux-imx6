@@ -1,0 +1,15 @@
+Freescale FXOS8700 - Inertial Measurement Unit with Accelerometer and Magnetometer
+
+https://www.nxp.com/products/sensors/motion-sensors/6-axis/digital-motion-sensor-3d-accelerometer-2g-4g-8g-plus-3d-magnetometer:FXOS8700CQ
+
+Required properties:
+ - compatible : must be "fsl,fxos8700"
+ - reg : the I2C address or SPI chip select number of the device
+ - spi-max-frequency : set maximum clock frequency (only for SPI)
+
+Example:
+
+bmi160@1e {
+	compatible = "fsl,fxos8700";
+	reg = <0x1e>;
+};
