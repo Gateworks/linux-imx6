@@ -128,7 +128,12 @@ if itest.s "x${dtype}" == "xnand" ; then
   setenv fsload "ubifsload"
 elif itest.s "x${dtype}" == "xmmc" ; then
   echo "Booting from MMC..."
-  setenv root "root=/dev/mmcblk0p1 rootwait"
+  part uuid mmc 0:1 uuid
+  if test -z "${uuid}" ; then
+     setenv root "root=/dev/mmcblk0p1 rootwait"
+  else
+     setenv root "root=PARTUUID=${uuid} rootwait"
+  fi
   setenv fsload "ext4load $dtype 0:1"
   setenv rd_addr # ramdisk not needed for IMX6 MMC
 elif itest.s "x${dtype}" == "xusb" ; then
