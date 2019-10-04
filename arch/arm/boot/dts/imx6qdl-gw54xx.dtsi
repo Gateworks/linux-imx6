@@ -506,6 +506,11 @@
 		VDDIO-supply = <&reg_3p3v>;
 	};
 
+	fxos8700@1e {
+		compatible = "nxp,fxos8700";
+		reg = <0x1e>;
+	};
+
 	touchscreen: egalax_ts@4 {
 		compatible = "eeti,egalax_ts";
 		reg = <0x04>;
