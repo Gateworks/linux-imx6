@@ -15,7 +15,7 @@
 # if 'mem' is not set, it will be automatically allocated
 #
 
-echo "Gateworks Ubuntu Bootscript v1.21"
+echo "Gateworks Ubuntu Bootscript v1.22"
 
 # calculate load addresses based off of loadaddr as the base
 # and allow 128KB for FDT and 64MB for kernel
@@ -27,7 +27,8 @@ setexpr rd_addr $linux_addr + 0x4000000 # allow 64MB for kernel
 if test -z "${mem}" ; then
   # CMA used by etnaviv display driver and coda VPU driver
   # specific requirements depend on display res and encode/decode res
-  setenv mem "cma=64M coherent_pool=32M"
+  # coherent_pool is used by various drivers such as ath10k
+  setenv mem "cma=64M coherent_pool=4M"
   echo "Detected ${mem_mb}MB DRAM: $mem" 
 fi
 if itest.s "x${mem}" == "xNA" ; then
