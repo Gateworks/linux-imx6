@@ -11,10 +11,13 @@
  */
 
 #include <linux/module.h>
+#include <linux/gpio.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
 #include <linux/i2c.h>
 #include <linux/clk.h>
+#include <linux/notifier.h>
+#include <linux/of_gpio.h>
 #include <sound/jack.h>
 #include <sound/soc.h>
 
@@ -31,13 +34,68 @@ struct imx_tlv320_data {
 	char platform_name[DAI_NAME_SIZE];
 	struct clk *codec_clk;
 	unsigned int clk_frequency;
+	int gpio_spkr_en;
 };
 
 static struct snd_soc_jack headset_jack;
 
+static struct snd_soc_jack_pin imx_headset_jack_pins[] = {
+	{
+		.pin = "Headphone Jack",
+		.mask = SND_JACK_HEADPHONE,
+	},
+	{
+		.pin = "Mic Jack",
+		.mask = SND_JACK_MICROPHONE,
+	},
+};
+
 static struct snd_soc_aux_dev imx_tlv320_headset_dev = {
 	.name = "Headset Chip",
 	.codec_name = "ts3a227e.2-003b",
+};
+
+static int imx_headset_jack_event(struct notifier_block *nb,
+		unsigned long event, void *data)
+{
+	struct snd_soc_jack *jack = (struct snd_soc_jack *)data;
+	struct snd_soc_dapm_context *dapm = &jack->codec->dapm;
+	struct device *dev = jack->codec->card->dev;
+
+	/* Change audio routing according to headphone in/out */
+	if (event & SND_JACK_HEADPHONE) {
+		dev_info(dev, "headphone in\n");
+		snd_soc_dapm_enable_pin(dapm, "Headphone Jack");
+		snd_soc_dapm_disable_pin(dapm, "Int Spk");
+		snd_soc_dapm_sync(dapm);
+	} else {
+		dev_info(dev, "headphone out\n");
+		snd_soc_dapm_enable_pin(dapm, "Int Spk");
+		snd_soc_dapm_disable_pin(dapm, "Headphone Jack");
+		snd_soc_dapm_sync(dapm);
+	}
+
+	return 0;
+}
+
+static int imx_tlv320_spk(struct snd_soc_dapm_widget *w,
+			  struct snd_kcontrol *ctrl, int event)
+{
+	struct snd_soc_dapm_context *dapm = w->dapm;
+	struct snd_soc_card *card = dapm->card;
+	struct imx_tlv320_data *imx_tlv320 = snd_soc_card_get_drvdata(card);
+
+	if (!gpio_is_valid(imx_tlv320->gpio_spkr_en))
+		return 0;
+
+	gpio_set_value_cansleep(imx_tlv320->gpio_spkr_en,
+				SND_SOC_DAPM_EVENT_ON(event));
+
+	return 0;
+}
+
+static struct notifier_block imx_headset_jack_nb = {
+	.notifier_call = imx_headset_jack_event,
 };
 
 static int imx_tlv320_dai_init(struct snd_soc_pcm_runtime *rtd)
@@ -71,6 +129,7 @@ static const struct snd_soc_dapm_widget imx_tlv320_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Mic Jack", NULL),
 	SND_SOC_DAPM_LINE("Line In", NULL),
 	SND_SOC_DAPM_HP("Headphone Jack", NULL),
+	SND_SOC_DAPM_SPK("Int Spk", imx_tlv320_spk),
 };
 
 static int imx_tlv320_audmux_config(struct platform_device *pdev)
@@ -124,7 +183,8 @@ static int imx_tlv320_late_probe(struct snd_soc_card *card)
 	int ret;
 
 	ret = snd_soc_jack_new(codec, "Headset Jack",
-			       SND_JACK_HEADSET |
+			       SND_JACK_HEADPHONE |
+			       SND_JACK_MICROPHONE |
 			       SND_JACK_BTN_0 | SND_JACK_BTN_1 |
 			       SND_JACK_BTN_2 | SND_JACK_BTN_3,
 			       &headset_jack);
@@ -132,6 +192,15 @@ static int imx_tlv320_late_probe(struct snd_soc_card *card)
 		dev_err(card->dev, "could not register headset jack detect\n");
 		return ret;
 	}
+	ret = snd_soc_jack_add_pins(&headset_jack,
+		ARRAY_SIZE(imx_headset_jack_pins), imx_headset_jack_pins);
+	if (ret) {
+		dev_err(card->dev, "could not register headset jack pins\n");
+		return ret;
+	}
+
+	snd_soc_jack_notifier_register(&headset_jack, &imx_headset_jack_nb);
+
 	ret = ts3a227e_enable_jack_detect(card, &headset_jack);
 	if (ret) {
 		dev_err(card->dev, "could not enable jack detect\n");
@@ -179,6 +248,15 @@ static int imx_tlv320_probe(struct platform_device *pdev)
 	if (!data) {
 		ret = -ENOMEM;
 		goto fail;
+	}
+	data->gpio_spkr_en = of_get_named_gpio(pdev->dev.of_node, "spkr-en-gpios", 0);
+	if (gpio_is_valid(data->gpio_spkr_en)) {
+		ret = devm_gpio_request_one(&pdev->dev, data->gpio_spkr_en,
+					    GPIOF_OUT_INIT_LOW, "spkr_en");
+		if (ret) {
+			dev_err(&pdev->dev, "cannot get spkr_en gpio\n");
+			goto fail;
+		}
 	}
 
 	data->codec_clk = clk_get(&codec_dev->dev, NULL);
@@ -251,6 +329,7 @@ static int imx_tlv320_remove(struct platform_device *pdev)
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct imx_tlv320_data *data = snd_soc_card_get_drvdata(card);
 
+	snd_soc_jack_notifier_unregister(&headset_jack, &imx_headset_jack_nb);
 	clk_put(data->codec_clk);
 
 	return 0;
