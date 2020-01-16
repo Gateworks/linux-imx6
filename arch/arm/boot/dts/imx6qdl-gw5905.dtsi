@@ -139,10 +139,12 @@
 		model = "imx-tlv320";
 		cpu-dai = <&ssi1>;
 		audio-codec = <&tlv320aic3105>;
+		spkr-en-gpios = <&gpio4 5 GPIO_ACTIVE_LOW>;
 		/* routing of sink, source */
 		audio-routing =
 			"LINE1L", "Mic Jack",
 			"Int Spk", "LLOUT",
+			"Int Spk", "RLOUT",
 			"Headphone Jack", "HPLOUT",
 			"Headphone Jack", "HPROUT",
 			"Mic Jack", "Mic Bias";
@@ -358,7 +360,12 @@
 				linux,phandle = <&reg_vdd_soc>;
 			};
 
-                        /* VDD_3P3 (1+R1/R2 = 1.281) */                                                  reg_3p3v: sw4 {                                                                          regulator-name = "vdd3p3";                                                       regulator-min-microvolt = <1880000>;                                             regulator-max-microvolt = <3647000>;                                             lltc,fb-voltage-divider = <200000 56200>;
+                        /* VDD_3P3 (1+R1/R2 = 1.281) */
+			reg_3p3v: sw4 {
+				regulator-name = "vdd3p3";
+				regulator-min-microvolt = <1880000>;
+				regulator-max-microvolt = <3647000>;
+				lltc,fb-voltage-divider = <200000 56200>;
 				regulator-ramp-delay = <7000>;
 				regulator-boot-on;
 				regulator-always-on;
@@ -690,6 +697,7 @@
 			fsl,pins = <
 				MX6QDL_PAD_DISP0_DAT23__GPIO5_IO17	0x1b0b1
 				MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0 /* MCK */
+				MX6QDL_PAD_GPIO_19__GPIO4_IO05		0x4001b0b0 /* SPK_SHDN# */
 			>;
 		};
 
