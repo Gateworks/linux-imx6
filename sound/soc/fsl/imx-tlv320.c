@@ -16,6 +16,7 @@
 #include <linux/of_platform.h>
 #include <linux/i2c.h>
 #include <linux/clk.h>
+#include <linux/switch.h>
 #include <linux/notifier.h>
 #include <linux/of_gpio.h>
 #include <sound/jack.h>
@@ -34,6 +35,7 @@ struct imx_tlv320_data {
 	char platform_name[DAI_NAME_SIZE];
 	struct clk *codec_clk;
 	unsigned int clk_frequency;
+	struct switch_dev sdev;
 	int gpio_spkr_en;
 };
 
@@ -302,6 +304,15 @@ static int imx_tlv320_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, &data->card);
 	snd_soc_card_set_drvdata(&data->card, data);
 
+	data->sdev.name = "h2w";
+#ifdef CONFIG_SWITCH
+	ret = switch_dev_register(&data->sdev);
+	if (ret < 0) {
+		dev_err(&pdev->dev, "switch_dev_register failed (%d)\n", ret);
+		goto fail;
+	}
+#endif
+
 	ret = devm_snd_soc_register_card(&pdev->dev, &data->card);
 	if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n", ret);
@@ -329,6 +340,9 @@ static int imx_tlv320_remove(struct platform_device *pdev)
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct imx_tlv320_data *data = snd_soc_card_get_drvdata(card);
 
+#ifdef CONFIG_SWITCH
+	switch_dev_unregister(&data->sdev);
+#endif
 	snd_soc_jack_notifier_unregister(&headset_jack, &imx_headset_jack_nb);
 	clk_put(data->codec_clk);
 
