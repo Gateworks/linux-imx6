@@ -1616,7 +1616,7 @@ static void set_default_params(struct coda_ctx *ctx)
 
 	/* Default formats for output and input queues */
 	ctx->q_data[V4L2_M2M_SRC].fourcc = ctx->cvd->src_formats[0];
-	ctx->q_data[V4L2_M2M_DST].fourcc = ctx->cvd->dst_formats[0];
+	ctx->q_data[V4L2_M2M_DST].fourcc = ctx->codec->dst_fourcc;
 	ctx->q_data[V4L2_M2M_SRC].width = max_w;
 	ctx->q_data[V4L2_M2M_SRC].height = max_h;
 	ctx->q_data[V4L2_M2M_DST].width = max_w;
