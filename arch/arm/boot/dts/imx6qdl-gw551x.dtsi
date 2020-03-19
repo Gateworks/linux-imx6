@@ -110,7 +110,7 @@
 			format = "i2s";
 
 			cpu {
-				sound-dai = <&ssi2>;
+				sound-dai = <&ssi1>;
 			};
 
 			codec {
