@@ -125,7 +125,7 @@ fi
 # setup root and load options based on dev type
 if itest.s "x${dtype}" == "xnand" ; then
   echo "Booting from NAND/ubifs..."
-  setenv root "root=ubi0:rootfs ubi.mtd=2 ubi.fm_autoconvert=1 rootfstype=ubifs rw rootwait"
+  setenv root "root=ubi0:rootfs ubi.mtd=2 rootfstype=ubifs rw rootwait"
   setenv fsload "ubifsload"
 elif itest.s "x${dtype}" == "xmmc" ; then
   echo "Booting from MMC..."
