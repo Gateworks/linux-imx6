@@ -152,6 +152,7 @@ fi
 setenv bootargs "console=${console},${baudrate} ${root} ${video} ${extra}"
 
 # additional bootargs
+setenv bootargs "${bootargs} net.ifnames=0"
 setenv bootargs "${bootargs} pci=nomsi" # MSI+legacy IRQs do not work on IMX6
 setenv bootargs "${bootargs} usbcore.autosuspend=-1" # IMX6DQ ERR004535
 
