@@ -446,12 +446,17 @@
 		VDDIO-supply = <&reg_3p3v>;
 	};
 
-	touchscreen: egalax_ts@4 {
-		compatible = "eeti,egalax_ts";
-		reg = <0x04>;
+	touchscreen: touchscreen@38 {
+		compatible = "edt,edt-ft5406", "edt,edt-ft5x06";
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_touch>;
+		reg = <0x38>;
 		interrupt-parent = <&gpio1>;
-		interrupts = <11 2>;
-		wakeup-gpios = <&gpio1 11 GPIO_ACTIVE_LOW>;
+		interrupts = <11 IRQ_TYPE_EDGE_FALLING>;
+		touchscreen-inverted-x;
+		touchscreen-inverted-y;
+		touchscreen-size-x = <1024>;
+		touchscreen-size-y = <600>;
 	};
 
 	accel@1e {
@@ -728,6 +733,12 @@
 	pinctrl_pwm4: pwm4grp {
 		fsl,pins = <
 			MX6QDL_PAD_SD1_CMD__PWM4_OUT		0x1b0b1
+		>;
+	};
+
+	pinctrl_touch: touchgrp {
+		fsl,pins = <
+			MX6QDL_PAD_SD2_CMD__GPIO1_IO11		0x1b0b0
 		>;
 	};
 
