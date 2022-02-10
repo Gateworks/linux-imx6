@@ -1703,8 +1703,7 @@ imx_uart_set_termios(struct uart_port *port, struct ktermios *termios,
 		if (ucr2 & UCR2_CTS)
 			ucr2 |= UCR2_CTSC;
 	}
-
-	if (termios->c_cflag & CRTSCTS)
+	if (!sport->have_rtsgpio && termios->c_cflag & CRTSCTS)
 		ucr2 &= ~UCR2_IRTS;
 	if (termios->c_cflag & CSTOPB)
 		ucr2 |= UCR2_STPB;
